@@ -41,11 +41,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Model</label>
-                    <input type="text" class="form-control" value="{{ $olt->model }}" readonly>
-                </div>
-
-                <div class="form-group">
                     <label>VLAN</label>
                     <input type="text" class="form-control" value="{{ $olt->vlan }}" readonly>
                 </div>

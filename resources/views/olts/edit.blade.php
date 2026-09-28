@@ -92,21 +92,6 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Model</label>
-                        <div class="input-group">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text"><i class="fas fa-microchip"></i></span>
-                            </div>
-                            <input type="text"
-                                   name="model"
-                                   value="{{ $olt->model }}"
-                                   class="form-control">
-                        </div>
-                    </div>
-
-                </div>
-
                 <div class="col-md-6">
 
                     <h6 class="text-muted text-uppercase small font-weight-bold mb-3">Connection &amp; Credentials</h6>

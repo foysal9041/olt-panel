@@ -214,7 +214,7 @@
                             <code>{{ $olt->ip }}</code>
                             @if ($olt->zone) · {{ $olt->zone }} @endif
                         </div>
-                        <div class="olt-meta">{{ trim($olt->brand . ' ' . $olt->model) }}@if ($olt->vlan) · VLAN {{ $olt->vlan }} @endif</div>
+                        <div class="olt-meta">{{ $olt->brand }}@if ($olt->vlan) · VLAN {{ $olt->vlan }} @endif</div>
                         @if ($canManageOlt)
                             <div class="olt-actions">
                                 <a href="{{ route('olt.show', $olt) }}" class="btn btn-light"><i class="fas fa-eye"></i> Details</a>

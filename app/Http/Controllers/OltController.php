@@ -184,7 +184,6 @@ class OltController extends Controller
         [
            'zone'      => 'required|exists:zones,name',
            'brand'     => 'required',
-           'model'     => 'required',
            'vlan' => 'nullable|max:4094',
            'name'      => 'required',
            'ip'        => 'required|ip|unique:olts,ip',
@@ -236,7 +235,6 @@ class OltController extends Controller
         [
             'zone'      => 'required|exists:zones,name',
             'brand'     => 'required',
-            'model'     => 'required',
             'vlan'      => 'nullable|max:4094',
             'name'      => 'required',
             'ip'        => 'required|ip|unique:olts,ip,' . $olt->id,

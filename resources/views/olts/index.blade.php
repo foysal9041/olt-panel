@@ -138,7 +138,6 @@
             <th>Zone</th>
             <th>Name</th>
             <th>Brand</th>
-            <th>Model</th>
             <th>VLAN</th>
             <th>IP Address</th>
             <th>Status</th>
@@ -161,8 +160,6 @@
                 <td>{{ $olt->name }}</td>
 
                 <td>{{ $olt->brand }}</td>
-
-                <td>{{ $olt->model }}</td>
 
                 <td class="text-center font-weight-bold">
                     {{ $olt->vlan }}
@@ -247,7 +244,7 @@
 
             <tr>
 
-                <td colspan="9"
+                <td colspan="8"
                     class="text-center">
 
                     No OLT Found
