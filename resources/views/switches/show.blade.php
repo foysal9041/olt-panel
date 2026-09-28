@@ -46,27 +46,27 @@
 @php
     $up = $ports->where('oper_status', \App\Models\SwitchPort::UP)->count();
     $sfp = $ports->filter->has_transceiver->count();
-    $redAt = $rxThreshold ?? -25;
-    // Colour by the module's own limits when the switch reports them,
-    // otherwise by the global threshold.
-    $rxClass = function ($port) use ($redAt) {
+    // Warning level per port: 10G/1G rule from Settings, else the module's
+    // own low warning, else the fallback (SwitchPort::rxWarning()).
+    // Red once it's past the module's low alarm, or 3 dB past the warning.
+    $rxClass = function ($port) use ($settings) {
         $rx = $port->rx_power;
         if ($rx === null) return '';
 
-        if ($port->rx_low_warn !== null || $port->rx_high_warn !== null) {
-            if (($port->rx_low_alarm !== null && $rx < $port->rx_low_alarm) || ($port->rx_high_alarm !== null && $rx > $port->rx_high_alarm)) return 'rx-bad';
-            if (($port->rx_low_warn !== null && $rx < $port->rx_low_warn) || ($port->rx_high_warn !== null && $rx > $port->rx_high_warn)) return 'rx-warn';
-            return 'rx-good';
-        }
+        $warn = $port->rxWarning($settings)['value'];
+        $alarm = $port->rx_low_alarm ?? ($warn !== null ? $warn - 3 : null);
 
-        if ($rx < $redAt) return 'rx-bad';
-        if ($rx < $redAt + 3) return 'rx-warn';
-        return 'rx-good';
+        if (($alarm !== null && $rx < $alarm) || ($port->rx_high_alarm !== null && $rx > $port->rx_high_alarm)) return 'rx-bad';
+        if (($warn !== null && $rx < $warn) || ($port->rx_high_warn !== null && $rx > $port->rx_high_warn)) return 'rx-warn';
+        return $warn !== null || $port->rx_high_warn !== null ? 'rx-good' : '';
     };
-    $rxTitle = function ($port) {
-        if ($port->rx_low_warn === null && $port->rx_high_warn === null) return 'No limits reported by the module';
-        return 'Module limits (dBm) — low alarm: ' . ($port->rx_low_alarm ?? '—') . ', low warn: ' . ($port->rx_low_warn ?? '—')
-            . ', high warn: ' . ($port->rx_high_warn ?? '—') . ', high alarm: ' . ($port->rx_high_alarm ?? '—');
+    $rxTitle = function ($port) use ($settings) {
+        $w = $port->rxWarning($settings);
+        $t = $w['value'] !== null ? "Warning below {$w['value']} dBm ({$w['label']})" : 'No Rx warning level for this port';
+        if ($port->rx_low_alarm !== null || $port->rx_high_warn !== null) {
+            $t .= ' · module limits: low alarm ' . ($port->rx_low_alarm ?? '—') . ', high warn ' . ($port->rx_high_warn ?? '—') . ', high alarm ' . ($port->rx_high_alarm ?? '—');
+        }
+        return $t;
     };
 @endphp
 
@@ -185,8 +185,9 @@
                                         </span>
                                     @endif
                                 @endif
-                                @if ($port->rx_low_warn !== null)
-                                    <div class="small text-muted font-weight-normal">min {{ $port->rx_low_warn }}</div>
+                                @php $w = $port->rxWarning($settings); @endphp
+                                @if ($w['value'] !== null)
+                                    <div class="small text-muted font-weight-normal">warn &lt; {{ $w['value'] }}</div>
                                 @endif
                             @else
                                 —
@@ -227,17 +228,11 @@
     </div>
 
     <div class="card-footer small text-muted">
-        Rx colours use each module's own limits reported by the switch ("min" = low warning; hover for all limits):
-        <span class="rx-good">normal</span> ·
-        <span class="rx-warn">past warning</span> ·
-        <span class="rx-bad">past alarm</span>.
-        Modules without limits use
-        @if ($rxThreshold === null)
-            <span class="rx-warn">{{ $redAt }} to {{ $redAt + 3 }}</span> / <span class="rx-bad">&lt; {{ $redAt }} dBm</span>
-            (set a fallback Low Rx threshold in Settings → Telegram to get alerts for them).
-        @else
-            the Settings → Telegram threshold: <span class="rx-bad">&lt; {{ $redAt }} dBm</span>.
-        @endif
+        Rx warning: <strong>10G links below {{ $settings->rx_warn_10g ?? '—' }} dBm</strong>,
+        <strong>1G links below {{ $settings->rx_warn_1g ?? '—' }} dBm</strong>; other speeds use the module's own limit
+        @if ($settings->rx_low_threshold !== null) or {{ $settings->rx_low_threshold }} dBm @endif.
+        Colours: <span class="rx-good">normal</span> · <span class="rx-warn">warning</span> · <span class="rx-bad">3 dB past warning / module alarm</span>.
+        @can('access-settings-telegram') <a href="{{ route('settings.telegram') }}">Change</a> @endcan
     </div>
 
 </div>

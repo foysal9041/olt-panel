@@ -244,7 +244,6 @@ class SwitchPoller
             return 0;
         }
 
-        $threshold = $settings->rx_low_threshold;
         $history = [];
 
         foreach ($ports as $ifIndex => $port) {
@@ -263,7 +262,7 @@ class SwitchPoller
                 'dom_updated_at' => $dom ? $now : $port->dom_updated_at,
             ]);
 
-            $this->checkRxAlarm($switch, $port, $port->rxAlertThreshold($threshold), $now, $settings);
+            $this->checkRxAlarm($switch, $port, $port->rxWarning($settings), $now);
 
             $port->save();
 
@@ -286,8 +285,13 @@ class SwitchPoller
         return count($readings);
     }
 
-    protected function checkRxAlarm(NetworkSwitch $switch, SwitchPort $port, ?float $threshold, Carbon $now, NocAlertSetting $settings): void
+    /**
+     * @param  array{value: ?float, source: string, label: string}  $warning  from SwitchPort::rxWarning()
+     */
+    protected function checkRxAlarm(NetworkSwitch $switch, SwitchPort $port, array $warning, Carbon $now): void
     {
+        $threshold = $warning['value'];
+
         if ($threshold === null || $port->rx_power === null || $port->oper_status !== SwitchPort::UP) {
             // Nothing to judge (no threshold, no module, or link down —
             // the port_down alert already covers that case).
@@ -299,10 +303,8 @@ class SwitchPoller
         if (! $port->rx_alarm && $port->rx_power < $threshold) {
             $port->rx_alarm = true;
 
-            $source = $port->rx_low_warn !== null ? 'module low warning' : 'threshold';
-
             $this->event($switch, $port, 'rx_low',
-                "Low Rx power on {$this->portLabel($port)} ({$switch->name}): {$port->rx_power} dBm ({$source} {$threshold} dBm)",
+                "Low Rx power on {$this->portLabel($port)} ({$switch->name}): {$port->rx_power} dBm (warning below {$threshold} dBm, {$warning['label']})",
                 $now, $port->notify);
         } elseif ($port->rx_alarm && $port->rx_power >= $threshold + self::RX_HYSTERESIS) {
             $port->rx_alarm = false;
@@ -366,8 +368,10 @@ class SwitchPoller
                 if ($port->rx_power !== null && in_array($event->type, ['rx_low', 'rx_normal', 'port_up'])) {
                     $block .= "\n📶 Rx: <b>{$port->rx_power} dBm</b>" . ($port->tx_power !== null ? " · Tx: {$port->tx_power} dBm" : '');
 
-                    if ($port->rx_low_warn !== null) {
-                        $block .= "\n📏 Module limit: warn {$port->rx_low_warn} / alarm {$port->rx_low_alarm} dBm";
+                    $warning = $port->rxWarning($settings);
+
+                    if ($warning['value'] !== null) {
+                        $block .= "\n📏 Warning below {$warning['value']} dBm ({$warning['label']}" . ($port->speed_label ? ", {$port->speed_label} link" : '') . ')';
                     }
                 }
             }

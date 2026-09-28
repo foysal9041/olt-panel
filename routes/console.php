@@ -16,6 +16,11 @@ Schedule::command('app:probe-latency')
 Schedule::command('app:prune-latency')
     ->dailyAt('03:15');
 
+Schedule::command('app:check-nttn-links')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('app:poll-switches')
     ->everyMinute()
     ->withoutOverlapping()

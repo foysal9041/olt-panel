@@ -22,9 +22,11 @@ class NttnLinkController extends Controller
 
     public function create()
     {
+        $nttnLink = new NttnLink(['status' => 'active', 'monitor' => true]);
         $zones = Zone::orderBy('name')->pluck('name');
+        $providers = $this->providerSuggestions();
 
-        return view('nttn_links.create', compact('zones'));
+        return view('nttn_links.create', compact('nttnLink', 'zones', 'providers'));
     }
 
     public function store(Request $request)
@@ -37,6 +39,7 @@ class NttnLinkController extends Controller
             'public_ip_subnet'   => 'nullable|string|max:100',
             'private_ip_subnet'  => 'nullable|string|max:100',
             'peering_ip'         => 'nullable|string|max:100|unique:nttn_links,peering_ip',
+            'ping_ip'            => 'nullable|ip',
             'peering_vlan'       => 'nullable|string|max:20',
             'asn'                => 'nullable|string|max:20',
             'location'           => 'required|string|max:255',
@@ -59,6 +62,9 @@ class NttnLinkController extends Controller
             $validated['private_ip_subnet'] ?? '',
             fieldName: 'private_ip_subnet'
         );
+
+        // Every link is pinged by the monitor; there's no opt-out.
+        $validated['monitor'] = true;
 
         NttnLink::create($validated);
 
@@ -75,8 +81,9 @@ class NttnLinkController extends Controller
     public function edit(NttnLink $nttnLink)
     {
         $zones = Zone::orderBy('name')->pluck('name');
+        $providers = $this->providerSuggestions();
 
-        return view('nttn_links.edit', compact('nttnLink', 'zones'));
+        return view('nttn_links.edit', compact('nttnLink', 'zones', 'providers'));
     }
 
     public function update(Request $request, NttnLink $nttnLink)
@@ -89,6 +96,7 @@ class NttnLinkController extends Controller
             'public_ip_subnet'   => 'nullable|string|max:100',
             'private_ip_subnet'  => 'nullable|string|max:100',
             'peering_ip'         => 'nullable|string|max:100|unique:nttn_links,peering_ip,' . $nttnLink->id,
+            'ping_ip'            => 'nullable|ip',
             'peering_vlan'       => 'nullable|string|max:20',
             'asn'                => 'nullable|string|max:20',
             'location'           => 'required|string|max:255',
@@ -115,6 +123,13 @@ class NttnLinkController extends Controller
             fieldName: 'private_ip_subnet'
         );
 
+        $validated['monitor'] = true;
+
+        // Changing where we ping starts the up/down state over.
+        if (($validated['ping_ip'] ?? null) !== $nttnLink->ping_ip || ($validated['peering_ip'] ?? null) !== $nttnLink->peering_ip) {
+            $nttnLink->forceFill(['link_state' => null, 'state_streak' => 0, 'state_changed_at' => null]);
+        }
+
         $nttnLink->update($validated);
 
         return redirect()
@@ -129,5 +144,17 @@ class NttnLinkController extends Controller
         return redirect()
             ->route('nttn-links.index')
             ->with('success', 'NTTN Link Deleted Successfully');
+    }
+
+    /**
+     * Providers already used, plus the common Bangladeshi NTTN operators.
+     */
+    protected function providerSuggestions()
+    {
+        return NttnLink::whereNotNull('provider')->distinct()->pluck('provider')
+            ->merge(['Fiber@Home', 'Summit Communications', 'BTCL', 'Bahon', 'PGCB'])
+            ->unique()
+            ->sort()
+            ->values();
     }
 }

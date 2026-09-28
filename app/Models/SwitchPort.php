@@ -62,12 +62,30 @@ class SwitchPort extends Model
     }
 
     /**
-     * Rx low limit that triggers an alert: the module's own low-warning
-     * threshold when the switch reports one, else the global setting.
+     * The Rx level below which this port is in warning (and alerts), and
+     * where it came from. Priority: the per-speed rule from Settings
+     * (10G+ / 1G), then the module's own low-warning limit, then the
+     * global fallback.
+     *
+     * @return array{value: ?float, source: string, label: string}
      */
-    public function rxAlertThreshold(?float $fallback): ?float
+    public function rxWarning(NocAlertSetting $settings): array
     {
-        return $this->rx_low_warn ?? $fallback;
+        $speed = (int) $this->speed_mbps;
+
+        if ($speed >= 10000 && $settings->rx_warn_10g !== null) {
+            return ['value' => $settings->rx_warn_10g, 'source' => '10g', 'label' => '10G rule'];
+        }
+
+        if ($speed >= 1000 && $speed < 10000 && $settings->rx_warn_1g !== null) {
+            return ['value' => $settings->rx_warn_1g, 'source' => '1g', 'label' => '1G rule'];
+        }
+
+        if ($this->rx_low_warn !== null) {
+            return ['value' => $this->rx_low_warn, 'source' => 'module', 'label' => 'module low warning'];
+        }
+
+        return ['value' => $settings->rx_low_threshold, 'source' => 'fallback', 'label' => 'fallback threshold'];
     }
 
     public function getSpeedLabelAttribute(): ?string

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LatencyTarget;
 use App\Models\NetworkSwitch;
+use App\Models\NttnLink;
 use App\Models\Olt;
 use App\Models\SwitchPort;
 use App\Models\User;
@@ -80,6 +81,14 @@ class NocOverview
                 $issues[] = ['warning', 'fas fa-lightbulb', "Low Rx on {$p->label} ({$p->networkSwitch?->name})",
                     "{$p->rx_power} dBm" . ($p->alias ? " · {$p->alias}" : ''),
                     route('switches.ports.show', [$p->network_switch_id, $p->id])];
+            }
+        }
+
+        if (Gate::forUser($this->user)->allows('access-olt-nttn')) {
+            foreach (NttnLink::where('monitor', true)->where('status', 'active')->where('link_state', 0)->get() as $l) {
+                $issues[] = ['danger', 'fas fa-project-diagram', "NTTN link {$l->link_id} is down",
+                    trim("{$l->location} · no reply from {$l->pingTarget()} · since " . $l->state_changed_at?->diffForHumans(), ' ·'),
+                    route('nttn-links.show', $l)];
             }
         }
 

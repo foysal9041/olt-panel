@@ -60,10 +60,10 @@ class SwitchController extends Controller
     {
         $ports = $switch->ports()->get();
         $events = $switch->events()->with('port')->latest('occurred_at')->limit(25)->get();
-        $rxThreshold = NocAlertSetting::current()->rx_low_threshold;
+        $settings = NocAlertSetting::current();
         $rxTrend = $this->rxTrend($ports->filter(fn ($p) => $p->rx_power !== null));
 
-        return view('switches.show', compact('switch', 'ports', 'events', 'rxThreshold', 'rxTrend'));
+        return view('switches.show', compact('switch', 'ports', 'events', 'settings', 'rxTrend'));
     }
 
     public function portHistory(NetworkSwitch $switch, SwitchPort $port)
@@ -71,11 +71,11 @@ class SwitchController extends Controller
         abort_unless($port->network_switch_id === $switch->id, 404);
 
         $events = $switch->events()->where('switch_port_id', $port->id)->latest('occurred_at')->limit(30)->get();
-        $rxThreshold = NocAlertSetting::current()->rx_low_threshold;
+        $warning = $port->rxWarning(NocAlertSetting::current());
         $firstReading = $port->readings()->min('recorded_at');
         $ranges = self::HISTORY_RANGES;
 
-        return view('switches.port', compact('switch', 'port', 'events', 'rxThreshold', 'firstReading', 'ranges'));
+        return view('switches.port', compact('switch', 'port', 'events', 'warning', 'firstReading', 'ranges'));
     }
 
     /**
@@ -149,13 +149,17 @@ class SwitchController extends Controller
                 'avg' => $agg?->avg === null ? null : round((float) $agg->avg, 2),
                 'biggest_drop' => $biggestDrop,
             ],
-            'thresholds' => [
-                'low_warn' => $port->rx_low_warn,
-                'low_alarm' => $port->rx_low_alarm,
-                'high_warn' => $port->rx_high_warn,
-                'high_alarm' => $port->rx_high_alarm,
-                'fallback' => $port->rx_low_warn === null ? NocAlertSetting::current()->rx_low_threshold : null,
-            ],
+            'thresholds' => (function () use ($port) {
+                $warning = $port->rxWarning(NocAlertSetting::current());
+
+                return [
+                    'warn' => $warning['value'],
+                    'warn_label' => $warning['label'],
+                    'low_alarm' => $port->rx_low_alarm,
+                    'high_warn' => $port->rx_high_warn,
+                    'high_alarm' => $port->rx_high_alarm,
+                ];
+            })(),
         ]);
     }
 

@@ -79,11 +79,18 @@
                         <label class="custom-control-label" for="alert_port_status">A switch port goes UP or DOWN</label>
                     </div>
 
-                    <div class="custom-control custom-checkbox mb-3">
+                    <div class="custom-control custom-checkbox">
                         <input type="hidden" name="alert_switch_status" value="0">
                         <input type="checkbox" class="custom-control-input" id="alert_switch_status" name="alert_switch_status" value="1"
                                @checked(old('alert_switch_status', $settings->alert_switch_status))>
                         <label class="custom-control-label" for="alert_switch_status">A switch stops / starts answering SNMP</label>
+                    </div>
+
+                    <div class="custom-control custom-checkbox mb-3">
+                        <input type="hidden" name="alert_nttn_status" value="0">
+                        <input type="checkbox" class="custom-control-input" id="alert_nttn_status" name="alert_nttn_status" value="1"
+                               @checked(old('alert_nttn_status', $settings->alert_nttn_status))>
+                        <label class="custom-control-label" for="alert_nttn_status">An NTTN link goes DOWN or comes back UP (ping)</label>
                     </div>
 
                     <p class="small text-muted mb-3">
@@ -97,15 +104,39 @@
                         Individual switches and ports can be muted from their own pages.
                     </p>
 
-                    <div class="form-group mb-0">
-                        <label>Fallback low Rx threshold (dBm) <small class="text-muted">(optional)</small></label>
-                        <input type="number" step="0.1" name="rx_low_threshold" class="form-control" style="max-width: 12rem"
-                               value="{{ old('rx_low_threshold', $settings->rx_low_threshold) }}" placeholder="e.g. -25">
-                        <small class="form-text text-muted">
-                            Rx alerts use each module's own <strong>low warning</strong> limit read from the switch (Cisco).
-                            This value is only used for modules that don't report one (MikroTik, Huawei, …). Leave blank to turn those off.
-                        </small>
+                    <label class="d-block mb-1">SFP Rx warning level</label>
+                    <p class="small text-muted mb-2">Alert and turn the port yellow when Rx power drops below this. Checked by link speed first.</p>
+
+                    <div class="row">
+                        <div class="col-sm-4 form-group">
+                            <label class="small mb-1" for="rx_warn_10g">10G links (and faster)</label>
+                            <div class="input-group">
+                                <input type="number" step="0.1" id="rx_warn_10g" name="rx_warn_10g" class="form-control @error('rx_warn_10g') is-invalid @enderror"
+                                       value="{{ old('rx_warn_10g', $settings->rx_warn_10g) }}" placeholder="-15">
+                                <div class="input-group-append"><span class="input-group-text">dBm</span></div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label class="small mb-1" for="rx_warn_1g">1G links</label>
+                            <div class="input-group">
+                                <input type="number" step="0.1" id="rx_warn_1g" name="rx_warn_1g" class="form-control @error('rx_warn_1g') is-invalid @enderror"
+                                       value="{{ old('rx_warn_1g', $settings->rx_warn_1g) }}" placeholder="-18">
+                                <div class="input-group-append"><span class="input-group-text">dBm</span></div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4 form-group">
+                            <label class="small mb-1" for="rx_low_threshold">Other speeds (fallback)</label>
+                            <div class="input-group">
+                                <input type="number" step="0.1" id="rx_low_threshold" name="rx_low_threshold" class="form-control @error('rx_low_threshold') is-invalid @enderror"
+                                       value="{{ old('rx_low_threshold', $settings->rx_low_threshold) }}" placeholder="optional">
+                                <div class="input-group-append"><span class="input-group-text">dBm</span></div>
+                            </div>
+                        </div>
                     </div>
+                    <small class="form-text text-muted mt-0">
+                        Leave a speed blank to use the module's own low-warning limit (Cisco) for those ports.
+                        The fallback applies only when neither a speed rule nor a module limit exists.
+                    </small>
 
                 </div>
 

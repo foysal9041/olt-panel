@@ -86,15 +86,14 @@
                     <tr>
                         <th class="pl-3">Rx limits</th>
                         <td>
-                            @if ($port->rx_low_warn !== null || $port->rx_high_warn !== null)
-                                low warn {{ $port->rx_low_warn ?? '—' }} / alarm {{ $port->rx_low_alarm ?? '—' }},
-                                high warn {{ $port->rx_high_warn ?? '—' }} / alarm {{ $port->rx_high_alarm ?? '—' }} dBm
-                                <div class="small text-muted">reported by the module</div>
-                            @elseif ($rxThreshold !== null)
-                                alert below {{ $rxThreshold }} dBm
-                                <div class="small text-muted">fallback from Settings → Telegram</div>
+                            @if ($warning['value'] !== null)
+                                warning below <strong>{{ $warning['value'] }} dBm</strong>
+                                <div class="small text-muted">{{ $warning['label'] }}{{ $port->speed_label ? ' · ' . $port->speed_label . ' link' : '' }}</div>
                             @else
                                 <span class="text-muted">none</span>
+                            @endif
+                            @if ($port->rx_low_alarm !== null || $port->rx_high_warn !== null)
+                                <div class="small text-muted">module: low alarm {{ $port->rx_low_alarm ?? '—' }}, high warn {{ $port->rx_high_warn ?? '—' }} / alarm {{ $port->rx_high_alarm ?? '—' }} dBm</div>
                             @endif
                         </td>
                     </tr>
@@ -181,9 +180,9 @@
             { label: 'Tx', data: pts.map(function (p) { return p[4]; }), borderColor: '#94a3b8', borderDash: [4, 3], borderWidth: 1.5, pointRadius: 0, fill: false, lineTension: 0.15 },
         ];
 
-        var low = thr.low_warn !== null ? thr.low_warn : thr.fallback;
+        var low = thr.warn;
         if (low !== null && low !== undefined) {
-            datasets.push({ label: (thr.low_warn !== null ? 'Low warning ' : 'Alert below ') + low, data: line(low), borderColor: '#f59e0b', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false });
+            datasets.push({ label: 'Warning ' + low + ' (' + thr.warn_label + ')', data: line(low), borderColor: '#f59e0b', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false });
         }
         if (thr.low_alarm !== null && thr.low_alarm !== undefined && thr.low_alarm !== low) {
             datasets.push({ label: 'Low alarm ' + thr.low_alarm, data: line(thr.low_alarm), borderColor: '#dc2626', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false });

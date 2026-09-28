@@ -12,7 +12,10 @@ class NocAlertSetting extends Model
         'telegram_chat_ids',
         'alert_port_status',
         'alert_switch_status',
+        'alert_nttn_status',
         'rx_low_threshold',
+        'rx_warn_10g',
+        'rx_warn_1g',
     ];
 
     protected $hidden = ['telegram_bot_token'];
@@ -24,7 +27,10 @@ class NocAlertSetting extends Model
             'telegram_bot_token' => 'encrypted',
             'alert_port_status' => 'boolean',
             'alert_switch_status' => 'boolean',
+            'alert_nttn_status' => 'boolean',
             'rx_low_threshold' => 'float',
+            'rx_warn_10g' => 'float',
+            'rx_warn_1g' => 'float',
         ];
     }
 
@@ -34,6 +40,9 @@ class NocAlertSetting extends Model
             'telegram_enabled' => false,
             'alert_port_status' => true,
             'alert_switch_status' => true,
+            'alert_nttn_status' => true,
+            'rx_warn_10g' => -15,
+            'rx_warn_1g' => -18,
         ]);
     }
 

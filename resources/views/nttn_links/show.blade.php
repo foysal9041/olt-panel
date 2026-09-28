@@ -8,6 +8,22 @@
 
 @section('content')
 
+<div class="card card-outline card-primary">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-heartbeat mr-1"></i> Link Status</h3>
+    </div>
+    <div class="card-body d-flex align-items-center flex-wrap" style="gap: .5rem 2rem">
+        <div>@include('nttn_links._ping', ['link' => $nttnLink])</div>
+        @if ($nttnLink->pingTarget())
+            <div class="text-muted small">
+                Pinged every minute at <code>{{ $nttnLink->pingTarget() }}</code>
+                ({{ $nttnLink->ping_ip ? 'Ping IP' : 'Peering IP' }})
+                @if ($nttnLink->last_ping_at) · last check {{ $nttnLink->last_ping_at->diffForHumans() }} @endif
+            </div>
+        @endif
+    </div>
+</div>
+
 <div class="card card-outline card-info">
 
     <div class="card-header">
@@ -86,6 +102,11 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Ping IP</label>
+                    <input type="text" class="form-control" value="{{ $nttnLink->ping_ip ?? 'Same as Peering IP' }}" readonly>
+                </div>
+
+                <div class="form-group">
                     <label>Peering VLAN</label>
                     <input type="text" class="form-control" value="{{ $nttnLink->peering_vlan ?? '—' }}" readonly>
                 </div>
@@ -122,4 +143,8 @@
 
 </div>
 
+@stop
+
+@section('js')
+<script>setTimeout(function () { location.reload(); }, 60000);</script>
 @stop

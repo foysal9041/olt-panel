@@ -21,6 +21,8 @@ class NocAlertSettingController extends Controller
             'telegram_bot_token' => ['nullable', 'string', 'max:255', 'regex:/^\d+:[\w-]+$/'],
             'telegram_chat_ids' => ['nullable', 'string', 'max:255', 'regex:/^[\s,@\w-]*$/'],
             'rx_low_threshold' => 'nullable|numeric|min:-40|max:5',
+            'rx_warn_10g' => 'nullable|numeric|min:-40|max:5',
+            'rx_warn_1g' => 'nullable|numeric|min:-40|max:5',
         ], [
             'telegram_bot_token.regex' => 'That does not look like a bot token (it should look like 123456789:ABCdef...).',
             'telegram_chat_ids.regex' => 'Chat IDs should be numbers like -1001234567890 or @channelname, separated by commas.',
@@ -34,6 +36,7 @@ class NocAlertSettingController extends Controller
         $validated['telegram_enabled'] = $request->boolean('telegram_enabled');
         $validated['alert_port_status'] = $request->boolean('alert_port_status');
         $validated['alert_switch_status'] = $request->boolean('alert_switch_status');
+        $validated['alert_nttn_status'] = $request->boolean('alert_nttn_status');
 
         $settings->update($validated);
 
