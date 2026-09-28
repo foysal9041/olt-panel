@@ -3,7 +3,7 @@
 @section('title', 'Add Customer')
 
 @section('content_header')
-<h1>Add Customer</h1>
+<x-accounts.header title="Add Customer" subtitle="New Mac or bandwidth client" :back="route('accounts.customers.index')" />
 @stop
 
 @section('content')

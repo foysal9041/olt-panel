@@ -127,13 +127,15 @@ class DashboardController extends Controller
         $accounts = null;
         if ($can['accounts']) {
             $month = Carbon::today();
-            $invoices = Invoice::whereYear('billing_month', $month->year)
+            $invoices = Invoice::with('payments')
+                ->whereYear('billing_month', $month->year)
                 ->whereMonth('billing_month', $month->month)
-                ->get(['amount', 'status']);
+                ->get(['id', 'amount', 'status']);
 
+            // Partial payments count as collected, same as the Invoices page.
             $accounts = [
                 'invoiced' => (float) $invoices->sum('amount'),
-                'collected' => (float) $invoices->where('status', 'paid')->sum('amount'),
+                'collected' => (float) $invoices->sum(fn (Invoice $invoice) => $invoice->amountPaid()),
                 'count' => $invoices->count(),
                 'unpaid' => $invoices->where('status', '!=', 'paid')->count(),
             ];

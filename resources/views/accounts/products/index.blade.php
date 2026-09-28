@@ -3,7 +3,7 @@
 @section('title', 'Products')
 
 @section('content_header')
-<h1>Products &amp; Bandwidth Packages</h1>
+<x-accounts.header title="Products & Packages" icon="fas fa-box" subtitle="Packages and list prices used when billing" />
 @stop
 
 @section('content')

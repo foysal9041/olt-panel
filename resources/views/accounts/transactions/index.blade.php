@@ -3,7 +3,7 @@
 @section('title', 'Transactions')
 
 @section('content_header')
-<h1>Income &amp; Expenses</h1>
+<x-accounts.header title="Income & Expenses" icon="fas fa-exchange-alt" subtitle="Every taka in and out, by category" />
 @stop
 
 @section('content')

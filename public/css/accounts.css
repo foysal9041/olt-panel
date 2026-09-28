@@ -1,0 +1,372 @@
+/* ==========================================================================
+   Accounts module — shared look for every page that renders
+   <x-accounts.header>. Generic AdminLTE pieces (info boxes, tables, badges)
+   are only restyled inside those pages via :has(.acct-header), so the rest
+   of the panel is untouched.
+   ========================================================================== */
+
+/* ---- Header + tabs ----------------------------------------------------- */
+
+.acct-header {
+    margin-bottom: .25rem;
+}
+
+.acct-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.acct-header-title {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    min-width: 0;
+}
+
+.acct-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: #0f172a;
+}
+
+.acct-header p {
+    margin: .15rem 0 0;
+    font-size: .88rem;
+    color: #64748b;
+}
+
+.acct-header-icon,
+.acct-back {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: .75rem;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-size: 1.05rem;
+}
+
+.acct-back {
+    background: #fff;
+    color: #475569;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .1);
+}
+
+.acct-back:hover { color: #4f46e5; }
+
+.acct-header-actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.acct-tabs {
+    display: flex;
+    gap: .25rem;
+    margin-top: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.acct-tabs::-webkit-scrollbar { display: none; }
+
+.acct-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .6rem .9rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-size: .88rem;
+    font-weight: 500;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.acct-tabs a:hover {
+    color: #0f172a;
+    text-decoration: none;
+}
+
+.acct-tabs a.active {
+    border-bottom-color: #4f46e5;
+    color: #4f46e5;
+    font-weight: 600;
+}
+
+.acct-tabs a i { font-size: .85rem; opacity: .85; }
+
+@media (max-width: 575.98px) {
+    .acct-header h1 { font-size: 1.25rem; }
+    .acct-tabs a span { display: none; }
+    .acct-tabs a { padding: .6rem .85rem; }
+    .acct-tabs a.active span { display: inline; }
+}
+
+/* ---- Stat cards (dashboard + list pages) ------------------------------- */
+
+.acct-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.acct-stat {
+    position: relative;
+    padding: 1.1rem 1.2rem;
+    border-radius: .85rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+    overflow: hidden;
+}
+
+.acct-stat::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--accent, #4f46e5);
+}
+
+.acct-stat-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: .76rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.acct-stat-label i {
+    color: var(--accent, #4f46e5);
+    font-size: .95rem;
+    opacity: .85;
+}
+
+.acct-stat-value {
+    margin-top: .45rem;
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.acct-stat-foot {
+    margin-top: .3rem;
+    font-size: .8rem;
+    color: #64748b;
+}
+
+.acct-delta { font-weight: 600; }
+.acct-delta.up { color: #16a34a; }
+.acct-delta.down { color: #dc2626; }
+
+.acct-progress {
+    height: .4rem;
+    margin-top: .7rem;
+    border-radius: 999px;
+    background: #eef2f7;
+    overflow: hidden;
+}
+
+.acct-progress span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent, #4f46e5);
+}
+
+/* ---- Panels ------------------------------------------------------------- */
+
+.acct-panel .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.acct-panel .card-header::after { display: none; }
+.acct-panel .card-title { font-size: 1rem; }
+
+.acct-list-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .7rem 1.15rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: inherit;
+}
+
+.acct-list-row:last-child { border-bottom: 0; }
+a.acct-list-row:hover { background: #f8fafc; color: inherit; text-decoration: none; }
+
+.acct-avatar {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.acct-list-main { flex: 1; min-width: 0; }
+.acct-list-title { font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-list-sub { font-size: .78rem; color: #94a3b8; }
+.acct-list-amount { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.acct-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #94a3b8;
+    font-size: .9rem;
+}
+
+.acct-empty i { display: block; margin-bottom: .5rem; font-size: 1.8rem; color: #cbd5e1; }
+
+.acct-bar-row { margin-bottom: .85rem; }
+.acct-bar-row:last-child { margin-bottom: 0; }
+.acct-bar-row .d-flex { font-size: .86rem; }
+
+.money { font-variant-numeric: tabular-nums; }
+.text-income { color: #16a34a !important; }
+.text-expense { color: #dc2626 !important; }
+
+/* ---- Existing Accounts pages: polish AdminLTE pieces ------------------- */
+
+.content-wrapper:has(.acct-header) .content-header {
+    padding-bottom: .25rem;
+}
+
+/* info-boxes become clean stat cards */
+.content-wrapper:has(.acct-header) .info-box {
+    min-height: 0;
+    padding: 1rem 1.1rem;
+    border-radius: .85rem;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+}
+
+.content-wrapper:has(.acct-header) .info-box .info-box-icon {
+    width: 2.9rem;
+    height: 2.9rem;
+    border-radius: .75rem !important;
+    font-size: 1.15rem;
+    box-shadow: none;
+}
+
+.content-wrapper:has(.acct-header) .info-box .info-box-icon.bg-success { background: #dcfce7 !important; color: #16a34a !important; }
+.content-wrapper:has(.acct-header) .info-box .info-box-icon.bg-danger  { background: #ffe4e6 !important; color: #e11d48 !important; }
+.content-wrapper:has(.acct-header) .info-box .info-box-icon.bg-info    { background: #e0f2fe !important; color: #0284c7 !important; }
+.content-wrapper:has(.acct-header) .info-box .info-box-icon.bg-primary { background: #eef2ff !important; color: #4f46e5 !important; }
+.content-wrapper:has(.acct-header) .info-box .info-box-icon.bg-warning { background: #fef3c7 !important; color: #d97706 !important; }
+.content-wrapper:has(.acct-header) .info-box .info-box-icon.bg-secondary { background: #f1f5f9 !important; color: #475569 !important; }
+
+.content-wrapper:has(.acct-header) .info-box-text {
+    font-size: .76rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.content-wrapper:has(.acct-header) .info-box-number {
+    margin-top: .1rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+/* cards: flat header, no coloured top bar */
+.content-wrapper:has(.acct-header) .card.card-outline {
+    border-top: 0;
+}
+
+.content-wrapper:has(.acct-header) .card > .card-header {
+    border-bottom: 1px solid #eef2f7;
+}
+
+.content-wrapper:has(.acct-header) .card-title {
+    font-size: 1rem;
+}
+
+/* tables: lighter grid, numeric columns line up */
+.content-wrapper:has(.acct-header) .table {
+    font-size: .9rem;
+}
+
+.content-wrapper:has(.acct-header) .table-bordered,
+.content-wrapper:has(.acct-header) .table-bordered td,
+.content-wrapper:has(.acct-header) .table-bordered th {
+    border-color: #eef2f7;
+}
+
+.content-wrapper:has(.acct-header) .table-bordered {
+    border-left: 0;
+    border-right: 0;
+}
+
+.content-wrapper:has(.acct-header) .table-bordered td:first-child,
+.content-wrapper:has(.acct-header) .table-bordered th:first-child { border-left: 0; }
+.content-wrapper:has(.acct-header) .table-bordered td:last-child,
+.content-wrapper:has(.acct-header) .table-bordered th:last-child { border-right: 0; }
+
+.content-wrapper:has(.acct-header) .table-striped tbody tr:nth-of-type(odd) {
+    background-color: #fbfcfe;
+}
+
+.content-wrapper:has(.acct-header) .table td {
+    vertical-align: middle;
+}
+
+.content-wrapper:has(.acct-header) .table td.text-right,
+.content-wrapper:has(.acct-header) .table th.text-right {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* soft status pills */
+.content-wrapper:has(.acct-header) .badge-success { background: #dcfce7; color: #15803d; }
+.content-wrapper:has(.acct-header) .badge-danger  { background: #ffe4e6; color: #be123c; }
+.content-wrapper:has(.acct-header) .badge-warning { background: #fef3c7; color: #b45309; }
+.content-wrapper:has(.acct-header) .badge-info    { background: #e0f2fe; color: #0369a1; }
+.content-wrapper:has(.acct-header) .badge-secondary { background: #f1f5f9; color: #475569; }
+.content-wrapper:has(.acct-header) .badge-primary { background: #eef2ff; color: #4338ca; }
+
+/* action buttons in tables: compact and even */
+.content-wrapper:has(.acct-header) .table .btn-sm {
+    padding: .22rem .55rem;
+    font-size: .8rem;
+}
+
+/* filter forms */
+.content-wrapper:has(.acct-header) label {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+@media (max-width: 767.98px) {
+    .content-wrapper:has(.acct-header) .form-inline > * { margin-bottom: .5rem; }
+    .content-wrapper:has(.acct-header) .form-inline .form-control { width: 100%; }
+}

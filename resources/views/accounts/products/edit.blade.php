@@ -3,7 +3,7 @@
 @section('title', 'Edit Product')
 
 @section('content_header')
-<h1>Edit Product</h1>
+<x-accounts.header title="Edit Product" :back="route('accounts.products.index')" />
 @stop
 
 @section('content')

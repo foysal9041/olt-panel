@@ -3,7 +3,7 @@
 @section('title', 'Customer Details')
 
 @section('content_header')
-<h1>Customer Details</h1>
+<x-accounts.header title="{{ $customer->name }}" subtitle="Customer profile, rates, invoices and payments" :back="route('accounts.customers.index')" />
 @stop
 
 @section('content')

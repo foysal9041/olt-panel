@@ -3,7 +3,7 @@
 @section('title', 'Edit Transaction')
 
 @section('content_header')
-<h1>Edit Transaction</h1>
+<x-accounts.header title="Edit Transaction" subtitle="Update this income or expense entry" :back="route('accounts.transactions.index')" />
 @stop
 
 @section('content')

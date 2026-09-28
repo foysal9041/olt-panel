@@ -3,7 +3,7 @@
 @section('title', 'Edit Customer')
 
 @section('content_header')
-<h1>Edit Customer</h1>
+<x-accounts.header title="Edit Customer" subtitle="{{ $customer->name }}" :back="route('accounts.customers.index')" />
 @stop
 
 @section('content')

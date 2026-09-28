@@ -3,7 +3,7 @@
 @section('title', 'Customer Ledger')
 
 @section('content_header')
-<h1>Ledger — {{ $customer->name }}</h1>
+<x-accounts.header title="Ledger — {{ $customer->name }}" subtitle="Invoices and payments, running balance" :back="route('accounts.customers.show', $customer)" />
 @stop
 
 @section('content')

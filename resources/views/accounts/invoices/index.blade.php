@@ -3,7 +3,7 @@
 @section('title', 'Invoices')
 
 @section('content_header')
-<h1>Invoices</h1>
+<x-accounts.header title="Invoices" icon="fas fa-file-invoice" subtitle="Generate monthly bills, record payments and print" />
 @stop
 
 @section('content')

@@ -3,7 +3,7 @@
 @section('title', 'Customers')
 
 @section('content_header')
-<h1>Customers</h1>
+<x-accounts.header title="Customers" icon="fas fa-users" subtitle="Mac and bandwidth clients, their rates and dues" />
 @stop
 
 @section('content')

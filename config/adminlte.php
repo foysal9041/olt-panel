@@ -555,6 +555,11 @@ return [
                     'asset' => true,
                     'location' => 'js/custom.js',
                 ],
+                [
+                    'type' => 'css',
+                    'asset' => true,
+                    'location' => 'css/accounts.css',
+                ],
             ],
         ],
         'Datatables' => [
