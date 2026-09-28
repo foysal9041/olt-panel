@@ -6,6 +6,7 @@ use App\Models\NetworkSwitch;
 use App\Models\NocAlertSetting;
 use App\Models\SwitchEvent;
 use App\Models\SwitchPort;
+use App\Models\SwitchPortReading;
 use App\Services\Snmp\SnmpClient;
 use App\Services\Snmp\TransceiverReader;
 use Illuminate\Support\Carbon;
@@ -244,6 +245,7 @@ class SwitchPoller
         }
 
         $threshold = $settings->rx_low_threshold;
+        $history = [];
 
         foreach ($ports as $ifIndex => $port) {
             $dom = $readings[$ifIndex] ?? [];
@@ -264,6 +266,21 @@ class SwitchPoller
             $this->checkRxAlarm($switch, $port, $port->rxAlertThreshold($threshold), $now, $settings);
 
             $port->save();
+
+            if ($port->rx_power !== null || $port->tx_power !== null) {
+                $history[] = [
+                    'switch_port_id' => $port->id,
+                    'recorded_at' => $now,
+                    'rx_power' => $port->rx_power,
+                    'tx_power' => $port->tx_power,
+                    'temperature' => $port->temperature,
+                ];
+            }
+        }
+
+        // Rx/Tx history for the port graphs, one bulk insert per poll.
+        if ($history) {
+            SwitchPortReading::insert($history);
         }
 
         return count($readings);

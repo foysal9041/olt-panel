@@ -46,6 +46,11 @@ class SwitchPort extends Model
         return $this->belongsTo(NetworkSwitch::class);
     }
 
+    public function readings()
+    {
+        return $this->hasMany(SwitchPortReading::class);
+    }
+
     public function getLabelAttribute(): string
     {
         return $this->name ?: ($this->descr ?: "ifIndex {$this->if_index}");

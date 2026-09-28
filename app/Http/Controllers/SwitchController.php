@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\NetworkSwitch;
 use App\Models\NocAlertSetting;
 use App\Models\SwitchPort;
+use App\Models\SwitchPortReading;
 use App\Models\Zone;
+use Illuminate\Support\Facades\DB;
 use App\Services\SwitchPoller;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -46,13 +48,174 @@ class SwitchController extends Controller
         return $this->pollAndRedirect($switch, $poller, 'Switch Added');
     }
 
+    /** Port history graph ranges: label, span in seconds, bucket size. */
+    public const HISTORY_RANGES = [
+        '24h' => ['24 Hours', 86400, 300],
+        '7d' => ['7 Days', 7 * 86400, 1800],
+        '30d' => ['30 Days', 30 * 86400, 7200],
+        '90d' => ['90 Days', 90 * 86400, 21600],
+    ];
+
     public function show(NetworkSwitch $switch)
     {
         $ports = $switch->ports()->get();
         $events = $switch->events()->with('port')->latest('occurred_at')->limit(25)->get();
         $rxThreshold = NocAlertSetting::current()->rx_low_threshold;
+        $rxTrend = $this->rxTrend($ports->filter(fn ($p) => $p->rx_power !== null));
 
-        return view('switches.show', compact('switch', 'ports', 'events', 'rxThreshold'));
+        return view('switches.show', compact('switch', 'ports', 'events', 'rxThreshold', 'rxTrend'));
+    }
+
+    public function portHistory(NetworkSwitch $switch, SwitchPort $port)
+    {
+        abort_unless($port->network_switch_id === $switch->id, 404);
+
+        $events = $switch->events()->where('switch_port_id', $port->id)->latest('occurred_at')->limit(30)->get();
+        $rxThreshold = NocAlertSetting::current()->rx_low_threshold;
+        $firstReading = $port->readings()->min('recorded_at');
+        $ranges = self::HISTORY_RANGES;
+
+        return view('switches.port', compact('switch', 'port', 'events', 'rxThreshold', 'firstReading', 'ranges'));
+    }
+
+    /**
+     * Bucketed Rx/Tx history for one port.
+     *
+     * { start, end, step, points: [[ts, rxAvg, rxMin, rxMax, txAvg]], stats: {...} }
+     */
+    public function portHistoryData(Request $request, NetworkSwitch $switch, SwitchPort $port)
+    {
+        abort_unless($port->network_switch_id === $switch->id, 404);
+
+        [, $span, $step] = self::HISTORY_RANGES[$request->query('range')] ?? self::HISTORY_RANGES['24h'];
+
+        $end = now();
+        $start = $end->copy()->subSeconds($span);
+
+        $points = DB::table('switch_port_readings')
+            ->where('switch_port_id', $port->id)
+            ->where('recorded_at', '>=', $start)
+            ->groupBy('bucket')
+            ->orderBy('bucket')
+            ->get([
+                DB::raw("FLOOR(UNIX_TIMESTAMP(recorded_at) / {$step}) * {$step} AS bucket"),
+                DB::raw('AVG(rx_power) AS rx'),
+                DB::raw('MIN(rx_power) AS rx_min'),
+                DB::raw('MAX(rx_power) AS rx_max'),
+                DB::raw('AVG(tx_power) AS tx'),
+            ])
+            ->map(fn ($r) => [
+                (int) $r->bucket,
+                $r->rx === null ? null : round((float) $r->rx, 2),
+                $r->rx_min === null ? null : round((float) $r->rx_min, 2),
+                $r->rx_max === null ? null : round((float) $r->rx_max, 2),
+                $r->tx === null ? null : round((float) $r->tx, 2),
+            ]);
+
+        $range = SwitchPortReading::where('switch_port_id', $port->id)
+            ->where('recorded_at', '>=', $start)
+            ->whereNotNull('rx_power');
+
+        $first = (clone $range)->orderBy('recorded_at')->first(['rx_power', 'recorded_at']);
+        $last = (clone $range)->orderByDesc('recorded_at')->first(['rx_power', 'recorded_at']);
+        $agg = (clone $range)->selectRaw('MIN(rx_power) AS min, MAX(rx_power) AS max, AVG(rx_power) AS avg')->first();
+
+        // Biggest fall between two neighbouring buckets — "when did it drop?"
+        $biggestDrop = null;
+        $prev = null;
+        foreach ($points as $p) {
+            if ($p[1] === null) {
+                continue;
+            }
+            if ($prev !== null && ($drop = $p[1] - $prev[1]) < 0 && ($biggestDrop === null || $drop < $biggestDrop['change'])) {
+                $biggestDrop = ['change' => round($drop, 2), 'from' => $prev[1], 'to' => $p[1], 'at' => $p[0]];
+            }
+            $prev = $p;
+        }
+
+        return response()->json([
+            'start' => $start->getTimestamp(),
+            'end' => $end->getTimestamp(),
+            'step' => $step,
+            'points' => $points,
+            'stats' => [
+                'first' => $first?->rx_power,
+                'first_at' => $first?->recorded_at?->getTimestamp(),
+                'last' => $last?->rx_power,
+                'last_at' => $last?->recorded_at?->getTimestamp(),
+                'change' => $first && $last ? round($last->rx_power - $first->rx_power, 2) : null,
+                'min' => $agg?->min === null ? null : round((float) $agg->min, 2),
+                'max' => $agg?->max === null ? null : round((float) $agg->max, 2),
+                'avg' => $agg?->avg === null ? null : round((float) $agg->avg, 2),
+                'biggest_drop' => $biggestDrop,
+            ],
+            'thresholds' => [
+                'low_warn' => $port->rx_low_warn,
+                'low_alarm' => $port->rx_low_alarm,
+                'high_warn' => $port->rx_high_warn,
+                'high_alarm' => $port->rx_high_alarm,
+                'fallback' => $port->rx_low_warn === null ? NocAlertSetting::current()->rx_low_threshold : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Rx change over the last 24h for each port: now vs. the average around
+     * 24h ago (or the oldest reading, if history is younger than a day).
+     *
+     * @return array<int, array{change: float, from: float, since: \Illuminate\Support\Carbon}>
+     */
+    protected function rxTrend($ports): array
+    {
+        if ($ports->isEmpty()) {
+            return [];
+        }
+
+        $ids = $ports->pluck('id');
+        $dayAgo = now()->subDay();
+
+        $then = SwitchPortReading::whereIn('switch_port_id', $ids)
+            ->whereBetween('recorded_at', [$dayAgo->copy()->subMinutes(15), $dayAgo->copy()->addMinutes(15)])
+            ->whereNotNull('rx_power')
+            ->groupBy('switch_port_id')
+            ->selectRaw('switch_port_id, AVG(rx_power) AS rx, MIN(recorded_at) AS at')
+            ->get()
+            ->keyBy('switch_port_id');
+
+        $missing = $ids->diff($then->keys());
+
+        if ($missing->isNotEmpty()) {
+            $oldest = SwitchPortReading::whereIn('switch_port_id', $missing)
+                ->where('recorded_at', '>=', $dayAgo)
+                ->whereNotNull('rx_power')
+                ->whereIn('id', SwitchPortReading::selectRaw('MIN(id)')
+                    ->whereIn('switch_port_id', $missing)
+                    ->where('recorded_at', '>=', $dayAgo)
+                    ->whereNotNull('rx_power')
+                    ->groupBy('switch_port_id'))
+                ->get(['switch_port_id', 'rx_power as rx', 'recorded_at as at'])
+                ->keyBy('switch_port_id');
+
+            $then = $then->union($oldest);
+        }
+
+        $trend = [];
+
+        foreach ($ports as $port) {
+            if (! isset($then[$port->id])) {
+                continue;
+            }
+
+            $from = round((float) $then[$port->id]->rx, 2);
+
+            $trend[$port->id] = [
+                'change' => round($port->rx_power - $from, 2),
+                'from' => $from,
+                'since' => \Illuminate\Support\Carbon::parse($then[$port->id]->at),
+            ];
+        }
+
+        return $trend;
     }
 
     public function edit(NetworkSwitch $switch)

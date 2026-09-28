@@ -114,6 +114,11 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
     Route::patch('switches/{switch}/ports/{port}/notify', [SwitchController::class, 'togglePortNotify'])
         ->name('switches.ports.notify')->middleware('can:access-olt-switches');
 
+    Route::get('switches/{switch}/ports/{port}', [SwitchController::class, 'portHistory'])
+        ->name('switches.ports.show')->middleware('can:access-olt-switches');
+    Route::get('switches/{switch}/ports/{port}/history', [SwitchController::class, 'portHistoryData'])
+        ->name('switches.ports.history')->middleware('can:access-olt-switches');
+
 });
 
 Route::middleware(['auth', 'can:access-settings-telegram'])->prefix('settings')->name('settings.')->group(function () {

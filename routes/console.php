@@ -26,6 +26,17 @@ Schedule::call(fn () => \App\Models\SwitchEvent::where('occurred_at', '<', now()
     ->name('prune-switch-events')
     ->dailyAt('03:30');
 
+// Rx/Tx history: delete in chunks so a large backlog doesn't lock the table.
+Schedule::call(function () {
+    $cutoff = now()->subDays(\App\Models\SwitchPortReading::RETENTION_DAYS);
+
+    do {
+        $deleted = \App\Models\SwitchPortReading::where('recorded_at', '<', $cutoff)->limit(5000)->delete();
+    } while ($deleted > 0);
+})
+    ->name('prune-switch-port-readings')
+    ->dailyAt('03:45');
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

@@ -38,6 +38,9 @@
     .rx-bad  { color: #b91c1c; font-weight: 700; }
     .port-filter .btn { margin: 0 .25rem .35rem 0; }
     .port-muted { opacity: .45; }
+    .rx-trend { margin-left: .25rem; font-size: .75rem; font-weight: 600; color: #64748b; white-space: nowrap; }
+    .rx-trend-bad { color: #dc2626; }
+    .rx-trend-up { color: #16a34a; }
 </style>
 @stop
 
@@ -147,7 +150,7 @@
                     <th>Description</th>
                     <th>Status</th>
                     <th>Speed</th>
-                    <th>Rx (dBm)</th>
+                    <th title="Current Rx, with the change over the last 24 hours">Rx (dBm) <small class="text-muted text-lowercase">24h Δ</small></th>
                     <th>Tx (dBm)</th>
                     <th>Temp (°C)</th>
                     <th>Voltage (V)</th>
@@ -165,7 +168,9 @@
                     <tr data-state="{{ $isUp ? 'up' : 'down' }}" data-sfp="{{ $port->has_transceiver ? 1 : 0 }}"
                         class="{{ $adminDown ? 'port-muted' : '' }}">
                         <td class="pl-3">
-                            <strong>{{ $port->name ?: $port->descr }}</strong>
+                            <a href="{{ route('switches.ports.show', [$switch, $port]) }}" class="text-reset" title="Rx/Tx history">
+                                <strong>{{ $port->name ?: $port->descr }}</strong>
+                            </a>
                             @if ($port->name && $port->descr && $port->descr !== $port->name)
                                 <div class="small text-muted">{{ $port->descr }}</div>
                             @endif
@@ -182,10 +187,22 @@
                         </td>
                         <td>{{ $port->speed_label ?? '—' }}</td>
                         <td class="{{ $rxClass($port) }}" title="{{ $rxTitle($port) }}">
-                            {{ $port->rx_power ?? '—' }}
-                            @if ($port->rx_alarm) <i class="fas fa-exclamation-triangle" title="Below threshold"></i> @endif
-                            @if ($port->rx_low_warn !== null)
-                                <div class="small text-muted font-weight-normal">min {{ $port->rx_low_warn }}</div>
+                            @if ($port->rx_power !== null)
+                                <a href="{{ route('switches.ports.show', [$switch, $port]) }}" class="text-reset">{{ $port->rx_power }}</a>
+                                @if ($port->rx_alarm) <i class="fas fa-exclamation-triangle" title="Below threshold"></i> @endif
+                                @if ($t = $rxTrend[$port->id] ?? null)
+                                    @if (abs($t['change']) >= 0.1)
+                                        <span class="rx-trend {{ $t['change'] <= -1 ? 'rx-trend-bad' : ($t['change'] >= 1 ? 'rx-trend-up' : '') }}"
+                                              title="{{ $t['from'] }} dBm {{ $t['since']->diffForHumans() }} → {{ $port->rx_power }} dBm now">
+                                            <i class="fas fa-caret-{{ $t['change'] < 0 ? 'down' : 'up' }}"></i>{{ number_format(abs($t['change']), 1) }}
+                                        </span>
+                                    @endif
+                                @endif
+                                @if ($port->rx_low_warn !== null)
+                                    <div class="small text-muted font-weight-normal">min {{ $port->rx_low_warn }}</div>
+                                @endif
+                            @else
+                                —
                             @endif
                         </td>
                         <td>{{ $port->tx_power ?? '—' }}</td>
