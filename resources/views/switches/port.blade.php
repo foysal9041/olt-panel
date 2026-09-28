@@ -3,29 +3,18 @@
 @section('title', ($port->name ?: $port->descr) . ' — ' . $switch->name)
 
 @section('content_header')
-<div class="d-flex justify-content-between align-items-start flex-wrap">
-    <div>
-        <h1 class="mb-1">
-            {{ $port->name ?: $port->descr }}
-            @if ($port->admin_status === 2)
-                <span class="badge badge-secondary">DISABLED</span>
-            @elseif ($port->oper_status === \App\Models\SwitchPort::UP)
-                <span class="badge badge-success">UP</span>
-            @else
-                <span class="badge badge-danger">DOWN</span>
-            @endif
-        </h1>
-        <div class="text-muted">
-            <a href="{{ route('switches.show', $switch) }}">{{ $switch->name }}</a>
-            <code class="ml-1">{{ $switch->ip }}</code>
-            @if ($port->alias) &middot; {{ $port->alias }} @endif
-            @if ($port->speed_label) &middot; {{ $port->speed_label }} @endif
-        </div>
-    </div>
-    <a href="{{ route('switches.show', $switch) }}" class="btn btn-secondary btn-sm mt-2 mt-md-0">
-        <i class="fas fa-arrow-left"></i> Back to {{ $switch->name }}
-    </a>
-</div>
+<x-noc.header :title="$port->name ?: $port->descr" :back="route('switches.show', $switch)"
+    subtitle="{{ $switch->name }} · {{ $switch->ip }}{{ $port->alias ? ' · ' . $port->alias : '' }}{{ $port->speed_label ? ' · ' . $port->speed_label : '' }}">
+    <x-slot:badge>
+        @if ($port->admin_status === 2)
+            <span class="badge badge-secondary">DISABLED</span>
+        @elseif ($port->oper_status === \App\Models\SwitchPort::UP)
+            <span class="badge badge-success">UP</span>
+        @else
+            <span class="badge badge-danger">DOWN</span>
+        @endif
+    </x-slot:badge>
+</x-noc.header>
 @stop
 
 @section('css')

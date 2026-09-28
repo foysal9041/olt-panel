@@ -3,9 +3,7 @@
 @section('title', 'OLT Management')
 
 @section('content_header')
-
-<h1>OLT Management</h1>
-
+<x-noc.header title="OLTs" icon="fas fa-network-wired" subtitle="All OLT devices, status, credentials and web access" />
 @stop
 
 @section('content')

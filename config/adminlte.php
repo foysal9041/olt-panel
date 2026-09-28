@@ -317,78 +317,90 @@ return [
         'icon' => 'fas fa-satellite-dish',
         'submenu' => [
             [
-                'text' => 'OLT Dashboard',
+                'text' => 'NOC Dashboard',
                 'url'  => 'olt/dashboard',
-                'icon' => 'fas fa-chart-line',
+                'icon' => 'fas fa-tachometer-alt',
                 'can'  => 'access-olt-dashboard',
             ],
             [
-                'text' => 'All OLTs',
+                'text' => 'OLTs',
                 'url'  => 'olt',
-                'icon' => 'fas fa-list',
+                'icon' => 'fas fa-network-wired',
                 'can'  => 'access-olt-manage',
             ],
             [
-                'text' => 'Zones',
-                'url'  => 'zones',
-                'icon' => 'fas fa-map-marked-alt',
-                'can'  => 'access-olt-zones',
+                'text' => 'Switches',
+                'icon' => 'fas fa-server',
+                'can'  => 'access-olt-switches',
+                'submenu' => [
+                    [
+                        'text' => 'All Switches',
+                        'url'  => 'switches',
+                        'icon' => 'fas fa-list',
+                        'can'  => 'access-olt-switches',
+                    ],
+                    [
+                        'text' => 'Port Events',
+                        'url'  => 'switch-events',
+                        'icon' => 'fas fa-history',
+                        'can'  => 'access-olt-switches',
+                    ],
+                ],
             ],
             [
-                'text' => 'VLAN Management',
-                'url'  => 'vlans',
+                'text' => 'Latency',
+                'icon' => 'fas fa-wave-square',
+                'can'  => 'access-latency',
+                'submenu' => [
+                    [
+                        'text' => 'Latency Graphs',
+                        'url'  => 'latency',
+                        'icon' => 'fas fa-chart-area',
+                        'can'  => 'access-latency-graphs',
+                    ],
+                    [
+                        'text' => 'Manage Targets',
+                        'url'  => 'latency/targets',
+                        'icon' => 'fas fa-bullseye',
+                        'can'  => 'access-latency-targets',
+                    ],
+                ],
+            ],
+            [
+                'text' => 'IP & VLAN',
                 'icon' => 'fas fa-sitemap',
-                'can'  => 'access-olt-vlans',
-            ],
-            [
-                'text' => 'IP Management',
-                'url'  => 'ip-pools',
-                'icon' => 'fas fa-globe',
-                'can'  => 'access-olt-ip',
-            ],
-            [
-                'text' => 'NTTN Links',
-                'url'  => 'nttn-links',
-                'icon' => 'fas fa-project-diagram',
-                'can'  => 'access-olt-nttn',
+                'submenu' => [
+                    [
+                        'text' => 'Zones',
+                        'url'  => 'zones',
+                        'icon' => 'fas fa-map-marked-alt',
+                        'can'  => 'access-olt-zones',
+                    ],
+                    [
+                        'text' => 'VLAN Management',
+                        'url'  => 'vlans',
+                        'icon' => 'fas fa-stream',
+                        'can'  => 'access-olt-vlans',
+                    ],
+                    [
+                        'text' => 'IP Management',
+                        'url'  => 'ip-pools',
+                        'icon' => 'fas fa-globe',
+                        'can'  => 'access-olt-ip',
+                    ],
+                    [
+                        'text' => 'NTTN Links',
+                        'url'  => 'nttn-links',
+                        'icon' => 'fas fa-project-diagram',
+                        'can'  => 'access-olt-nttn',
+                    ],
+                ],
             ],
             [
                 'text' => 'Technical Support',
                 'url'  => 'support-contacts',
                 'icon' => 'fas fa-headset',
                 'can'  => 'access-olt-support',
-            ],
-            [
-                'text' => 'Switches',
-                'url'  => 'switches',
-                'icon' => 'fas fa-server',
-                'can'  => 'access-olt-switches',
-            ],
-            [
-                'text' => 'Port Events',
-                'url'  => 'switch-events',
-                'icon' => 'fas fa-history',
-                'can'  => 'access-olt-switches',
-            ],
-
-        ],
-    ],
-
-    [
-        'text' => 'Latency Checker',
-        'icon' => 'fas fa-wave-square',
-        'submenu' => [
-            [
-                'text' => 'Latency Graphs',
-                'url'  => 'latency',
-                'icon' => 'fas fa-chart-area',
-                'can'  => 'access-latency-graphs',
-            ],
-            [
-                'text' => 'Manage Targets',
-                'url'  => 'latency/targets',
-                'icon' => 'fas fa-bullseye',
-                'can'  => 'access-latency-targets',
             ],
         ],
     ],

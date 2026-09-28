@@ -3,50 +3,15 @@
 @section('title', $target->name.' — Latency')
 
 @section('content_header')
-<div class="d-flex justify-content-between align-items-start flex-wrap">
-    <div>
-        <h1 class="mb-1">
-            {{ $target->name }}
-            @include('latency.partials.status', ['status' => $target->status])
-        </h1>
-        <div class="text-muted">
-            <code>{{ $target->host }}</code>
-            @if ($target->group)
-                &middot; {{ $target->group }}
-            @endif
-            &middot; {{ $target->pings }} pings every minute
-            @if ($target->hasThresholds())
-                &middot; <span class="text-danger"><i class="fas fa-bell"></i> alert
-                    @if ($target->latency_threshold !== null) &gt; {{ $target->latency_threshold }} ms @endif
-                    @if ($target->latency_threshold !== null && $target->loss_threshold !== null) or @endif
-                    @if ($target->loss_threshold !== null) ≥ {{ $target->loss_threshold }}% loss @endif
-                </span>
-            @endif
-            @unless ($target->is_active)
-                &middot; <span class="text-danger">paused</span>
-            @endunless
-        </div>
-        @if ($target->description)
-            <div class="text-muted small mt-1">{{ $target->description }}</div>
-        @endif
-        @if ($target->alert_active)
-            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 d-inline-block">
-                <i class="fas fa-exclamation-triangle"></i> Over threshold since {{ $target->alert_since?->format('d M, h:i A') }}
-                ({{ $target->alert_since?->diffForHumans() }})
-            </div>
-        @endif
-    </div>
-    <div class="mt-2 mt-md-0">
-        <a href="{{ route('latency.index') }}" class="btn btn-secondary btn-sm">
-            <i class="fas fa-arrow-left"></i> Back
+<x-noc.header :title="$target->name" :back="route('latency.index')"
+    subtitle="{{ $target->host }}{{ $target->group ? ' · ' . $target->group : '' }} · {{ $target->pings }} pings every minute{{ $target->is_active ? '' : ' · paused' }}">
+    <x-slot:badge>@include('latency.partials.status', ['status' => $target->status])</x-slot:badge>
+    @can('access-latency-targets')
+        <a href="{{ route('latency.targets.edit', $target) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-edit"></i> Edit
         </a>
-        @can('access-latency-targets')
-            <a href="{{ route('latency.targets.edit', $target) }}" class="btn btn-warning btn-sm">
-                <i class="fas fa-edit"></i> Edit
-            </a>
-        @endcan
-    </div>
-</div>
+    @endcan
+</x-noc.header>
 @stop
 
 @section('css')
@@ -54,6 +19,33 @@
 @stop
 
 @section('content')
+
+@if ($target->alert_active)
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle"></i> Over threshold since {{ $target->alert_since?->format('d M, h:i A') }}
+        ({{ $target->alert_since?->diffForHumans() }})
+    </div>
+@endif
+
+@if ($target->hasThresholds() || $target->description)
+    <div class="card">
+        <div class="card-body py-2 small d-flex flex-wrap align-items-center" style="gap: .25rem 1.5rem">
+            @if ($target->hasThresholds())
+                <span class="text-danger">
+                    <i class="fas fa-bell"></i> Alert when
+                    @if ($target->latency_threshold !== null) latency &gt; <strong>{{ $target->latency_threshold }} ms</strong> @endif
+                    @if ($target->latency_threshold !== null && $target->loss_threshold !== null) or @endif
+                    @if ($target->loss_threshold !== null) loss ≥ <strong>{{ $target->loss_threshold }}%</strong> @endif
+                    @unless ($target->notify) <span class="text-muted">(Telegram muted)</span> @endunless
+                </span>
+            @endif
+            @if ($target->description)
+                <span class="text-muted"><i class="fas fa-info-circle"></i> {{ $target->description }}</span>
+            @endif
+        </div>
+    </div>
+@endif
+
 
 @foreach ($ranges as $key => $range)
     <div class="card card-outline card-primary">

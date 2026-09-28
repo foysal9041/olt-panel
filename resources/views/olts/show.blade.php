@@ -3,7 +3,7 @@
 @section('title', 'OLT Credentials')
 
 @section('content_header')
-    <h1>Device Credentials</h1>
+<x-noc.header title="{{ $olt->name }}" subtitle="Device details and credentials · {{ $olt->ip }}" :back="route('olt.index')" />
 @stop
 
 @section('content')

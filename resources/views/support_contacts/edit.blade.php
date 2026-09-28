@@ -3,7 +3,7 @@
 @section('title', 'Edit Support Contact')
 
 @section('content_header')
-<h1>Edit Support Contact</h1>
+<x-noc.header title="Edit Support Contact" subtitle="{{ $supportContact->vendor_name }}" :back="route('support-contacts.index')" />
 @stop
 
 @section('content')

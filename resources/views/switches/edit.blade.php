@@ -3,7 +3,7 @@
 @section('title', 'Edit Switch')
 
 @section('content_header')
-<h1>Edit Switch</h1>
+<x-noc.header title="Edit Switch" subtitle="{{ $switch->name }} · {{ $switch->ip }}" :back="route('switches.show', $switch)" />
 @stop
 
 @section('content')

@@ -3,7 +3,7 @@
 @section('title', 'Add IP Subnet')
 
 @section('content_header')
-<h1>Add IP Subnet</h1>
+<x-noc.header title="Add IP Subnet" :back="route('ip-pools.index')" />
 @stop
 
 @section('content')

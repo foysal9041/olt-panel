@@ -3,7 +3,7 @@
 @section('title', 'Edit Latency Target')
 
 @section('content_header')
-<h1>Edit Latency Target</h1>
+<x-noc.header title="Edit Latency Target" subtitle="{{ $target->name }} · {{ $target->host }}" :back="route('latency.targets.index')" />
 @stop
 
 @section('content')

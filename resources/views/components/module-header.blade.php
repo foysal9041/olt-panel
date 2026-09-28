@@ -2,7 +2,8 @@
 
 {{--
     Shared page header for module pages: title row + section tabs.
-    $tabs: list of [route name, active pattern, label, icon, ability].
+    $tabs: list of [route name, active pattern(s), label, icon, ability].
+    Optional named slot $badge renders next to the title (e.g. UP/DOWN).
 --}}
 
 <div class="acct-header">
@@ -14,7 +15,7 @@
                 <span class="acct-header-icon"><i class="{{ $icon }}"></i></span>
             @endif
             <div>
-                <h1>{{ $title }}</h1>
+                <h1>{{ $title }} @isset($badge) <span class="acct-header-badge">{{ $badge }}</span> @endisset</h1>
                 @if ($subtitle)
                     <p>{{ $subtitle }}</p>
                 @endif
@@ -30,7 +31,7 @@
     <nav class="acct-tabs">
         @foreach ($tabs as [$route, $pattern, $label, $tabIcon, $ability])
             @can($ability)
-                <a href="{{ route($route) }}" class="{{ request()->routeIs($pattern) ? 'active' : '' }}">
+                <a href="{{ route($route) }}" class="{{ request()->routeIs(...(array) $pattern) ? 'active' : '' }}">
                     <i class="{{ $tabIcon }}"></i> <span>{{ $label }}</span>
                 </a>
             @endcan

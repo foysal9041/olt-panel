@@ -3,7 +3,7 @@
 @section('title', 'Zones')
 
 @section('content_header')
-<h1>Zones</h1>
+<x-noc.header title="Zones" icon="fas fa-map-marked-alt" subtitle="Service areas used across OLTs, staff and customers" />
 @stop
 
 @section('content')

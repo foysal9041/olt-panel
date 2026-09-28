@@ -3,7 +3,7 @@
 @section('title', 'Edit VLAN')
 
 @section('content_header')
-<h1>Edit VLAN</h1>
+<x-noc.header title="Edit VLAN" subtitle="VLAN {{ $vlan->vlan }} · {{ $vlan->name }}" :back="route('vlans.index')" />
 @stop
 
 @section('content')

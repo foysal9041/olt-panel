@@ -3,7 +3,7 @@
 @section('title', 'Add Latency Target')
 
 @section('content_header')
-<h1>Add Latency Target</h1>
+<x-noc.header title="Add Latency Target" subtitle="Any IP address or hostname" :back="route('latency.targets.index')" />
 @stop
 
 @section('content')

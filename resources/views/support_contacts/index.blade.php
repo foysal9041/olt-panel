@@ -3,7 +3,7 @@
 @section('title', 'Technical Support Contacts')
 
 @section('content_header')
-<h1>Technical Support Contacts</h1>
+<x-noc.header title="Technical Support" icon="fas fa-headset" subtitle="Vendor and upstream support contacts" />
 @stop
 
 @section('content')

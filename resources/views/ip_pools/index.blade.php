@@ -3,7 +3,7 @@
 @section('title', 'IP Management')
 
 @section('content_header')
-<h1>IP Management</h1>
+<x-noc.header title="IP Management" icon="fas fa-globe" subtitle="Public and private subnets, gateways and usage" />
 @stop
 
 @section('content')

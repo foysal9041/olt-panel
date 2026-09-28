@@ -3,7 +3,7 @@
 @section('title', 'Add Zone')
 
 @section('content_header')
-<h1>Add Zone</h1>
+<x-noc.header title="Add Zone" :back="route('zones.index')" />
 @stop
 
 @section('content')

@@ -3,7 +3,7 @@
 @section('title', 'Latency Targets')
 
 @section('content_header')
-<h1>Latency Targets</h1>
+<x-noc.header title="Latency Targets" icon="fas fa-bullseye" subtitle="Destinations pinged every minute, with alert thresholds" />
 @stop
 
 @section('css')

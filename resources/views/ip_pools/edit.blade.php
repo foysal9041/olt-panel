@@ -3,7 +3,7 @@
 @section('title', 'Edit IP Subnet')
 
 @section('content_header')
-<h1>Edit IP Subnet</h1>
+<x-noc.header title="Edit IP Subnet" subtitle="{{ $ipPool->subnet }}" :back="route('ip-pools.index')" />
 @stop
 
 @section('content')

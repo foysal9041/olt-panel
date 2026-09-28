@@ -3,7 +3,7 @@
 @section('title', 'Edit NTTN Link')
 
 @section('content_header')
-<h1>Edit NTTN Link</h1>
+<x-noc.header title="Edit NTTN Link" subtitle="{{ $nttnLink->link_id }} · {{ $nttnLink->provider }}" :back="route('nttn-links.index')" />
 @stop
 
 @section('content')

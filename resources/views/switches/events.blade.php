@@ -3,7 +3,7 @@
 @section('title', 'Port Events')
 
 @section('content_header')
-<h1>Port Events</h1>
+<x-noc.header title="Port Events" icon="fas fa-history" subtitle="Port up/down, switch reachability and Rx alarms" />
 @stop
 
 @section('content')

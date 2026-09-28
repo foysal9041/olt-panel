@@ -3,7 +3,7 @@
 @section('title', 'Add OLT')
 
 @section('content_header')
-    <h1>Add New OLT</h1>
+<x-noc.header title="Add OLT" subtitle="Register a new OLT device" :back="route('olt.index')" />
 @stop
 
 @section('content')

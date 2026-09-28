@@ -3,7 +3,7 @@
 @section('title', 'Add NTTN Link')
 
 @section('content_header')
-<h1>Add NTTN Link</h1>
+<x-noc.header title="Add NTTN Link" :back="route('nttn-links.index')" />
 @stop
 
 @section('content')

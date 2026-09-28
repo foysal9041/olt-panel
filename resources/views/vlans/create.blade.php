@@ -3,7 +3,7 @@
 @section('title', 'Add VLAN')
 
 @section('content_header')
-<h1>Add VLAN</h1>
+<x-noc.header title="Add VLAN" :back="route('vlans.index')" />
 @stop
 
 @section('content')

@@ -5,7 +5,17 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ChecksVlanOverlap;
 use App\Models\Olt;
 use App\Models\Zone;
+use App\Models\IpPool;
+use App\Models\LatencyTarget;
+use App\Models\NetworkSwitch;
+use App\Models\NttnLink;
+use App\Models\SupportContact;
+use App\Models\SwitchEvent;
+use App\Models\SwitchPort;
+use App\Models\Vlan;
+use App\Services\NocOverview;
 use App\Services\OltStatusChecker;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Process;
 
@@ -16,32 +26,54 @@ class OltController extends Controller
     public function dashboard()
     {
         $user = auth()->user();
+        $overview = new NocOverview($user);
+        $gate = fn ($ability) => Gate::allows($ability);
 
-        if (in_array(strtolower($user->role), ['admin', 'noc'])) {
+        $olts = $overview->olts();
+        $issues = $overview->issues($olts);
 
-            $olts = Olt::latest()->get();
+        $switches = collect();
+        $events = collect();
+        $ports = null;
+        if ($gate('access-olt-switches')) {
+            $switches = NetworkSwitch::where('is_active', true)
+                ->withCount([
+                    'ports',
+                    'ports as ports_up_count' => fn ($q) => $q->where('oper_status', SwitchPort::UP),
+                    'ports as ports_sfp_count' => fn ($q) => $q->whereNotNull('rx_power'),
+                    'ports as ports_rx_alarm_count' => fn ($q) => $q->where('rx_alarm', true),
+                ])
+                ->orderBy('status')
+                ->orderBy('name')
+                ->get();
 
-            $totalOlt = Olt::count();
+            $ports = [
+                'total' => $switches->sum('ports_count'),
+                'up' => $switches->sum('ports_up_count'),
+                'sfp' => $switches->sum('ports_sfp_count'),
+                'rx_alarms' => $switches->sum('ports_rx_alarm_count'),
+            ];
 
-            $onlineOlt = Olt::where('status', 1)->count();
-
-            $offlineOlt = Olt::where('status', 0)->count();
-
-        } else {
-
-            $olts = Olt::where('zone', $user->zone)->latest()->get();
-
-            $totalOlt = Olt::where('zone', $user->zone)->count();
-
-            $onlineOlt = Olt::where('zone', $user->zone)->where('status', 1)->count();
-
-            $offlineOlt = Olt::where('zone', $user->zone)->where('status', 0)->count();
+            $events = SwitchEvent::with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(10)->get();
         }
 
-        return view(
-            'olts.dashboard',
-            compact('olts', 'totalOlt', 'onlineOlt', 'offlineOlt')
-        );
+        $latencyTargets = $gate('access-latency-graphs')
+            ? LatencyTarget::where('is_active', true)->orderByDesc('alert_active')->orderBy('group')->orderBy('name')->get()
+            : collect();
+
+        $inventory = array_filter([
+            'zones' => $gate('access-olt-zones') ? ['Zones', Zone::count(), 'fas fa-map-marked-alt', 'zones.index'] : null,
+            'vlans' => $gate('access-olt-vlans') ? ['VLANs', Vlan::count(), 'fas fa-stream', 'vlans.index'] : null,
+            'ip' => $gate('access-olt-ip') ? ['IP Subnets', IpPool::count(), 'fas fa-globe', 'ip-pools.index'] : null,
+            'nttn' => $gate('access-olt-nttn') ? ['NTTN Links', NttnLink::count(), 'fas fa-project-diagram', 'nttn-links.index'] : null,
+            'support' => $gate('access-olt-support') ? ['Support Contacts', SupportContact::count(), 'fas fa-headset', 'support-contacts.index'] : null,
+        ]);
+
+        $events24h = $gate('access-olt-switches') ? SwitchEvent::where('occurred_at', '>=', now()->subDay())->count() : null;
+
+        return view('olts.dashboard', compact(
+            'olts', 'issues', 'switches', 'ports', 'events', 'events24h', 'latencyTargets', 'inventory'
+        ));
     }
 
     public function index(Request $request)

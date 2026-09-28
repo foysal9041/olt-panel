@@ -3,28 +3,15 @@
 @section('title', $switch->name.' — Switch')
 
 @section('content_header')
-<div class="d-flex justify-content-between align-items-start flex-wrap">
-    <div>
-        <h1 class="mb-1">
-            {{ $switch->name }}
-            @include('switches._status', ['status' => $switch->status])
-        </h1>
-        <div class="text-muted">
-            <code>{{ $switch->ip }}</code> &middot; {{ $switch->vendor_label }}
-            @if ($switch->zone) &middot; {{ $switch->zone }} @endif
-            @unless ($switch->notify) &middot; <span class="text-warning"><i class="fas fa-bell-slash"></i> alerts muted</span> @endunless
-            @unless ($switch->is_active) &middot; <span class="text-danger">paused</span> @endunless
-        </div>
-    </div>
-    <div class="mt-2 mt-md-0">
-        <a href="{{ route('switches.index') }}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
-        <form action="{{ route('switches.poll', $switch) }}" method="POST" class="d-inline" id="poll-form">
-            @csrf
-            <button class="btn btn-primary btn-sm" id="poll-btn"><i class="fas fa-sync-alt"></i> Poll Now</button>
-        </form>
-        <a href="{{ route('switches.edit', $switch) }}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i> Edit</a>
-    </div>
-</div>
+<x-noc.header :title="$switch->name" :back="route('switches.index')"
+    subtitle="{{ $switch->ip }} · {{ $switch->vendor_label }}{{ $switch->zone ? ' · ' . $switch->zone : '' }}{{ $switch->notify ? '' : ' · alerts muted' }}{{ $switch->is_active ? '' : ' · paused' }}">
+    <x-slot:badge>@include('switches._status', ['status' => $switch->status])</x-slot:badge>
+    <form action="{{ route('switches.poll', $switch) }}" method="POST" class="d-inline" id="poll-form">
+        @csrf
+        <button class="btn btn-primary btn-sm" id="poll-btn"><i class="fas fa-sync-alt"></i> Poll Now</button>
+    </form>
+    <a href="{{ route('switches.edit', $switch) }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-edit"></i> Edit</a>
+</x-noc.header>
 @stop
 
 @section('css')

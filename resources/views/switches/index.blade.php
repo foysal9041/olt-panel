@@ -3,17 +3,11 @@
 @section('title', 'Switches')
 
 @section('content_header')
-<div class="d-flex justify-content-between align-items-center flex-wrap">
-    <h1>Switches</h1>
-    <div>
-        <a href="{{ route('switch-events.index') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-history"></i> Port Events
-        </a>
-        <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm">
-            <i class="fas fa-plus"></i> Add Switch
-        </a>
-    </div>
-</div>
+<x-noc.header title="Switches" icon="fas fa-server" subtitle="SNMP-monitored switches, ports and SFP transceivers">
+    <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> Add Switch
+    </a>
+</x-noc.header>
 @stop
 
 @section('content')

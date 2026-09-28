@@ -62,6 +62,15 @@
 
 .acct-back:hover { color: #4f46e5; }
 
+.acct-header-badge {
+    display: inline-flex;
+    gap: .3rem;
+    vertical-align: middle;
+    font-size: .8rem;
+}
+
+.acct-header-badge .badge { font-size: .72rem; }
+
 .acct-header-actions {
     display: flex;
     gap: .5rem;

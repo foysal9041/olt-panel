@@ -3,7 +3,7 @@
 @section('title', 'Add Switch')
 
 @section('content_header')
-<h1>Add Switch</h1>
+<x-noc.header title="Add Switch" subtitle="Monitor a switch over SNMP" :back="route('switches.index')" />
 @stop
 
 @section('content')

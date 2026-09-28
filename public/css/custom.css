@@ -270,3 +270,24 @@ div.dataTables_wrapper div.dataTables_filter input,
 div.dataTables_wrapper div.dataTables_length select {
     border-radius: 0.3rem;
 }
+
+/* Third-level menus (e.g. NOC → Switches → Port Events) step in further */
+body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link,
+.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link {
+    padding-left: 2.6rem;
+    font-size: 0.88rem;
+}
+
+.sidebar-dark-primary .nav-treeview .nav-treeview {
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    margin-left: 1.35rem;
+}
+
+body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link {
+    padding-left: 1.1rem;
+}
+
+.sidebar-dark-primary .nav-treeview > .nav-item > .nav-link.active {
+    background-color: var(--brand);
+    color: #fff;
+}

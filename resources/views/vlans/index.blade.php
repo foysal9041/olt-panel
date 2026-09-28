@@ -3,7 +3,7 @@
 @section('title', 'VLAN Management')
 
 @section('content_header')
-<h1>VLAN Management</h1>
+<x-noc.header title="VLAN Management" icon="fas fa-stream" subtitle="VLAN IDs and ranges allocated per zone" />
 @stop
 
 @section('content')

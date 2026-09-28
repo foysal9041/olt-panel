@@ -3,14 +3,16 @@
 @section('title', 'Latency Graphs')
 
 @section('content_header')
-<div class="d-flex justify-content-between align-items-center flex-wrap">
-    <h1>Latency Graphs</h1>
+<x-noc.header title="Latency" icon="fas fa-wave-square" subtitle="SmokePing-style RTT and packet loss, probed every minute">
     @can('access-latency-targets')
+        <a href="{{ route('latency.targets.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-bullseye"></i> Manage Targets
+        </a>
         <a href="{{ route('latency.targets.create') }}" class="btn btn-primary btn-sm">
             <i class="fas fa-plus"></i> Add Target
         </a>
     @endcan
-</div>
+</x-noc.header>
 @stop
 
 @section('css')

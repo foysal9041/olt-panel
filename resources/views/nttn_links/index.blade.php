@@ -3,7 +3,7 @@
 @section('title', 'NTTN Link Management')
 
 @section('content_header')
-<h1>NTTN Link Management</h1>
+<x-noc.header title="NTTN Links" icon="fas fa-project-diagram" subtitle="Transmission links, bandwidth, peering and ASN" />
 @stop
 
 @section('content')

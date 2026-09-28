@@ -3,7 +3,7 @@
 @section('title', 'Edit OLT')
 
 @section('content_header')
-    <h1>Edit OLT</h1>
+<x-noc.header title="Edit OLT" subtitle="{{ $olt->name }} · {{ $olt->ip }}" :back="route('olt.index')" />
 @stop
 
 @section('content')
