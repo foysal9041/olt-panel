@@ -8,7 +8,7 @@
     ['latency.index', 'latency.*', 'Latency', 'fas fa-wave-square', 'access-latency-graphs'],
     ['zones.index', 'zones.*', 'Zones', 'fas fa-map-marked-alt', 'access-olt-zones'],
     ['vlans.index', 'vlans.*', 'VLANs', 'fas fa-stream', 'access-olt-vlans'],
-    ['ip-pools.index', 'ip-pools.*', 'IP', 'fas fa-globe', 'access-olt-ip'],
+    ['ip-pools.index', ['ip-pools.*', 'ip-blocks.*'], 'IP', 'fas fa-globe', 'access-olt-ip'],
     ['nttn-links.index', 'nttn-links.*', 'NTTN', 'fas fa-project-diagram', 'access-olt-nttn'],
     ['support-contacts.index', 'support-contacts.*', 'Support', 'fas fa-headset', 'access-olt-support'],
 ]">

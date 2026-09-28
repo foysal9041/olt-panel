@@ -8,6 +8,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ZoneController;
 use App\Http\Controllers\VlanController;
 use App\Http\Controllers\IpPoolController;
+use App\Http\Controllers\IpBlockController;
 use App\Http\Controllers\NttnLinkController;
 use App\Http\Controllers\SupportContactController;
 use App\Http\Controllers\SwitchController;
@@ -93,6 +94,10 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
 
     Route::resource('ip-pools', IpPoolController::class)
         ->except(['show'])
+        ->middleware('can:access-olt-ip');
+
+    Route::resource('ip-blocks', IpBlockController::class)
+        ->except(['index'])
         ->middleware('can:access-olt-ip');
 
     Route::resource('nttn-links', NttnLinkController::class)
