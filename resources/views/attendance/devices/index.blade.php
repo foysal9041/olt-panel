@@ -3,7 +3,7 @@
 @section('title', 'Attendance Devices')
 
 @section('content_header')
-<h1>Attendance Devices</h1>
+<x-attendance.header title="Attendance Devices" icon="fas fa-microchip" subtitle="ZKTeco F18 terminals and punch sync" />
 @stop
 
 @section('content')

@@ -1,8 +1,9 @@
 /* ==========================================================================
-   Accounts module — shared look for every page that renders
-   <x-accounts.header>. Generic AdminLTE pieces (info boxes, tables, badges)
-   are only restyled inside those pages via :has(.acct-header), so the rest
-   of the panel is untouched.
+   Module pages (Accounts, Attendance) — shared look for every page that
+   renders <x-module-header> (via <x-accounts.header> / <x-attendance.header>).
+   Generic AdminLTE pieces (info boxes, tables, badges) are only restyled
+   inside those pages via :has(.acct-header), so the rest of the panel is
+   untouched. The acct- prefix is historical; it isn't Accounts-only.
    ========================================================================== */
 
 /* ---- Header + tabs ----------------------------------------------------- */

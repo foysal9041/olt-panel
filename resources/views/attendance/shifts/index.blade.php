@@ -3,7 +3,7 @@
 @section('title', 'Duty Shifts')
 
 @section('content_header')
-<h1>Duty Shifts</h1>
+<x-attendance.header title="Duty Shifts" icon="fas fa-business-time" subtitle="Working hours and late grace per shift" />
 @stop
 
 @section('content')

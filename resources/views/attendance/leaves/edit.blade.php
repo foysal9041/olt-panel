@@ -3,7 +3,7 @@
 @section('title', 'Edit Leave')
 
 @section('content_header')
-<h1>Edit Leave</h1>
+<x-attendance.header title="Edit Leave" :back="route('attendance.leaves.index')" />
 @stop
 
 @section('content')

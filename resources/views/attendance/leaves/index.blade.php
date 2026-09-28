@@ -3,7 +3,7 @@
 @section('title', 'Leave Management')
 
 @section('content_header')
-<h1>Leave Management</h1>
+<x-attendance.header title="Leave Management" icon="fas fa-plane-departure" subtitle="Requests, approvals and balances" />
 @stop
 
 @section('content')

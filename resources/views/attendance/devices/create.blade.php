@@ -3,7 +3,7 @@
 @section('title', 'Add Device')
 
 @section('content_header')
-<h1>Add Device</h1>
+<x-attendance.header title="Add Device" subtitle="Register a ZKTeco terminal" :back="route('attendance.devices.index')" />
 @stop
 
 @section('content')

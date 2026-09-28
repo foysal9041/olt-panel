@@ -3,7 +3,7 @@
 @section('title', 'Edit Duty Shift')
 
 @section('content_header')
-<h1>Edit Duty Shift</h1>
+<x-attendance.header title="Edit Duty Shift" :back="route('attendance.shifts.index')" />
 @stop
 
 @section('content')

@@ -3,7 +3,7 @@
 @section('title', 'Edit Device')
 
 @section('content_header')
-<h1>Edit Device</h1>
+<x-attendance.header title="Edit Device" subtitle="{{ $device->name ?: $device->serial_number }}" :back="route('attendance.devices.index')" />
 @stop
 
 @section('content')

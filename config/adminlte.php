@@ -558,7 +558,7 @@ return [
                 [
                     'type' => 'css',
                     'asset' => true,
-                    'location' => 'css/accounts.css',
+                    'location' => 'css/module-pages.css',
                 ],
             ],
         ],

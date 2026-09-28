@@ -3,7 +3,7 @@
 @section('title', 'Edit Employee')
 
 @section('content_header')
-<h1>Edit Employee</h1>
+<x-attendance.header title="Edit Employee" subtitle="{{ $employee->name }}" :back="route('attendance.employees.index')" />
 @stop
 
 @section('content')

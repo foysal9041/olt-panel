@@ -3,7 +3,7 @@
 @section('title', 'Add Employee')
 
 @section('content_header')
-<h1>Add Employee</h1>
+<x-attendance.header title="Add Employee" subtitle="Link a staff member to their device PIN" :back="route('attendance.employees.index')" />
 @stop
 
 @section('content')

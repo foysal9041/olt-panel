@@ -3,7 +3,7 @@
 @section('title', 'Absence Report')
 
 @section('content_header')
-<h1>Absence Report</h1>
+<x-attendance.header title="Absence Report" icon="fas fa-calendar-times" subtitle="Who missed which days, and how often" />
 @stop
 
 @section('content')

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceLog;
 use App\Models\AttendanceSetting;
 use App\Models\Employee;
+use App\Models\Leave;
+use App\Models\ZkDevice;
 use App\Services\AttendanceCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -41,13 +43,38 @@ class AttendanceController extends Controller
 
         $unmappedCount = $unmappedPunches->count();
 
+        // Today's board: one row per employee with status and times.
+        $today = Carbon::today();
+        $todayReport = $this->calculator->buildReport($employees, $today, $today, $settings);
+        $board = $employees->map(fn (Employee $employee) => [
+            'employee' => $employee,
+        ] + ($todayReport[$employee->id][$today->toDateString()] ?? ['status' => 'absent', 'check_in' => null, 'check_out' => null, 'hours_worked' => null]))
+            ->sortBy(fn ($row) => [
+                ['late' => 0, 'present' => 1, 'leave' => 2, 'absent' => 3][$row['status']] ?? 4,
+                $row['check_in']?->timestamp ?? PHP_INT_MAX,
+            ])
+            ->values();
+
+        $devices = ZkDevice::orderBy('name')->get();
+
+        $pendingLeaves = Leave::with(['employee', 'leaveType'])
+            ->where('status', 'pending')
+            ->whereIn('employee_id', $employees->pluck('id'))
+            ->orderBy('start_date')
+            ->limit(6)
+            ->get();
+
         return view('attendance.dashboard', compact(
             'summary',
             'trend',
             'recentPunches',
             'employees',
             'unmappedCount',
-            'unmappedPunches'
+            'unmappedPunches',
+            'board',
+            'devices',
+            'pendingLeaves',
+            'settings'
         ));
     }
 

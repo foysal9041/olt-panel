@@ -3,7 +3,7 @@
 @section('title', 'Attendance Report')
 
 @section('content_header')
-<h1>Attendance Report</h1>
+<x-attendance.header title="Attendance Report" icon="fas fa-calendar-check" subtitle="Daily check-in, check-out and hours by employee" />
 @stop
 
 @section('content')

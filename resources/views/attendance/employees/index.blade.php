@@ -3,7 +3,7 @@
 @section('title', 'Employees')
 
 @section('content_header')
-<h1>Employees</h1>
+<x-attendance.header title="Employees" icon="fas fa-id-badge" subtitle="Staff linked to fingerprint devices" />
 @stop
 
 @section('content')
