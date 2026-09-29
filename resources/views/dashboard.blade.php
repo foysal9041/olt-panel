@@ -34,6 +34,23 @@
                     @endif
                 </a>
             @endif
+
+            @php
+                $chips = array_filter([
+                    $olt ? ['fas fa-network-wired', $olt['total'] . ' ' . Str::plural('OLT', $olt['total'])] : null,
+                    $switches ? ['fas fa-server', $switches['total'] . ' ' . Str::plural('switch', $switches['total'])] : null,
+                    $nttn ? ['fas fa-project-diagram', $nttn['total'] . ' NTTN ' . Str::plural('link', $nttn['total'])] : null,
+                    $ip ? ['fas fa-globe', $ip['blocks']->count() . ' IP ' . Str::plural('block', $ip['blocks']->count())] : null,
+                    $latency ? ['fas fa-wave-square', $latency['total'] . ' latency ' . Str::plural('target', $latency['total'])] : null,
+                ]);
+            @endphp
+            @if ($chips)
+                <div class="dash-chips">
+                    @foreach ($chips as [$icon, $text])
+                        <span><i class="{{ $icon }}"></i> {{ $text }}</span>
+                    @endforeach
+                </div>
+            @endif
         </div>
         <div class="col-sm-4">
             <div class="dash-clock">
@@ -52,6 +69,17 @@
     </div>
 
 @else
+
+@if ($actions)
+    <div class="qa-grid">
+        @foreach ($actions as [$label, $icon, $url, $tone])
+            <a href="{{ $url }}" class="qa">
+                <span class="qa-icon tone-{{ $tone }}"><i class="{{ $icon }}"></i></span>
+                <span>{{ $label }}</span>
+            </a>
+        @endforeach
+    </div>
+@endif
 
 {{-- ================= KPI tiles ================= --}}
 <div class="kpi-grid">
@@ -83,6 +111,35 @@
                 @if ($switches['rx_alarms']) · <span class="text-warning font-weight-bold">{{ $switches['rx_alarms'] }} low Rx</span> @endif
             </div>
             <div class="kpi-bar"><span class="{{ $switches['down'] ? 'fill-rose' : 'fill-sky' }}" style="width: {{ $pct($switches['up'], $switches['total']) }}%"></span></div>
+        </a>
+    @endif
+
+    @if ($nttn)
+        <a href="{{ route('nttn-links.index') }}" class="kpi">
+            <div class="kpi-top">
+                <span class="kpi-label">NTTN Links Up</span>
+                <span class="kpi-icon tone-violet"><i class="fas fa-project-diagram"></i></span>
+            </div>
+            <div class="kpi-value">{{ $nttn['up'] }} <small>/ {{ $nttn['monitored'] }}</small></div>
+            <div class="kpi-foot">
+                @if ($nttn['down']) <span class="text-danger font-weight-bold">{{ $nttn['down'] }} down</span> ·
+                @endif
+                @if ($nttn['no_ip']) {{ $nttn['no_ip'] }} without IP
+                @elseif (! $nttn['down']) All links up @endif
+            </div>
+            <div class="kpi-bar"><span class="{{ $nttn['down'] ? 'fill-rose' : 'fill-indigo' }}" style="width: {{ $pct($nttn['up'], $nttn['monitored']) }}%"></span></div>
+        </a>
+    @endif
+
+    @if ($ip && $ip['size'])
+        <a href="{{ route('ip-pools.index') }}" class="kpi">
+            <div class="kpi-top">
+                <span class="kpi-label">Public IP Used</span>
+                <span class="kpi-icon tone-green"><i class="fas fa-globe"></i></span>
+            </div>
+            <div class="kpi-value">{{ $pct($ip['used'], $ip['size']) }}<small>%</small></div>
+            <div class="kpi-foot">{{ number_format($ip['size'] - $ip['used']) }} of {{ number_format($ip['size']) }} IPs free · {{ $ip['subnets'] }} subnets</div>
+            <div class="kpi-bar"><span class="{{ $pct($ip['used'], $ip['size']) >= 90 ? 'fill-rose' : ($pct($ip['used'], $ip['size']) >= 75 ? 'fill-amber' : 'fill-green') }}" style="width: {{ $pct($ip['used'], $ip['size']) }}%"></span></div>
         </a>
     @endif
 
@@ -286,6 +343,79 @@
     @endif
 
 </div>
+
+{{-- ================= Network resources ================= --}}
+@if (($ip && $ip['blocks']->isNotEmpty()) || $nttn)
+<div class="row">
+
+    @if ($ip && $ip['blocks']->isNotEmpty())
+        <div class="{{ $nttn ? 'col-lg-7' : 'col-12' }}">
+            <div class="card dash-panel">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-globe mr-1 text-success"></i> IP Space</h3>
+                    <a href="{{ route('ip-pools.index') }}" class="small">IP Management</a>
+                </div>
+                <div class="card-body">
+                    @foreach ($ip['blocks'] as $block)
+                        @php
+                            $bUsed = $block->usedCount($block->allocations);
+                            $bPct = $pct($bUsed, $block->size());
+                        @endphp
+                        <a href="{{ route('ip-blocks.show', $block) }}" class="ipblock-row">
+                            <div class="d-flex justify-content-between align-items-baseline">
+                                <span><strong class="mono">{{ $block->cidr }}</strong> <span class="text-muted small">{{ $block->name }}</span></span>
+                                <span class="small"><strong>{{ $bPct }}%</strong> <span class="text-muted">· {{ $block->size() - $bUsed }} free</span></span>
+                            </div>
+                            <div class="stack-bar mt-1">
+                                <span style="width: {{ $bPct }}%; background: {{ $bPct >= 90 ? '#f43f5e' : ($bPct >= 75 ? '#f59e0b' : '#22c55e') }}"></span>
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($nttn)
+        <div class="{{ $ip && $ip['blocks']->isNotEmpty() ? 'col-lg-5' : 'col-12' }}">
+            <div class="card dash-panel">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-project-diagram mr-1" style="color:#7c3aed"></i> NTTN Links</h3>
+                    <a href="{{ route('nttn-links.index') }}" class="small">All links</a>
+                </div>
+                <div class="card-body">
+                    @php
+                        $segments = [
+                            ['Up', $nttn['up'], '#22c55e'],
+                            ['Down', $nttn['down'], '#f43f5e'],
+                            ['Checking', $nttn['monitored'] - $nttn['up'] - $nttn['down'], '#94a3b8'],
+                            ['No IP', $nttn['no_ip'], '#e2e8f0'],
+                        ];
+                    @endphp
+                    <div class="stack-bar">
+                        @foreach ($segments as [$label, $value, $color])
+                            @if ($value > 0)
+                                <span style="width: {{ $pct($value, $nttn['total']) }}%; background: {{ $color }}" title="{{ $label }}: {{ $value }}"></span>
+                            @endif
+                        @endforeach
+                    </div>
+                    <div class="stack-legend">
+                        @foreach ($segments as [$label, $value, $color])
+                            <div><i style="background: {{ $color }}"></i> {{ $label }} <b>{{ $value }}</b></div>
+                        @endforeach
+                    </div>
+                    @if ($nttn['no_ip'])
+                        <div class="small text-muted mt-3">
+                            <i class="fas fa-info-circle"></i> {{ $nttn['no_ip'] }} {{ Str::plural('link', $nttn['no_ip']) }} have no Peering/Ping IP yet, so they aren't monitored.
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+</div>
+@endif
 
 @endunless
 

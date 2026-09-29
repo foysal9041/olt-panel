@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceSetting;
 use App\Models\Employee;
 use App\Models\Invoice;
+use App\Models\IpBlock;
+use App\Models\NttnLink;
 use App\Models\LatencyTarget;
 use App\Models\NetworkSwitch;
 use App\Models\Olt;
@@ -32,6 +34,8 @@ class DashboardController extends Controller
             'latency' => Gate::allows('access-latency-graphs'),
             'attendance' => Gate::allows('access-attendance'),
             'accounts' => Gate::allows('access-accounts-dashboard'),
+            'nttn' => Gate::allows('access-olt-nttn'),
+            'ip' => Gate::allows('access-olt-ip'),
         ];
 
         $overview = new NocOverview($user);
@@ -102,6 +106,47 @@ class DashboardController extends Controller
             $accounts['outstanding'] = $accounts['invoiced'] - $accounts['collected'];
         }
 
-        return view('dashboard', compact('can', 'olt', 'switches', 'events', 'latency', 'attendance', 'accounts', 'issues'));
+        $nttn = null;
+        if ($can['nttn']) {
+            $links = NttnLink::where('status', 'active')->get();
+            $monitored = $links->filter(fn (NttnLink $l) => $l->pingTarget() !== null);
+
+            $nttn = [
+                'total' => $links->count(),
+                'monitored' => $monitored->count(),
+                'up' => $monitored->where('link_state', 1)->count(),
+                'down' => $monitored->where('link_state', 0)->count(),
+                'no_ip' => $links->count() - $monitored->count(),
+            ];
+        }
+
+        $ip = null;
+        if ($can['ip']) {
+            $blocks = IpBlock::with('allocations')->orderBy('cidr')->get();
+            $size = $blocks->sum(fn (IpBlock $b) => $b->size());
+            $used = $blocks->sum(fn (IpBlock $b) => $b->usedCount($b->allocations));
+
+            $ip = [
+                'blocks' => $blocks,
+                'size' => $size,
+                'used' => $used,
+                'subnets' => $blocks->sum(fn (IpBlock $b) => $b->allocations->count()),
+            ];
+        }
+
+        // One-click shortcuts, only for what this user may do.
+        $actions = array_values(array_filter([
+            Gate::allows('access-olt-manage') ? ['Add OLT', 'fas fa-network-wired', route('olt.create'), 'indigo'] : null,
+            $can['switches'] ? ['Add Switch', 'fas fa-server', route('switches.create'), 'sky'] : null,
+            $can['nttn'] ? ['Add NTTN Link', 'fas fa-project-diagram', route('nttn-links.create'), 'violet'] : null,
+            $can['ip'] ? ['Allocate IP', 'fas fa-globe', route('ip-pools.create'), 'green'] : null,
+            Gate::allows('access-latency-targets') ? ['Latency Target', 'fas fa-wave-square', route('latency.targets.create'), 'violet'] : null,
+            Gate::allows('access-accounts-invoices') ? ['Receive Payment', 'fas fa-hand-holding-usd', route('accounts.payments.create'), 'green'] : null,
+            Gate::allows('access-accounts-transactions') ? ['Add Transaction', 'fas fa-exchange-alt', route('accounts.transactions.create'), 'amber'] : null,
+            Gate::allows('access-accounts-invoices') ? ['Invoices', 'fas fa-file-invoice', route('accounts.invoices.index'), 'amber'] : null,
+            Gate::allows('access-attendance-leaves') ? ['Add Leave', 'fas fa-plane-departure', route('attendance.leaves.create'), 'rose'] : null,
+        ]));
+
+        return view('dashboard', compact('can', 'olt', 'switches', 'events', 'latency', 'attendance', 'accounts', 'issues', 'nttn', 'ip', 'actions'));
     }
 }
