@@ -21,7 +21,7 @@ class ZkDeviceController extends Controller
     {
         $this->authorizeAdmin();
 
-        return view('attendance.devices.create');
+        return view('attendance.devices.create', ['zones' => \App\Models\Zone::names()]);
     }
 
     public function store(Request $request)
@@ -31,7 +31,7 @@ class ZkDeviceController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'serial_number' => 'required|string|max:255|unique:zk_devices,serial_number',
-            'zone' => 'nullable|string|max:100',
+            'zone' => 'nullable|exists:zones,name',
         ]);
 
         ZkDevice::create($validated);
@@ -45,7 +45,7 @@ class ZkDeviceController extends Controller
     {
         $this->authorizeAdmin();
 
-        return view('attendance.devices.edit', compact('device'));
+        return view('attendance.devices.edit', compact('device') + ['zones' => \App\Models\Zone::names()]);
     }
 
     public function update(Request $request, ZkDevice $device)
@@ -54,7 +54,7 @@ class ZkDeviceController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'zone' => 'nullable|string|max:100',
+            'zone' => 'nullable|exists:zones,name',
             'clock_offset_minutes' => 'nullable|integer|min:-720|max:720',
         ]);
 

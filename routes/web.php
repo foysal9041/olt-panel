@@ -74,6 +74,9 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
         [OltController::class,'dashboard']
     )->name('olt.dashboard')->middleware('can:access-olt-dashboard');
 
+    Route::get('/olt/suggest', [OltController::class, 'suggest'])
+        ->name('olt.suggest')->middleware('can:access-olt-manage');
+
     Route::resource('olt', OltController::class)
         ->middleware('can:access-olt-manage');
 

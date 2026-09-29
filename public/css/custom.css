@@ -305,6 +305,7 @@ body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item
 .role-viewer form[method="POST"]:not(#logout-form),
 .role-viewer form[method="post"]:not(#logout-form),
 .role-viewer button[form],
+.role-viewer .viewer-hide,
 .role-viewer .qa-grid {
     display: none !important;
 }
@@ -314,3 +315,123 @@ body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item
     display: block !important;
     pointer-events: none;
 }
+
+
+/* ---- VLAN Management: free VLAN finder ---------------------------------- */
+
+.vlan-pick {
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: .75rem 1rem;
+    background: #fff;
+}
+.vlan-pick.vlan-pick-main {
+    border-color: #28a745;
+    background: #f3fbf5;
+}
+.vlan-pick .vlan-range {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    font-variant-numeric: tabular-nums;
+}
+.vlan-pick .vlan-ids .badge {
+    font-size: .8rem;
+    font-weight: 600;
+    margin: 0 .15rem .15rem 0;
+}
+.vlan-src {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.vlan-src-vlan { background: #6f42c1; color: #fff; }
+.vlan-src-olt  { background: #007bff; color: #fff; }
+.vlan-src-pool { background: #17a2b8; color: #fff; }
+.vlan-src-nttn { background: #fd7e14; color: #fff; }
+
+
+/* ---- Dropdowns (Select2, Bootstrap 4 theme) -----------------------------
+   Same height, border and radius as the other inputs; a long list scrolls
+   inside itself (never the page), is taller and easier to read. */
+
+.select2-container--bootstrap4 .select2-selection {
+    border-color: #cbd2e1;
+    border-radius: .4rem;
+}
+.select2-container--bootstrap4 .select2-selection--single:hover {
+    border-color: #a5b4fc;
+}
+.select2-container--bootstrap4.select2-container--focus .select2-selection,
+.select2-container--bootstrap4.select2-container--open .select2-selection {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 .2rem rgba(79, 70, 229, .15);
+}
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+    padding-right: 2.25rem;  /* room for the arrow and the clear (×) */
+    color: #1f2937;
+}
+.select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+    right: .45rem;
+}
+.select2-container--bootstrap4 .select2-selection__clear {
+    margin-right: .25rem;
+}
+
+.select2-container--bootstrap4 .select2-dropdown {
+    border-color: var(--brand);
+    box-shadow: 0 14px 32px -12px rgba(15, 23, 42, .35);
+    overflow: hidden;
+}
+.select2-container--bootstrap4 .select2-dropdown.select2-dropdown--below { border-radius: 0 0 .4rem .4rem; }
+.select2-container--bootstrap4 .select2-dropdown.select2-dropdown--above { border-radius: .4rem .4rem 0 0; }
+
+.select2-container--bootstrap4 .select2-search--dropdown {
+    padding: .5rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #eef2f7;
+}
+.select2-container--bootstrap4 .select2-search--dropdown .select2-search__field {
+    border-color: #cbd2e1;
+    border-radius: .4rem;
+    padding-left: 2rem;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2394a3b8'%3E%3Cpath d='M11.7 10.3l3 3-1.4 1.4-3-3a6 6 0 1 1 1.4-1.4zM6.5 11a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9z'/%3E%3C/svg%3E") no-repeat .65rem center / .85rem;
+}
+.select2-container--bootstrap4 .select2-search--dropdown .select2-search__field:focus {
+    border-color: var(--brand);
+    outline: 0;
+}
+
+.select2-container--bootstrap4 .select2-results > .select2-results__options {
+    max-height: min(22rem, 55vh);
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+.select2-container--bootstrap4 .select2-results__option {
+    padding: .45rem .75rem;
+    font-size: .9rem;
+}
+.select2-container--bootstrap4 .select2-results__option + .select2-results__option {
+    border-top: 1px solid #f1f5f9;
+}
+.select2-container--bootstrap4 .select2-dropdown .select2-results__option[aria-selected="true"] {
+    background: var(--brand-light);
+    color: var(--brand-dark);
+    font-weight: 600;
+}
+.select2-container--bootstrap4 .select2-results__option--highlighted,
+.select2-container--bootstrap4 .select2-results__option--highlighted.select2-results__option[aria-selected="true"] {
+    background: var(--brand);
+    color: #fff;
+}
+
+/* Zone dropdown: name on the left, OLT count / down / POP on the right */
+.zs-opt { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.zs-opt .zs-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zs-opt .zs-meta { display: inline-flex; align-items: center; gap: .25rem; flex: none; }
+.select2-selection__rendered .zs-opt { height: calc(1.5em + .75rem); }
+.zs-badge { font-size: .68rem; font-weight: 700; line-height: 1; padding: .25rem .45rem; border-radius: 999px;
+    background: #eef2f7; color: #475569; }
+.zs-badge.down { background: #ffe4e6; color: #be123c; }
+.zs-badge.pop { background: #fef3c7; color: #92400e; }
+.select2-results__option--highlighted .zs-badge { background: rgba(255, 255, 255, .22); color: #fff; }

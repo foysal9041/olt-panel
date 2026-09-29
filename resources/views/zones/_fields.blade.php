@@ -6,8 +6,8 @@
         <input type="text" name="name" class="form-control" value="{{ $v('name') }}"
                placeholder="e.g. Sunlit Khulna POP" required autofocus>
         @if ($zone->exists ?? false)
-            <small class="form-text text-warning"><i class="fas fa-exclamation-triangle"></i>
-                OLTs, switches, users and customers are linked by this name — renaming here does not rename them.</small>
+            <small class="form-text text-muted"><i class="fas fa-info-circle"></i>
+                Renaming also renames it on every OLT, switch, IP subnet, NTTN link, VLAN, user, employee and customer.</small>
         @endif
     </div>
     <div class="col-md-4 form-group">
@@ -30,6 +30,17 @@
     <div class="col-md-6 form-group">
         <label>Email</label>
         <input type="email" name="email" class="form-control" value="{{ $v('email') }}" placeholder="optional">
+    </div>
+    <div class="col-12 form-group">
+        <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input" id="own_vlans" name="own_vlans" value="1"
+                   @checked(old('own_vlans', $zone->own_vlans ?? false))>
+            <label class="custom-control-label" for="own_vlans">Own VLANs (POP with its own switch)</label>
+        </div>
+        <small class="form-text text-muted">
+            VLANs here are only checked against this POP — e.g. 101-108 can be used at several POPs.
+            Leave off for zones on the core network, where every VLAN must be unique.
+        </small>
     </div>
     <div class="col-12 form-group mb-0">
         <label>Notes</label>

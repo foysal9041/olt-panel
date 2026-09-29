@@ -55,12 +55,10 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
                             </div>
-                            <select name="zone" class="form-control select2-zone" required>
-                                <option value="">Select a zone</option>
-                                @foreach($zones as $zone)
-                                    <option value="{{ $zone }}" {{ old('zone', $olt->zone) == $zone ? 'selected' : '' }}>
-                                        {{ $zone }}
-                                    </option>
+                            <select name="zone" class="form-control js-zone-select" data-placeholder="Select a zone" required>
+                                <option value=""></option>
+                                @foreach($zoneStats as $zone => $st)
+                                    <option value="{{ $zone }}" data-name="{{ $zone }}" data-count="{{ $st['count'] }}" data-down="{{ $st['down'] }}" data-pop="{{ $st['pop'] ? 1 : 0 }}" @selected(old('zone', $olt->zone) == $zone)>{{ $zone }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -149,14 +147,15 @@
                     </div>
 
                     <div class="form-group">
-                        <label>SNMP Community</label>
+                        <label>SNMP Community <small class="text-muted">(optional)</small></label>
                         <div class="input-group">
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-key"></i></span>
                             </div>
                             <input type="text"
                                    name="snmp"
-                                   value="{{ $olt->snmp }}"
+                                   value="{{ old('snmp', $olt->snmp) }}"
+                                   placeholder="Leave blank if not used"
                                    class="form-control">
                         </div>
                     </div>
@@ -185,14 +184,5 @@
     </form>
 
 </div>
-
-<script>
-$(function () {
-    $('.select2-zone').select2({
-        theme: 'bootstrap4',
-        width: '100%',
-    });
-});
-</script>
 
 @stop

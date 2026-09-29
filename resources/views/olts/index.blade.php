@@ -24,11 +24,11 @@
 
         <div class="col-md-2">
 
-            <a href="{{ route('olt.create') }}"
+            <a href="{{ route('olt.create', array_filter(['zone' => request('zone')])) }}"
                class="btn btn-primary btn-block">
 
                 <i class="fas fa-plus"></i>
-                Add OLT
+                {{ request('zone') ? 'Add OLTs here' : 'Add OLTs' }}
 
             </a>
 
@@ -41,17 +41,18 @@
 
                 <div class="row">
 
-                    <div class="col-md-2">
+                    <div class="col-md-3">
 
-                        <input type="text"
-                               name="zone"
-                               class="form-control"
-                               placeholder="Zone"
-                               value="{{ request('zone') }}">
+                        <select name="zone" class="form-control js-zone-select" data-placeholder="All zones ({{ $zoneStats->sum('count') }} OLTs)" onchange="this.form.submit()">
+                            <option value=""></option>
+                            @foreach ($zoneStats as $zoneName => $st)
+                                <option value="{{ $zoneName }}" data-name="{{ $zoneName }}" data-count="{{ $st['count'] }}" data-down="{{ $st['down'] }}" data-pop="{{ $st['pop'] ? 1 : 0 }}" @selected(request('zone') === $zoneName)>{{ $zoneName }}</option>
+                            @endforeach
+                        </select>
 
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-2">
 
                         <input type="text"
                                name="search"
@@ -265,8 +266,12 @@
 
 <script>
 
+// Refresh every 30s for fresh status — but not while someone is picking a
+// zone or typing in a filter (it would close the dropdown / lose the text).
 setInterval(function () {
-    location.reload();
+    var busy = document.querySelector('.select2-container--open')
+        || (document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName));
+    if (!busy) location.reload();
 }, 30000);
 
 </script>

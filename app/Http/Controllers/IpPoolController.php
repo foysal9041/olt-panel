@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ChecksSubnetOverlap;
+use App\Http\Controllers\Concerns\ChecksVlanOverlap;
 use App\Models\IpBlock;
 use App\Models\IpPool;
 use App\Models\Zone;
+use App\Services\IpInventory;
 use App\Support\SubnetRange;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -16,14 +18,54 @@ use Illuminate\Validation\ValidationException;
  */
 class IpPoolController extends Controller
 {
-    use ChecksSubnetOverlap;
+    use ChecksSubnetOverlap, ChecksVlanOverlap;
 
-    public function index()
+    public function index(Request $request)
     {
         $blocks = IpBlock::with('allocations')->orderBy('type')->orderBy('cidr')->get();
         $standalone = IpPool::whereNull('ip_block_id')->orderBy('network')->get();
 
-        return view('ip_pools.index', compact('blocks', 'standalone'));
+        // One register of every IP in the panel (OLTs, switches, subnets, NTTN …).
+        $inventory = new IpInventory;
+        $entries = $inventory->entries();
+
+        $source = array_key_exists($request->query('src'), IpInventory::SOURCES) ? $request->query('src') : null;
+        $zone = $request->query('zone') ?: null;
+        $records = $entries
+            ->when($source, fn ($c) => $c->where('source', $source))
+            ->when($zone === '_none', fn ($c) => $c->whereNull('zone'))
+            ->when($zone && $zone !== '_none', fn ($c) => $c->where('zone', $zone))
+            ->values();
+
+        $lookupQuery = trim((string) $request->query('ip', ''));
+        $lookup = $lookupQuery !== '' ? $inventory->lookup($lookupQuery) : null;
+
+        // Find free IPs: how many blocks of which size, inside which range.
+        $find = [
+            'size' => max(24, min(32, (int) $request->query('size', 30))),
+            'count' => max(1, min(64, (int) $request->query('count', 1))),
+            'range' => trim((string) $request->query('range', '')),
+        ];
+        $findRange = $find['range'] !== '' ? IpInventory::parseRange($find['range']) : null;
+        $found = $findRange
+            ? $inventory->findFree($find['size'], $find['count'], $findRange[0], $findRange[1])
+            : null;
+
+        return view('ip_pools.index', [
+            'blocks' => $blocks,
+            'standalone' => $standalone,
+            'records' => $records,
+            'sourceCounts' => $entries->countBy('source'),
+            'duplicates' => $inventory->duplicates(),
+            'lookupQuery' => $lookupQuery,
+            'lookup' => $lookup,
+            'find' => $find,
+            'findRange' => $findRange,
+            'found' => $found,
+            'series' => $inventory->series(),
+            'filter' => ['src' => $source, 'zone' => $zone],
+            'zones' => Zone::names(),
+        ]);
     }
 
     public function create(Request $request)
@@ -33,7 +75,10 @@ class IpPoolController extends Controller
         $ipPool = new IpPool([
             'ip_block_id' => $block?->id,
             'subnet' => $request->query('subnet'),
-            'type' => $block?->type ?? 'public',
+            'zone' => $request->query('zone'),
+            'device' => $request->query('device'),
+            'purpose' => $request->query('purpose'),
+            'type' => $block?->type ?? ($request->query('subnet') && ! $this->isPublic($request->query('subnet')) ? 'private' : 'public'),
             'status' => 'active',
         ]);
 
@@ -96,7 +141,7 @@ class IpPoolController extends Controller
             'private_subnet' => 'nullable|string|max:50',
             'gateway'        => 'nullable|ip',
             'type'           => 'required|in:public,private',
-            'zone'           => 'nullable|string',
+            'zone'           => 'nullable|exists:zones,name',
             'vlan'           => ['nullable', 'string', 'max:255', 'regex:/^[\d\s,\-]*$/'],
             'status'         => 'required|in:active,inactive',
             'description'    => 'nullable|string',
@@ -141,8 +186,20 @@ class IpPoolController extends Controller
                 ->map(fn ($v) => preg_replace('/\s*-\s*/', '-', trim($v)))
                 ->filter()
                 ->implode(', ');
+
+            $this->assertVlanNotOverlapping($validated['vlan'], excludeIpPoolId: $ipPool?->id);
         }
 
         return $validated;
+    }
+
+    /**
+     * Not in 10/8, 172.16/12, 192.168/16 (or other reserved space).
+     */
+    protected function isPublic(string $subnet): bool
+    {
+        $ip = explode('/', trim($subnet))[0];
+
+        return (bool) filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
     }
 }

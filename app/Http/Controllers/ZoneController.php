@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Olt;
 use App\Models\Zone;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ZoneController extends Controller
 {
@@ -30,6 +30,8 @@ class ZoneController extends Controller
             'name' => 'required|string|max:255|unique:zones,name',
         ] + $this->contactRules());
 
+        $validated['own_vlans'] = $request->boolean('own_vlans');
+
         Zone::create($validated);
 
         return redirect()
@@ -48,17 +50,25 @@ class ZoneController extends Controller
             'name' => 'required|string|max:255|unique:zones,name,' . $zone->id,
         ] + $this->contactRules());
 
-        $zone->update($validated);
+        $validated['own_vlans'] = $request->boolean('own_vlans');
+        $oldName = $zone->name;
+
+        // Renaming also renames it on every OLT, switch, subnet, user … (Zone::booted).
+        DB::transaction(fn () => $zone->update($validated));
 
         return redirect()
             ->route('zones.index')
-            ->with('success', 'Zone Updated Successfully');
+            ->with('success', $oldName !== $zone->name
+                ? "Zone renamed to “{$zone->name}” — updated everywhere it's used."
+                : 'Zone Updated Successfully');
     }
 
     public function destroy(Zone $zone)
     {
-        if (Olt::where('zone', $zone->name)->exists()) {
-            return back()->with('error', 'This zone has OLTs assigned to it and cannot be deleted.');
+        if ($used = $zone->references()) {
+            $list = collect($used)->map(fn ($n, $what) => "{$n} {$what}")->implode(', ');
+
+            return back()->with('error', "“{$zone->name}” is still used by {$list} — move them to another zone first.");
         }
 
         $zone->delete();

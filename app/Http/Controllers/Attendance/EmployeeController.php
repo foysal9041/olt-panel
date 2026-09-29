@@ -7,7 +7,6 @@ use App\Models\AttendanceLog;
 use App\Models\DutyShift;
 use App\Models\Employee;
 use App\Models\LeaveType;
-use App\Models\Olt;
 use Illuminate\Http\Request;
 
 /**
@@ -108,7 +107,7 @@ class EmployeeController extends Controller
             'phone' => 'nullable|string|max:50',
             'designation' => 'nullable|string|max:255',
             'device_user_id' => 'nullable|string|max:255|unique:employees,device_user_id,' . ($employee->id ?? 'NULL'),
-            'zone' => 'nullable|string|max:100',
+            'zone' => 'nullable|exists:zones,name',
             'duty_shift_id' => 'nullable|exists:duty_shifts,id',
             'weekly_off_day' => 'nullable|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'status' => 'nullable|boolean',
@@ -154,11 +153,6 @@ class EmployeeController extends Controller
 
     private function zones()
     {
-        return Olt::select('zone')
-            ->whereNotNull('zone')
-            ->where('zone', '!=', '')
-            ->distinct()
-            ->orderBy('zone')
-            ->pluck('zone');
+        return \App\Models\Zone::names();
     }
 }

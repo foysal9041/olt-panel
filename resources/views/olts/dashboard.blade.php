@@ -39,15 +39,40 @@
     .dash-live .dash-health-dot { width: .5rem; height: .5rem; border-radius: 50%; background: #22c55e; }
     .dash-live--bad .dash-health-dot { background: #f43f5e; animation: dash-pulse 1.6s ease-in-out infinite; }
 
-    .olt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .85rem; }
-    .olt-tile { position: relative; padding: .9rem 1rem; border-radius: .8rem; background: #fff; border: 1px solid #eef2f7; }
-    .olt-tile::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; border-radius: .8rem 0 0 .8rem; background: #22c55e; }
-    .olt-tile.down::before { background: #f43f5e; }
-    .olt-tile.down { background: #fff7f8; border-color: #fecdd3; }
-    .olt-name { font-weight: 700; color: #0f172a; }
-    .olt-meta { font-size: .8rem; color: #64748b; }
-    .olt-actions { margin-top: .6rem; display: flex; gap: .35rem; }
-    .olt-actions .btn { padding: .15rem .5rem; font-size: .75rem; }
+    /* OLTs grouped by zone: one compact tile per zone, one dot per OLT */
+    .oz-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+    .oz-tools .form-control { width: 210px; max-width: 100%; }
+    .oz-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px; font-size: .78rem; font-weight: 600; }
+    .oz-pill.up { background: #dcfce7; color: #15803d; }
+    .oz-pill.down { background: #ffe4e6; color: #be123c; }
+    .oz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .7rem; }
+    .oz-tile { position: relative; padding: .65rem .8rem .55rem; border-radius: .7rem; background: #fff; border: 1px solid #eef2f7; }
+    .oz-tile::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; border-radius: .7rem 0 0 .7rem; background: #22c55e; }
+    .oz-tile.has-down { background: #fff7f8; border-color: #fecdd3; }
+    .oz-tile.has-down::before { background: #f43f5e; }
+    .oz-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+    .oz-name { font-weight: 700; color: #0f172a; font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .oz-count { font-size: .78rem; font-weight: 700; color: #15803d; white-space: nowrap; }
+    .oz-tile.has-down .oz-count { color: #be123c; }
+    .oz-dots { display: flex; flex-wrap: wrap; gap: 4px; margin: .45rem 0 .15rem; }
+    .oz-dot { width: 13px; height: 13px; border-radius: 3px; background: #22c55e; display: inline-block; }
+    .oz-dot.down { background: #f43f5e; animation: dash-pulse 1.6s ease-in-out infinite; }
+    a.oz-dot:hover { outline: 2px solid #0f172a33; }
+    .oz-down { font-size: .75rem; color: #be123c; line-height: 1.3; }
+    .oz-more summary { font-size: .74rem; color: #64748b; cursor: pointer; list-style: none; margin-top: .2rem; }
+    .oz-more summary::-webkit-details-marker { display: none; }
+    .oz-more summary::before { content: '\25B8'; display: inline-block; margin-right: .3rem; transition: transform .15s; }
+    .oz-more[open] summary::before { transform: rotate(90deg); }
+    .oz-list { list-style: none; padding: 0; margin: .4rem 0 0; border-top: 1px dashed #e2e8f0; }
+    .oz-list li { display: flex; align-items: center; gap: .4rem; padding: .3rem 0; font-size: .78rem; border-bottom: 1px dashed #f1f5f9; }
+    .oz-list li:last-child { border-bottom: 0; }
+    .oz-list .oz-dot { width: 9px; height: 9px; flex: none; animation: none; }
+    .oz-list .oz-olt { flex: 1; min-width: 0; }
+    .oz-list .oz-olt b { display: block; color: #0f172a; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .oz-list .oz-olt code { font-size: .72rem; color: #64748b; background: none; padding: 0; }
+    .oz-list .oz-act a { color: #94a3b8; margin-left: .3rem; }
+    .oz-list .oz-act a:hover { color: #4f46e5; }
+    .oz-empty { display: none; padding: 1.5rem; text-align: center; color: #64748b; }
 
     .sw-bar { height: .4rem; border-radius: 999px; background: #eef2f7; overflow: hidden; min-width: 70px; }
     .sw-bar span { display: block; height: 100%; background: #0ea5e9; border-radius: 999px; }
@@ -191,40 +216,90 @@
     @endif
 </div>
 
-{{-- ============ OLTs ============ --}}
+{{-- ============ OLTs by zone ============ --}}
+@php
+    // One tile per zone; zones with an offline OLT first.
+    $oltZones = $olts->groupBy(fn ($o) => $o->zone ?: 'No zone')
+        ->map(fn ($list, $zone) => [
+            'zone' => $zone,
+            'olts' => $list->sortBy([
+                fn ($a, $b) => $a->status <=> $b->status,
+                fn ($a, $b) => strnatcasecmp($a->name, $b->name),
+            ])->values(),
+            'down' => $list->where('status', 0)->count(),
+        ])
+        ->sortBy(fn ($z) => [$z['down'] ? 0 : 1, strtolower($z['zone'])])
+        ->values();
+    $oltOffline = $olts->count() - $oltOnline;
+@endphp
 <div class="card dash-panel" id="olts">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-network-wired mr-1" style="color:#4f46e5"></i> OLTs</h3>
-        @if ($canManageOlt)
-            <a href="{{ route('olt.index') }}" class="small">Manage</a>
-        @endif
+    <div class="card-header d-flex flex-wrap align-items-center" style="gap:.5rem">
+        <h3 class="card-title mr-auto"><i class="fas fa-network-wired mr-1" style="color:#4f46e5"></i> OLTs by Zone
+            <small class="text-muted ml-1">{{ $oltZones->count() }} zones</small>
+        </h3>
+        <div class="oz-tools">
+            <span class="oz-pill up"><i class="fas fa-circle" style="font-size:.5rem"></i> {{ $oltOnline }} online</span>
+            @if ($oltOffline)
+                <button type="button" class="oz-pill down border-0" id="oz-offline" title="Show only zones with an offline OLT">
+                    <i class="fas fa-circle" style="font-size:.5rem"></i> {{ $oltOffline }} offline
+                </button>
+            @endif
+            <input type="search" id="oz-search" class="form-control form-control-sm" placeholder="Search zone, OLT or IP…">
+            @if ($canManageOlt)
+                <a href="{{ route('olt.index') }}" class="small ml-1">Manage</a>
+            @endif
+        </div>
     </div>
     <div class="card-body">
         @if ($olts->isEmpty())
             <div class="dash-empty"><i class="fas fa-network-wired" style="color:#cbd5e1"></i>No OLTs yet.</div>
         @else
-            <div class="olt-grid">
-                @foreach ($olts as $olt)
-                    <div class="olt-tile {{ $olt->status ? '' : 'down' }}">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="olt-name">{{ $olt->name }}</div>
-                            <span class="badge {{ $olt->status ? 'badge-success' : 'badge-danger' }}">{{ $olt->status ? 'LIVE' : 'DOWN' }}</span>
+            <div class="oz-grid" id="oz-grid">
+                @foreach ($oltZones as $z)
+                    <div class="oz-tile {{ $z['down'] ? 'has-down' : '' }}" data-zone="{{ $z['zone'] }}" data-down="{{ $z['down'] }}"
+                         data-search="{{ strtolower($z['zone'] . ' ' . $z['olts']->map(fn ($o) => $o->name . ' ' . $o->ip . ' ' . $o->vlan)->implode(' ')) }}">
+                        <div class="oz-head">
+                            <span class="oz-name" title="{{ $z['zone'] }}">{{ $z['zone'] }}</span>
+                            <span class="oz-count">{{ $z['olts']->count() - $z['down'] }}/{{ $z['olts']->count() }}</span>
                         </div>
-                        <div class="olt-meta mt-1">
-                            <code>{{ $olt->ip }}</code>
-                            @if ($olt->zone) · {{ $olt->zone }} @endif
+                        <div class="oz-dots">
+                            @foreach ($z['olts'] as $olt)
+                                @php $tip = $olt->name . ' · ' . $olt->ip . ($olt->vlan ? ' · VLAN ' . $olt->vlan : '') . ' · ' . ($olt->status ? 'LIVE' : 'DOWN'); @endphp
+                                @if ($canManageOlt)
+                                    <a href="{{ route('olt.show', $olt) }}" class="oz-dot {{ $olt->status ? '' : 'down' }}" title="{{ $tip }}"></a>
+                                @else
+                                    <span class="oz-dot {{ $olt->status ? '' : 'down' }}" title="{{ $tip }}"></span>
+                                @endif
+                            @endforeach
                         </div>
-                        <div class="olt-meta">{{ $olt->brand }}@if ($olt->vlan) · VLAN {{ $olt->vlan }} @endif</div>
-                        @if ($canManageOlt)
-                            <div class="olt-actions">
-                                <a href="{{ route('olt.show', $olt) }}" class="btn btn-light"><i class="fas fa-eye"></i> Details</a>
-                                <a href="{{ route('olt.web', $olt) }}" target="_blank" class="btn btn-light"><i class="fas fa-external-link-alt"></i> Web</a>
-                                <a href="{{ route('olts.ping', $olt) }}" target="_blank" class="btn btn-light"><i class="fas fa-satellite-dish"></i> Ping</a>
-                            </div>
+                        @if ($z['down'])
+                            <div class="oz-down"><i class="fas fa-exclamation-circle"></i> {{ $z['olts']->where('status', 0)->pluck('name')->implode(', ') }}</div>
                         @endif
+                        <details class="oz-more">
+                            <summary>{{ $z['olts']->count() }} {{ Str::plural('OLT', $z['olts']->count()) }}</summary>
+                            <ul class="oz-list">
+                                @foreach ($z['olts'] as $olt)
+                                    <li>
+                                        <span class="oz-dot {{ $olt->status ? '' : 'down' }}"></span>
+                                        <span class="oz-olt">
+                                            <b title="{{ $olt->name }}">{{ $olt->name }}</b>
+                                            <code>{{ $olt->ip }}</code>@if ($olt->vlan) <span class="text-muted">· VLAN {{ $olt->vlan }}</span>@endif
+                                        </span>
+                                        @if ($canManageOlt)
+                                            <span class="oz-act text-nowrap">
+                                                <a href="{{ route('olt.show', $olt) }}" title="Details"><i class="fas fa-eye"></i></a>
+                                                <a href="{{ route('olt.web', $olt) }}" target="_blank" title="Web"><i class="fas fa-external-link-alt"></i></a>
+                                                <a href="{{ route('olts.ping', $olt) }}" target="_blank" title="Ping"><i class="fas fa-satellite-dish"></i></a>
+                                            </span>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </details>
                     </div>
                 @endforeach
             </div>
+            <div class="oz-empty" id="oz-empty"><i class="fas fa-search"></i> No zone or OLT matches.</div>
         @endif
     </div>
 </div>
@@ -330,6 +405,49 @@
 document.querySelectorAll('.js-smokegraph').forEach(function (el) {
     SmokeGraph.create(el, { url: el.dataset.url, height: 110, compact: true, refresh: 60 });
 });
+
+// OLTs by zone: search, "offline only", and open lists survive the reload.
+(function () {
+    var grid = document.getElementById('oz-grid');
+    if (!grid) return;
+    var tiles = Array.prototype.slice.call(grid.querySelectorAll('.oz-tile'));
+    var search = document.getElementById('oz-search');
+    var offlineBtn = document.getElementById('oz-offline');
+    var store = {
+        get: function (k) { try { return JSON.parse(sessionStorage.getItem('noc-oz-' + k)); } catch (e) { return null; } },
+        set: function (k, v) { try { sessionStorage.setItem('noc-oz-' + k, JSON.stringify(v)); } catch (e) {} }
+    };
+    var offlineOnly = !!store.get('offline') && !!offlineBtn;
+    search.value = store.get('q') || '';
+
+    function apply() {
+        var q = search.value.trim().toLowerCase(), shown = 0;
+        tiles.forEach(function (t) {
+            var ok = (!q || t.dataset.search.indexOf(q) !== -1) && (!offlineOnly || t.dataset.down !== '0');
+            t.style.display = ok ? '' : 'none';
+            if (ok) shown++;
+        });
+        document.getElementById('oz-empty').style.display = shown ? 'none' : 'block';
+        if (offlineBtn) offlineBtn.style.boxShadow = offlineOnly ? '0 0 0 2px #be123c' : '';
+        store.set('q', search.value);
+        store.set('offline', offlineOnly);
+    }
+
+    search.addEventListener('input', apply);
+    if (offlineBtn) offlineBtn.addEventListener('click', function () { offlineOnly = !offlineOnly; apply(); });
+
+    var open = store.get('open') || [];
+    tiles.forEach(function (t) {
+        var d = t.querySelector('details');
+        if (open.indexOf(t.dataset.zone) !== -1) d.open = true;
+        d.addEventListener('toggle', function () {
+            var list = tiles.filter(function (x) { return x.querySelector('details').open; }).map(function (x) { return x.dataset.zone; });
+            store.set('open', list);
+        });
+    });
+
+    apply();
+})();
 
 // OLT status is checked every 30 seconds; keep the page in step.
 setTimeout(function () { location.reload(); }, 30000);

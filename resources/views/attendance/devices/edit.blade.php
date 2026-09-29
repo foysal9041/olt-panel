@@ -34,8 +34,13 @@
             </div>
 
             <div class="form-group">
-                <label>Zone / Location</label>
-                <input type="text" name="zone" class="form-control" value="{{ old('zone', $device->zone) }}" placeholder="e.g. Head Office">
+                <label>Zone</label>
+                <select name="zone" class="form-control">
+                    <option value="">— None —</option>
+                    @foreach($zones as $zone)
+                        <option value="{{ $zone }}" @selected(old('zone', $device->zone) === $zone)>{{ $zone }}</option>
+                    @endforeach
+                </select>
                 @error('zone')
                     <div class="text-danger">{{ $message }}</div>
                 @enderror

@@ -50,6 +50,9 @@
                         <td class="text-center text-muted">{{ $loop->iteration }}</td>
                         <td>
                             <strong style="color:#0f172a">{{ $zone->name }}</strong>
+                            @if ($zone->own_vlans)
+                                <span class="badge badge-light border ml-1" title="Own VLAN space — VLANs checked only within this POP">Own VLANs</span>
+                            @endif
                             @if ($zone->notes)
                                 <i class="fas fa-sticky-note text-warning ml-1" title="{{ $zone->notes }}"></i>
                             @endif

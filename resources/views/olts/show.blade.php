@@ -93,7 +93,7 @@
                 <div class="form-group">
                     <label>SNMP Community</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" value="{{ $olt->snmp }}" readonly id="field-snmp">
+                        <input type="text" class="form-control" value="{{ $olt->snmp }}" placeholder="Not set" readonly id="field-snmp">
                         <div class="input-group-append">
                             <button type="button" class="btn btn-outline-secondary js-copy" data-target="field-snmp">
                                 <i class="fas fa-copy"></i>

@@ -27,6 +27,35 @@ class VlanRange
         return [null, null];
     }
 
+    /**
+     * A comma-separated list ("2211-2214, 2435-2439, 20") as [min, max]
+     * pairs; anything unreadable is skipped. Reversed ranges are put right.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public static function parseList(?string $value): array
+    {
+        $ranges = [];
+
+        foreach (preg_split('/\s*,\s*/', trim((string) $value)) as $part) {
+            [$min, $max] = self::parse(preg_replace('/\s*-\s*/', '-', $part));
+
+            if ($min !== null) {
+                $ranges[] = [min($min, $max), max($min, $max)];
+            }
+        }
+
+        return $ranges;
+    }
+
+    /**
+     * [2505, 2508] -> "2505-2508", [20, 20] -> "20".
+     */
+    public static function format(int $min, int $max): string
+    {
+        return $min === $max ? (string) $min : "{$min}-{$max}";
+    }
+
     public static function overlaps(string $a, string $b): bool
     {
         [$aMin, $aMax] = self::parse($a);

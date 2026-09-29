@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ChecksIpConflict;
 use App\Models\NetworkSwitch;
 use App\Models\NocAlertSetting;
 use App\Models\SwitchPort;
@@ -14,6 +15,8 @@ use Illuminate\Validation\Rule;
 
 class SwitchController extends Controller
 {
+    use ChecksIpConflict;
+
     public function index()
     {
         $switches = NetworkSwitch::visibleTo(auth()->user())->withCount([
@@ -315,6 +318,8 @@ class SwitchController extends Controller
             'dom_tx_oid.regex' => 'OIDs must be numeric, e.g. 1.3.6.1.4.1.3320.9.63.1.7.1.4',
             'dom_temp_oid.regex' => 'OIDs must be numeric, e.g. 1.3.6.1.4.1.3320.9.63.1.7.1.2',
         ]);
+
+        $this->assertIpNotUsed($validated['ip'], 'switch', $switch?->id);
 
         if ($switch && blank($validated['community'])) {
             unset($validated['community']);

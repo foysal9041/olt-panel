@@ -561,26 +561,6 @@ return [
     */
 
     'plugins' => [
-        'CustomTheme' => [
-            'active' => true,
-            'files' => [
-                [
-                    'type' => 'css',
-                    'asset' => true,
-                    'location' => 'css/custom.css',
-                ],
-                [
-                    'type' => 'js',
-                    'asset' => true,
-                    'location' => 'js/custom.js',
-                ],
-                [
-                    'type' => 'css',
-                    'asset' => true,
-                    'location' => 'css/module-pages.css',
-                ],
-            ],
-        ],
         'Datatables' => [
             'active' => true,
             'files' => [
@@ -601,23 +581,25 @@ return [
                 ],
             ],
         ],
+        // Served from public/vendor (AdminLTE's bundled Select2 4.0.13 and its
+        // Bootstrap 4 theme) — the old cdnjs theme link returned 404.
         'Select2' => [
             'active' => true,
             'files' => [
                 [
                     'type' => 'js',
-                    'asset' => false,
-                    'location' => '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js',
+                    'asset' => true,
+                    'location' => 'vendor/select2/js/select2.full.min.js',
                 ],
                 [
                     'type' => 'css',
-                    'asset' => false,
-                    'location' => '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.css',
+                    'asset' => true,
+                    'location' => 'vendor/select2/css/select2.min.css',
                 ],
                 [
                     'type' => 'css',
-                    'asset' => false,
-                    'location' => '//cdnjs.cloudflare.com/ajax/libs/select2-bootstrap4-theme/1.5.2/select2-bootstrap4.min.css',
+                    'asset' => true,
+                    'location' => 'vendor/select2-bootstrap4-theme/select2-bootstrap4.min.css',
                 ],
             ],
         ],
@@ -653,6 +635,27 @@ return [
                     'type' => 'js',
                     'asset' => false,
                     'location' => '//cdnjs.cloudflare.com/ajax/libs/pace/1.0.2/pace.min.js',
+                ],
+            ],
+        ],
+        // Last, so the panel's own styles override the plugins' above.
+        'CustomTheme' => [
+            'active' => true,
+            'files' => [
+                [
+                    'type' => 'css',
+                    'asset' => true,
+                    'location' => 'css/custom.css?v=' . @filemtime(public_path('css/custom.css')),
+                ],
+                [
+                    'type' => 'js',
+                    'asset' => true,
+                    'location' => 'js/custom.js?v=' . @filemtime(public_path('js/custom.js')),
+                ],
+                [
+                    'type' => 'css',
+                    'asset' => true,
+                    'location' => 'css/module-pages.css?v=' . @filemtime(public_path('css/module-pages.css')),
                 ],
             ],
         ],

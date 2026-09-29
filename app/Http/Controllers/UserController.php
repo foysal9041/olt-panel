@@ -37,12 +37,7 @@ class UserController extends Controller
     }
 
 
-    $zones = \App\Models\Olt::select('zone')
-         ->whereNotNull('zone')
-         ->where('zone', '!=', '')
-         ->distinct()
-         ->orderBy('zone')
-         ->pluck('zone');
+    $zones = \App\Models\Zone::names();
 
     $modules = config('modules');
 
@@ -65,7 +60,7 @@ class UserController extends Controller
         'username'        => 'required|unique:users,username',
         'password'        => 'required|min:6',
         'role'            => 'required',
-        'zone'            => 'required',
+        'zone'            => ['required', $this->zoneRule()],
         'status'          => 'required',
         'permissions'     => 'nullable|array',
     ]);
@@ -113,12 +108,7 @@ class UserController extends Controller
       {
           $authUser = auth()->user();
 
-          $zones = \App\Models\Olt::select('zone')
-               ->whereNotNull('zone')
-               ->where('zone', '!=', '')
-               ->distinct()
-               ->orderBy('zone')
-               ->pluck('zone');
+          $zones = \App\Models\Zone::names();
 
           $modules = config('modules');
           $permissionState = $this->buildPermissionState($user);
@@ -156,6 +146,7 @@ class UserController extends Controller
             'email'          => 'required|email',
             'username'       => 'required',
             'role'           => 'required',
+            'zone'           => ['required', $this->zoneRule()],
             'permissions'    => 'nullable|array',
         ]);
 
@@ -317,5 +308,17 @@ class UserController extends Controller
 
         $user->allowedOlts()->sync($validated['allowed_olts'] ?? []);
         $user->allowedSwitches()->sync($validated['allowed_switches'] ?? []);
+    }
+
+    /**
+     * A zone from Zones, or "all".
+     */
+    private function zoneRule(): \Closure
+    {
+        return function (string $attribute, $value, \Closure $fail) {
+            if ($value !== 'all' && ! \App\Models\Zone::where('name', $value)->exists()) {
+                $fail('Choose a zone from the list.');
+            }
+        };
     }
 }

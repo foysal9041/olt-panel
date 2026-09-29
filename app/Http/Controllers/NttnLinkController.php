@@ -43,7 +43,7 @@ class NttnLinkController extends Controller
             'peering_vlan'       => 'nullable|string|max:20',
             'asn'                => 'nullable|string|max:20',
             'location'           => 'required|string|max:255',
-            'zone'               => 'nullable|string',
+            'zone'               => 'nullable|exists:zones,name',
             'status'             => 'required|in:active,inactive',
             'remarks'            => 'nullable|string',
         ]);
@@ -100,7 +100,7 @@ class NttnLinkController extends Controller
             'peering_vlan'       => 'nullable|string|max:20',
             'asn'                => 'nullable|string|max:20',
             'location'           => 'required|string|max:255',
-            'zone'               => 'nullable|string',
+            'zone'               => 'nullable|exists:zones,name',
             'status'             => 'required|in:active,inactive',
             'remarks'            => 'nullable|string',
         ]);

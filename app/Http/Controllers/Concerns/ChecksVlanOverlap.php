@@ -2,18 +2,20 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Models\Olt;
-use App\Models\NttnLink;
-use App\Models\Vlan;
+use App\Services\VlanInventory;
 use App\Support\VlanRange;
 use Illuminate\Validation\ValidationException;
 
 /**
- * VLANs are recorded in three places — the VLAN each OLT is configured on
- * (Olt::vlan), the reserved/planned entries in VLAN Management (the Vlan
- * model), and each NTTN link's peering VLAN (NttnLink::peering_vlan).
- * OltController, VlanController and NttnLinkController all need to reject a
- * submitted VLAN that overlaps anything already recorded anywhere else.
+ * VLANs are recorded in four places — the VLAN each OLT is configured on
+ * (Olt::vlan), the entries in VLAN Management (the Vlan model), each NTTN
+ * link's peering VLAN (NttnLink::peering_vlan) and the VLANs on IP pools
+ * (IpPool::vlan, a list like "2211-2214, 2435-2439"). Saving any of them
+ * rejects a VLAN that's already recorded anywhere else, so no VLAN is
+ * given out twice. VLANs are compared within one network: the core, or
+ * the record's POP when that zone has its own VLANs ($zone). And an OLT,
+ * pool or NTTN link may take VLANs *reserved* in VLAN Management
+ * ($reservedIsFree) — that's what reserving them was for.
  */
 trait ChecksVlanOverlap
 {
@@ -22,7 +24,10 @@ trait ChecksVlanOverlap
         ?int $excludeOltId = null,
         ?int $excludeVlanId = null,
         ?int $excludeNttnLinkId = null,
-        string $fieldName = 'vlan'
+        string $fieldName = 'vlan',
+        ?int $excludeIpPoolId = null,
+        bool $reservedIsFree = true,
+        ?string $zone = null
     ): void {
         $vlan = trim($vlan);
 
@@ -30,49 +35,36 @@ trait ChecksVlanOverlap
             return;
         }
 
-        [$min, $max] = VlanRange::parse($vlan);
-
-        if ($min === null) {
-            return;
-        }
-
-        $olts = Olt::whereNotNull('vlan')
-            ->where('vlan', '!=', '')
-            ->when($excludeOltId, fn ($q) => $q->where('id', '!=', $excludeOltId))
-            ->get(['id', 'name', 'vlan']);
-
-        foreach ($olts as $olt) {
-            if (VlanRange::overlaps($vlan, $olt->vlan)) {
+        foreach (VlanRange::parseList($vlan) as [$min, $max]) {
+            if ($min < VlanInventory::MIN || $max > VlanInventory::MAX) {
                 throw ValidationException::withMessages([
-                    $fieldName => "VLAN {$vlan} overlaps with OLT \"{$olt->name}\" which already uses VLAN {$olt->vlan}.",
+                    $fieldName => 'VLAN IDs must be between ' . VlanInventory::MIN . ' and ' . VlanInventory::MAX . '.',
                 ]);
             }
         }
 
-        $reserved = Vlan::whereNotNull('vlan')
-            ->where('vlan', '!=', '')
-            ->when($excludeVlanId, fn ($q) => $q->where('id', '!=', $excludeVlanId))
-            ->get(['id', 'name', 'vlan']);
+        $except = array_filter([
+            'olt' => $excludeOltId,
+            'vlan' => $excludeVlanId,
+            'nttn' => $excludeNttnLinkId,
+            'pool' => $excludeIpPoolId,
+        ]);
 
-        foreach ($reserved as $entry) {
-            if (VlanRange::overlaps($vlan, $entry->vlan)) {
-                throw ValidationException::withMessages([
-                    $fieldName => "VLAN {$vlan} overlaps with reserved VLAN \"{$entry->name}\" ({$entry->vlan}) in VLAN Management.",
-                ]);
-            }
-        }
+        $inventory = new VlanInventory;
+        $network = $inventory->networkFor($zone);
+        $conflicts = $inventory->conflicts($vlan, $except, $reservedIsFree, $network);
 
-        $nttnLinks = NttnLink::whereNotNull('peering_vlan')
-            ->where('peering_vlan', '!=', '')
-            ->when($excludeNttnLinkId, fn ($q) => $q->where('id', '!=', $excludeNttnLinkId))
-            ->get(['id', 'link_id', 'peering_vlan']);
+        if ($conflicts) {
+            throw ValidationException::withMessages([
+                $fieldName => collect($conflicts)->take(3)->map(function ($c) {
+                    $what = VlanInventory::SOURCES[$c['source']] . ($c['reserved'] ? ' (reserved)' : '');
+                    $theirs = VlanRange::format($c['from'], $c['to']);
 
-        foreach ($nttnLinks as $link) {
-            if (VlanRange::overlaps($vlan, $link->peering_vlan)) {
-                throw ValidationException::withMessages([
-                    $fieldName => "VLAN {$vlan} overlaps with the peering VLAN ({$link->peering_vlan}) of NTTN link \"{$link->link_id}\".",
-                ]);
-            }
+                    return "VLAN {$c['overlap']} is already used by {$what} \"{$c['label']}\" (VLAN {$theirs}).";
+                })->implode(' ')
+                    . (count($conflicts) > 3 ? ' …and ' . (count($conflicts) - 3) . ' more.' : '')
+                    . ($network ? " ({$network} has its own VLANs.)" : '') . ' Use VLAN Management → Find Free VLANs to get unused ones.',
+            ]);
         }
     }
 }
