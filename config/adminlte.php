@@ -465,6 +465,13 @@ return [
                 'can'  => 'access-accounts-dashboard',
             ],
             [
+                'text' => 'Receive Payment',
+                'url'  => 'accounts/payments/receive',
+                'icon' => 'fas fa-hand-holding-usd',
+                'icon_color' => 'success',
+                'can'  => 'access-accounts-invoices',
+            ],
+            [
                 'text' => 'Invoices',
                 'url'  => 'accounts/invoices',
                 'icon' => 'fas fa-file-invoice',

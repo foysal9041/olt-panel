@@ -25,8 +25,11 @@
         </a>
     @endcan
     @can('access-accounts-invoices')
-        <a href="{{ route('accounts.invoices.index') }}" class="btn btn-primary btn-sm">
+        <a href="{{ route('accounts.invoices.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-file-invoice-dollar"></i> Invoices
+        </a>
+        <a href="{{ route('accounts.payments.create') }}" class="btn btn-success btn-sm">
+            <i class="fas fa-hand-holding-usd"></i> Receive Payment
         </a>
     @endcan
 </x-accounts.header>

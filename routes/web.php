@@ -25,6 +25,7 @@ use App\Http\Controllers\Accounts\AccountsDashboardController;
 use App\Http\Controllers\Accounts\BandwidthTypeController;
 use App\Http\Controllers\Accounts\CustomerController;
 use App\Http\Controllers\Accounts\InvoiceController;
+use App\Http\Controllers\Accounts\PaymentController;
 use App\Http\Controllers\Accounts\ProductCategoryController;
 use App\Http\Controllers\Accounts\ProductController;
 use App\Http\Controllers\Accounts\TransactionCategoryController;
@@ -237,6 +238,13 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
 
     Route::post('customers/{customer}/payments', [CustomerController::class, 'recordPayment'])
         ->name('customers.payments.store')->middleware('can:access-accounts-invoices');
+
+    Route::get('payments/receive', [PaymentController::class, 'create'])
+        ->name('payments.create')->middleware('can:access-accounts-invoices');
+    Route::post('payments/receive', [PaymentController::class, 'store'])
+        ->name('payments.store')->middleware('can:access-accounts-invoices');
+    Route::get('payments/receipt', [PaymentController::class, 'receipt'])
+        ->name('payments.receipt')->middleware('can:access-accounts-invoices');
 
     Route::post('bandwidth-types', [BandwidthTypeController::class, 'store'])
         ->name('bandwidth-types.store')->middleware('can:access-accounts-customers');

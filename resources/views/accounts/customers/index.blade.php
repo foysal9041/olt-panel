@@ -96,6 +96,14 @@
                             @endif
                         </td>
                         <td>
+                            @if(($customer->outstanding_due ?? 0) > 0)
+                                @can('access-accounts-invoices')
+                                    <a href="{{ route('accounts.payments.create', ['customer' => $customer->id]) }}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-hand-holding-usd"></i> Receive
+                                    </a>
+                                @endcan
+                            @endif
+
                             <a href="{{ route('accounts.customers.show', $customer->id) }}" class="btn btn-info btn-sm">
                                 View
                             </a>

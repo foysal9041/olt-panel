@@ -164,6 +164,10 @@
                             </a>
 
                             @unless($invoice->isPaid())
+                                <a href="{{ route('accounts.payments.create', ['customer' => $invoice->customer_id]) }}" class="btn btn-outline-success btn-sm">
+                                    <i class="fas fa-hand-holding-usd"></i> Receive
+                                </a>
+
                                 <form action="{{ route('accounts.invoices.mark-paid', $invoice->id) }}" method="POST" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-success btn-sm">

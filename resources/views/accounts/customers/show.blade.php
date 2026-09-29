@@ -204,8 +204,13 @@
 
 <div class="card card-outline card-success">
 
-    <div class="card-header">
-        <h3 class="card-title">Record Payment (Money Received)</h3>
+    <div class="card-header d-flex align-items-center flex-wrap">
+        <h3 class="card-title mr-auto">Record Payment (Money Received)</h3>
+        @if($outstandingInvoices->isNotEmpty())
+            <a href="{{ route('accounts.payments.create', ['customer' => $customer->id]) }}" class="btn btn-success btn-sm">
+                <i class="fas fa-hand-holding-usd"></i> Receive Payment — all dues, oldest first
+            </a>
+        @endif
     </div>
 
     <div class="card-body">
