@@ -54,6 +54,7 @@
 
             <thead>
                 <tr>
+                    <th class="text-center" style="width: 3rem" data-orderable="false" data-searchable="false">SL</th>
                     <th>Status</th>
                     <th>Name</th>
                     <th>IP</th>
@@ -72,6 +73,7 @@
                 @foreach($switches as $switch)
 
                     <tr>
+                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
                         <td data-order="{{ $switch->status ?? -1 }}">
                             @include('switches._status', ['status' => $switch->status])
                             @unless ($switch->is_active)
@@ -145,6 +147,22 @@
 
 @section('js')
 <script>
+// SL numbers follow the table's current order/search/page, 1..n.
+$(function () {
+    setTimeout(function () {
+        var $table = $('table.data-table');
+        if (!$.fn.dataTable || !$.fn.dataTable.isDataTable($table)) return;
+
+        var dt = $table.DataTable();
+        dt.on('draw.dt', function () {
+            var start = dt.page.info().start;
+            dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each(function (cell, i) {
+                cell.textContent = start + i + 1;
+            });
+        }).draw(false);
+    }, 0);
+});
+
 setTimeout(function () { location.reload(); }, 60000);
 </script>
 @stop
