@@ -134,7 +134,7 @@
 
         <tr>
 
-            <th>ID</th>
+            <th class="text-center" style="width: 3rem" data-orderable="false" data-searchable="false">SL</th>
             <th>Zone</th>
             <th>Name</th>
             <th>Brand</th>
@@ -153,7 +153,7 @@
 
             <tr>
 
-                <td>{{ $olt->id }}</td>
+                <td class="text-center text-muted">{{ $loop->iteration }}</td>
 
                 <td>{{ $olt->zone }}</td>
 
@@ -281,3 +281,22 @@ setInterval(function () {
 
 @stop
 
+@section('js')
+<script>
+// SL numbers follow the table's current order/search/page, 1..n.
+$(function () {
+    setTimeout(function () {
+        var $table = $('table.data-table');
+        if (!$.fn.dataTable || !$.fn.dataTable.isDataTable($table)) return;
+
+        var dt = $table.DataTable();
+        dt.on('draw.dt', function () {
+            var start = dt.page.info().start;
+            dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each(function (cell, i) {
+                cell.textContent = start + i + 1;
+            });
+        }).draw(false);
+    }, 0);
+});
+</script>
+@stop
