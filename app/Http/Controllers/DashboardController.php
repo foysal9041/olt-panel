@@ -12,6 +12,7 @@ use App\Models\NetworkSwitch;
 use App\Models\Olt;
 use App\Models\SwitchEvent;
 use App\Models\SwitchPort;
+use App\Models\Transaction;
 use App\Services\AttendanceCalculator;
 use App\Services\NocOverview;
 use Illuminate\Support\Carbon;
@@ -86,7 +87,11 @@ class DashboardController extends Controller
             $employees = Employee::whereNotNull('device_user_id')->with('dutyShift')
                 ->when(! $isPrivileged, fn ($q) => $q->where('zone', $user->zone));
 
-            $attendance = $this->calculator->todaySummary($employees->get(), AttendanceSetting::current());
+            $employeeList = $employees->get();
+            $settings = AttendanceSetting::current();
+
+            $attendance = $this->calculator->todaySummary($employeeList, $settings);
+            $attendance['trend'] = $this->calculator->trend($employeeList, $settings, 7);
         }
 
         $accounts = null;
@@ -105,6 +110,18 @@ class DashboardController extends Controller
                 'unpaid' => $invoices->where('status', '!=', 'paid')->count(),
             ];
             $accounts['outstanding'] = $accounts['invoiced'] - $accounts['collected'];
+
+            // Income vs expense, last 6 months, for the mini chart.
+            $accounts['trend'] = collect(range(5, 0))->map(function ($i) {
+                $start = Carbon::today()->subMonthsNoOverflow($i)->startOfMonth();
+                $range = [$start->toDateString(), $start->copy()->endOfMonth()->toDateString()];
+
+                return [
+                    'label' => $start->format('M'),
+                    'income' => (float) Transaction::income()->whereBetween('transaction_date', $range)->sum('amount'),
+                    'expense' => (float) Transaction::expense()->whereBetween('transaction_date', $range)->sum('amount'),
+                ];
+            })->all();
         }
 
         $nttn = null;

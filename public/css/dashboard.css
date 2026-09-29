@@ -405,3 +405,67 @@
 .ipblock-row:hover strong { color: #4f46e5; }
 
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ---- Health ring (hero) ------------------------------------------------ */
+
+.dash-hero-side { display: flex; align-items: center; justify-content: flex-end; gap: 1.25rem; }
+
+.health-ring {
+    flex: none;
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    background: conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255, 255, 255, .18) 0);
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, .06);
+}
+
+.health-ring-inner {
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    background: rgba(49, 46, 129, .92);
+    display: grid;
+    place-items: center;
+    align-content: center;
+    text-align: center;
+    line-height: 1.05;
+}
+
+.health-ring-inner b { font-size: 1.25rem; color: #fff; }
+.health-ring-inner span { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .7); }
+
+@media (max-width: 575.98px) {
+    .dash-hero-side { justify-content: flex-start; margin-top: 1rem; }
+    .dash-hero-side .dash-clock { margin-top: 0; }
+}
+
+/* ---- Section headings ------------------------------------------------- */
+
+.dash-section {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: .25rem 0 .75rem;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.dash-section::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+.dash-section i { color: #4f46e5; }
+
+/* ---- Panels ---------------------------------------------------------- */
+
+.lat-card { padding: .65rem .8rem .4rem; border-radius: .75rem; border: 1px solid #eef2f7; background: #fff; }
+.lat-card.alert-on { border-color: #fecaca; box-shadow: 0 0 0 1px #fecaca; }
+
+.big-num { font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.big-num small { font-size: 1rem; font-weight: 500; color: #94a3b8; }
+
+.mini-legend { display: flex; flex-wrap: wrap; gap: .25rem .9rem; font-size: .8rem; color: #475569; }
+.mini-legend i { display: inline-block; width: .55rem; height: .55rem; border-radius: 2px; margin-right: .3rem; }
+.mini-legend b { color: #0f172a; margin-left: .15rem; }

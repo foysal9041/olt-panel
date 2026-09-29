@@ -4,6 +4,7 @@
 
 @section('css')
 <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ filemtime(public_path('css/dashboard.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/latency.css') }}?v={{ filemtime(public_path('css/latency.css')) }}">
 @stop
 
 @php
@@ -13,6 +14,12 @@
     $dangerCount = collect($issues)->where(0, 'danger')->count();
     $anyModule = in_array(true, $can, true);
     $eventColors = ['danger' => '#ef4444', 'success' => '#22c55e', 'warning' => '#f59e0b', 'info' => '#0ea5e9'];
+
+    // Network health: share of monitored things that are fine right now.
+    $checks = ($olt['total'] ?? 0) + ($switches['total'] ?? 0) + ($nttn['monitored'] ?? 0) + ($latency['total'] ?? 0);
+    $healthy = ($olt['online'] ?? 0) + ($switches['up'] ?? 0) + ($nttn['up'] ?? 0) + ($latency['ok'] ?? 0);
+    $health = $checks ? (int) round($healthy / $checks * 100) : null;
+    $healthColor = $health === null ? '#cbd5e1' : ($health >= 95 ? '#4ade80' : ($health >= 80 ? '#fbbf24' : '#f87171'));
 @endphp
 
 @section('content')
@@ -53,9 +60,19 @@
             @endif
         </div>
         <div class="col-sm-4">
-            <div class="dash-clock">
-                <span id="dash-clock">{{ now()->format('h:i A') }}</span>
-                <small>{{ now()->format('l, d F Y') }}</small>
+            <div class="dash-hero-side">
+                @if ($health !== null)
+                    <div class="health-ring" style="--p: {{ $health }}; --c: {{ $healthColor }}" title="{{ $healthy }} of {{ $checks }} checks healthy">
+                        <div class="health-ring-inner">
+                            <b>{{ $health }}%</b>
+                            <span>network<br>health</span>
+                        </div>
+                    </div>
+                @endif
+                <div class="dash-clock">
+                    <span id="dash-clock">{{ now()->format('h:i A') }}</span>
+                    <small>{{ now()->format('l, d F Y') }}</small>
+                </div>
             </div>
         </div>
     </div>
@@ -81,7 +98,11 @@
     </div>
 @endif
 
-{{-- ================= KPI tiles ================= --}}
+{{-- ================= Network ================= --}}
+@if ($olt || $switches || $nttn || $latency || $ip)
+    <div class="dash-section"><i class="fas fa-satellite-dish"></i> Network</div>
+@endif
+
 <div class="kpi-grid">
 
     @if ($olt)
@@ -159,31 +180,6 @@
         </a>
     @endif
 
-    @if ($attendance)
-        @php $in = $attendance['present'] + $attendance['late']; @endphp
-        <a href="{{ route('attendance.dashboard') }}" class="kpi">
-            <div class="kpi-top">
-                <span class="kpi-label">In Office Today</span>
-                <span class="kpi-icon tone-green"><i class="fas fa-fingerprint"></i></span>
-            </div>
-            <div class="kpi-value">{{ $in }} <small>/ {{ $attendance['total'] }}</small></div>
-            <div class="kpi-foot">{{ $attendance['late'] }} late · {{ $attendance['absent'] }} absent</div>
-            <div class="kpi-bar"><span class="fill-green" style="width: {{ $pct($in, $attendance['total']) }}%"></span></div>
-        </a>
-    @endif
-
-    @if ($accounts)
-        <a href="{{ route('accounts.dashboard') }}" class="kpi">
-            <div class="kpi-top">
-                <span class="kpi-label">Collected ({{ now()->format('M') }})</span>
-                <span class="kpi-icon tone-amber"><i class="fas fa-file-invoice-dollar"></i></span>
-            </div>
-            <div class="kpi-value money" style="font-size: 1.5rem">&#2547;{{ number_format($accounts['collected']) }}</div>
-            <div class="kpi-foot">of &#2547;{{ number_format($accounts['invoiced']) }} invoiced · {{ $accounts['unpaid'] }} unpaid</div>
-            <div class="kpi-bar"><span class="fill-amber" style="width: {{ $pct($accounts['collected'], $accounts['invoiced']) }}%"></span></div>
-        </a>
-    @endif
-
 </div>
 
 {{-- ================= Needs attention + activity ================= --}}
@@ -247,102 +243,32 @@
 
 </div>
 
-{{-- ================= Module panels ================= --}}
-<div class="row">
-
-    @if ($latency && $latency['targets']->isNotEmpty())
-        <div class="col-lg-4 col-md-6">
-            <div class="card dash-panel">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-wave-square mr-1" style="color:#7c3aed"></i> Latency</h3>
-                    <a href="{{ route('latency.index') }}" class="small">Graphs</a>
-                </div>
-                <div class="card-body p-0">
-                    @php $dotColors = ['up' => '#22c55e', 'degraded' => '#f59e0b', 'alert' => '#ef4444', 'down' => '#ef4444', 'unknown' => '#cbd5e1']; @endphp
-                    @foreach ($latency['targets']->take(8) as $t)
-                        <a href="{{ route('latency.show', $t) }}" class="lat-row">
-                            <span class="lat-dot" style="background: {{ $dotColors[$t->status] }}"></span>
-                            <span class="lat-name">
-                                {{ $t->name }}
-                                <div class="lat-host">{{ $t->host }}</div>
-                            </span>
-                            <span class="lat-ms {{ $t->alert_active ? 'text-danger' : '' }}">
-                                {{ $t->last_median !== null ? round($t->last_median, 1) : '—' }} <small>ms</small>
-                                @if ($t->last_loss > 0)
-                                    <div class="small text-warning text-right">{{ round($t->last_loss) }}% loss</div>
-                                @endif
-                            </span>
-                        </a>
-                    @endforeach
-                    @if ($latency['targets']->count() > 8)
-                        <a href="{{ route('latency.index') }}" class="lat-row justify-content-center small">+ {{ $latency['targets']->count() - 8 }} more</a>
-                    @endif
-                </div>
+{{-- ================= Latency graphs ================= --}}
+@if ($latency && $latency['targets']->isNotEmpty())
+    <div class="card dash-panel">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-wave-square mr-1" style="color:#7c3aed"></i> Latency — last 3 hours</h3>
+            <a href="{{ route('latency.index') }}" class="small">All graphs</a>
+        </div>
+        <div class="card-body pb-1">
+            <div class="row">
+                @foreach ($latency['targets']->sortByDesc('alert_active')->take(4) as $t)
+                    <div class="col-xl-3 col-md-6 mb-3">
+                        <div class="lat-card {{ $t->alert_active ? 'alert-on' : '' }}">
+                            <div class="d-flex justify-content-between align-items-baseline">
+                                <a href="{{ route('latency.show', $t) }}" class="font-weight-bold text-truncate" style="color:#0f172a">{{ $t->name }}</a>
+                                <span class="small font-weight-bold {{ $t->alert_active ? 'text-danger' : 'text-muted' }} text-nowrap">
+                                    {{ $t->last_median !== null ? round($t->last_median, 1) . ' ms' : '—' }}
+                                </span>
+                            </div>
+                            <div class="js-smokegraph" data-url="{{ route('latency.data', ['target' => $t, 'range' => '3h', 'points' => 90]) }}"></div>
+                        </div>
+                    </div>
+                @endforeach
             </div>
         </div>
-    @endif
-
-    @if ($attendance)
-        <div class="col-lg-4 col-md-6">
-            <div class="card dash-panel">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-fingerprint mr-1 text-success"></i> Attendance Today</h3>
-                    <a href="{{ route('attendance.dashboard') }}" class="small">Open</a>
-                </div>
-                <div class="card-body">
-                    @php
-                        $segments = [
-                            ['Present', $attendance['present'], '#22c55e'],
-                            ['Late', $attendance['late'], '#f59e0b'],
-                            ['On leave', $attendance['leave'] ?? 0, '#0ea5e9'],
-                            ['Absent', $attendance['absent'], '#f43f5e'],
-                        ];
-                    @endphp
-                    <div class="stack-bar">
-                        @foreach ($segments as [$label, $value, $color])
-                            @if ($value)
-                                <span style="width: {{ $pct($value, $attendance['total']) }}%; background: {{ $color }}" title="{{ $label }}: {{ $value }}"></span>
-                            @endif
-                        @endforeach
-                    </div>
-                    <div class="stack-legend">
-                        @foreach ($segments as [$label, $value, $color])
-                            <div><i style="background: {{ $color }}"></i> {{ $label }} <b>{{ $value }}</b></div>
-                        @endforeach
-                    </div>
-                    <div class="small text-muted mt-3">{{ $attendance['total'] }} employees on devices</div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if ($accounts)
-        <div class="col-lg-4 col-md-6">
-            <div class="card dash-panel">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-file-invoice-dollar mr-1 text-warning"></i> Billing — {{ now()->format('F') }}</h3>
-                    <a href="{{ route('accounts.dashboard') }}" class="small">Open</a>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-1 small text-muted">
-                        <span>Collected</span>
-                        <span>{{ $pct($accounts['collected'], $accounts['invoiced']) }}%</span>
-                    </div>
-                    <div class="stack-bar mb-3">
-                        <span style="width: {{ $pct($accounts['collected'], $accounts['invoiced']) }}%; background: #22c55e"></span>
-                    </div>
-                    <div class="stack-legend">
-                        <div><i style="background:#6366f1"></i> Invoiced <b class="money">&#2547;{{ number_format($accounts['invoiced']) }}</b></div>
-                        <div><i style="background:#22c55e"></i> Collected <b class="money">&#2547;{{ number_format($accounts['collected']) }}</b></div>
-                        <div><i style="background:#f43f5e"></i> Outstanding <b class="money">&#2547;{{ number_format($accounts['outstanding']) }}</b></div>
-                        <div><i style="background:#94a3b8"></i> Invoices <b>{{ $accounts['count'] }}</b></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-</div>
+    </div>
+@endif
 
 {{-- ================= Network resources ================= --}}
 @if (($ip && $ip['blocks']->isNotEmpty()) || $nttn)
@@ -417,12 +343,141 @@
 </div>
 @endif
 
+{{-- ================= Office & Billing ================= --}}
+@if ($attendance || $accounts)
+    <div class="dash-section"><i class="fas fa-building"></i> Office &amp; Billing</div>
+
+    <div class="row">
+        @if ($attendance)
+            @php
+                $in = $attendance['present'] + $attendance['late'];
+                $segments = [
+                    ['Present', $attendance['present'], '#22c55e'],
+                    ['Late', $attendance['late'], '#f59e0b'],
+                    ['On leave', $attendance['leave'] ?? 0, '#0ea5e9'],
+                    ['Absent', $attendance['absent'], '#f43f5e'],
+                ];
+            @endphp
+            <div class="{{ $accounts ? 'col-lg-6' : 'col-12' }}">
+                <div class="card dash-panel">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-fingerprint mr-1 text-success"></i> Attendance</h3>
+                        <a href="{{ route('attendance.dashboard') }}" class="small">Open</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-end justify-content-between flex-wrap mb-2" style="gap:.5rem">
+                            <div>
+                                <div class="small text-muted text-uppercase font-weight-bold">In office today</div>
+                                <div class="big-num">{{ $in }} <small>/ {{ $attendance['total'] }}</small></div>
+                            </div>
+                            <div class="mini-legend">
+                                @foreach ($segments as [$label, $value, $color])
+                                    <span><i style="background: {{ $color }}"></i>{{ $label }} <b>{{ $value }}</b></span>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="stack-bar mb-3">
+                            @foreach ($segments as [$label, $value, $color])
+                                @if ($value)
+                                    <span style="width: {{ $pct($value, $attendance['total']) }}%; background: {{ $color }}" title="{{ $label }}: {{ $value }}"></span>
+                                @endif
+                            @endforeach
+                        </div>
+                        <div class="small text-muted mb-1">Last 7 days</div>
+                        <div style="position: relative; height: 150px;"><canvas id="att-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        @if ($accounts)
+            <div class="{{ $attendance ? 'col-lg-6' : 'col-12' }}">
+                <div class="card dash-panel">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-file-invoice-dollar mr-1 text-warning"></i> Billing</h3>
+                        <div>
+                            @can('access-accounts-invoices')
+                                <a href="{{ route('accounts.payments.create') }}" class="btn btn-success btn-xs mr-1"><i class="fas fa-hand-holding-usd"></i> Receive</a>
+                            @endcan
+                            <a href="{{ route('accounts.dashboard') }}" class="small">Open</a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-end justify-content-between flex-wrap mb-2" style="gap:.5rem">
+                            <div>
+                                <div class="small text-muted text-uppercase font-weight-bold">Collected in {{ now()->format('F') }}</div>
+                                <div class="big-num money">&#2547;{{ number_format($accounts['collected']) }}
+                                    <small>/ &#2547;{{ number_format($accounts['invoiced']) }}</small></div>
+                            </div>
+                            <div class="mini-legend">
+                                <span><i style="background:#f43f5e"></i>Outstanding <b class="money">&#2547;{{ number_format($accounts['outstanding']) }}</b></span>
+                                <span><i style="background:#94a3b8"></i>Unpaid <b>{{ $accounts['unpaid'] }}</b></span>
+                            </div>
+                        </div>
+                        <div class="stack-bar mb-3">
+                            <span style="width: {{ $pct($accounts['collected'], $accounts['invoiced']) }}%; background: #22c55e"></span>
+                        </div>
+                        <div class="small text-muted mb-1">Income vs expense, last 6 months</div>
+                        <div style="position: relative; height: 150px;"><canvas id="bill-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        @endif
+    </div>
+@endif
+
 @endunless
 
 @stop
 
 @section('js')
+<script src="{{ asset('js/smokegraph.js') }}?v={{ filemtime(public_path('js/smokegraph.js')) }}"></script>
 <script>
+document.querySelectorAll('.js-smokegraph').forEach(function (el) {
+    SmokeGraph.create(el, { url: el.dataset.url, height: 90, compact: true, refresh: 60 });
+});
+
+(function () {
+    var tk = function (v) { return '৳' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }); };
+    var common = {
+        maintainAspectRatio: false,
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 10, fontColor: '#64748b', fontSize: 11 } },
+        tooltips: { mode: 'index', intersect: false },
+    };
+    var xAxis = [{ barPercentage: 0.7, categoryPercentage: 0.6, gridLines: { display: false }, ticks: { fontColor: '#64748b' } }];
+
+    var att = document.getElementById('att-chart');
+    if (att) new Chart(att.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: @json(collect($attendance['trend'] ?? [])->map(fn ($d) => \Illuminate\Support\Carbon::parse($d['date'])->format('D'))),
+            datasets: [
+                { label: 'Present', data: @json(array_column($attendance['trend'] ?? [], 'present')), backgroundColor: '#22c55e' },
+                { label: 'Absent', data: @json(array_column($attendance['trend'] ?? [], 'absent')), backgroundColor: '#fb7185' },
+            ],
+        },
+        options: Object.assign({}, common, {
+            scales: { xAxes: xAxis, yAxes: [{ ticks: { beginAtZero: true, precision: 0, fontColor: '#94a3b8' }, gridLines: { color: '#eef2f7', drawBorder: false } }] },
+        }),
+    });
+
+    var bill = document.getElementById('bill-chart');
+    if (bill) new Chart(bill.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: @json(array_column($accounts['trend'] ?? [], 'label')),
+            datasets: [
+                { label: 'Income', data: @json(array_column($accounts['trend'] ?? [], 'income')), backgroundColor: '#22c55e' },
+                { label: 'Expense', data: @json(array_column($accounts['trend'] ?? [], 'expense')), backgroundColor: '#fb7185' },
+            ],
+        },
+        options: Object.assign({}, common, {
+            tooltips: { mode: 'index', intersect: false, callbacks: { label: function (i, d) { return d.datasets[i.datasetIndex].label + ': ' + tk(i.yLabel); } } },
+            scales: { xAxes: xAxis, yAxes: [{ ticks: { beginAtZero: true, fontColor: '#94a3b8', callback: function (v) { return tk(v); } }, gridLines: { color: '#eef2f7', drawBorder: false } }] },
+        }),
+    });
+})();
+
 (function () {
     var el = document.getElementById('dash-clock');
     function tick() {
