@@ -126,6 +126,7 @@
 
         @if(strtolower(auth()->user()->role) == 'admin')
             @include('users.partials.module-permissions')
+            @include('users.partials.device-access')
         @endif
 
         <br>

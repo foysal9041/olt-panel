@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class NetworkSwitch extends Model
@@ -82,5 +83,21 @@ class NetworkSwitch extends Model
         $s = $this->uptime_seconds;
 
         return sprintf('%dd %02dh %02dm', intdiv($s, 86400), intdiv($s % 86400, 3600), intdiv($s % 3600, 60));
+    }
+
+    /**
+     * Only the devices this user may see (see User::deviceAccess()).
+     */
+    public function scopeVisibleTo(Builder $query, ?User $user): Builder
+    {
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return match ($user->deviceAccess('switch')) {
+            'all' => $query,
+            'selected' => $query->whereIn($this->getTable() . '.id', $user->allowedSwitches()->select('network_switches.id')),
+            default => $user->zone ? $query->where($this->getTable() . '.zone', $user->zone) : $query->whereRaw('1 = 0'),
+        };
     }
 }

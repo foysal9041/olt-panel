@@ -26,7 +26,16 @@ class User extends Authenticatable
         'password',
         'role',
         'zone',
+        'olt_access',
+        'switch_access',
         'status',
+    ];
+
+    /** Device access modes for OLTs and switches. */
+    public const DEVICE_ACCESS = [
+        'all' => 'All devices',
+        'zone' => 'Only their zone',
+        'selected' => 'Selected devices',
     ];
 
     /**
@@ -77,6 +86,50 @@ class User extends Authenticatable
      * foothold in the module at all — used for the module's outer route
      * group and top-level sidebar entry.
      */
+    public function isAdmin(): bool
+    {
+        return strtolower((string) $this->role) === 'admin';
+    }
+
+    public function allowedOlts()
+    {
+        return $this->belongsToMany(Olt::class);
+    }
+
+    public function allowedSwitches()
+    {
+        return $this->belongsToMany(NetworkSwitch::class, 'network_switch_user');
+    }
+
+    /**
+     * Effective access mode for a device type ('olt' or 'switch').
+     * Admins always get 'all'; a zone of "all" also means everything.
+     */
+    public function deviceAccess(string $type): string
+    {
+        if ($this->isAdmin()) {
+            return 'all';
+        }
+
+        $mode = $type === 'olt' ? $this->olt_access : $this->switch_access;
+
+        if ($mode === 'zone' && strtolower((string) $this->zone) === 'all') {
+            return 'all';
+        }
+
+        return array_key_exists($mode, self::DEVICE_ACCESS) ? $mode : 'zone';
+    }
+
+    public function canSeeOlt(Olt $olt): bool
+    {
+        return Olt::visibleTo($this)->whereKey($olt->getKey())->exists();
+    }
+
+    public function canSeeSwitch(NetworkSwitch $switch): bool
+    {
+        return NetworkSwitch::visibleTo($this)->whereKey($switch->getKey())->exists();
+    }
+
     public function hasModuleAccess(string $module, ?string $submodule = null): bool
     {
         if ($submodule === null) {

@@ -21,18 +21,13 @@ class NocOverview
     {
     }
 
-    public function isPrivileged(): bool
-    {
-        return in_array(strtolower($this->user->role), ['admin', 'noc']);
-    }
 
     /**
      * OLTs this user may see (non-privileged users only get their zone).
      */
     public function olts(): Collection
     {
-        return Olt::query()
-            ->when(! $this->isPrivileged(), fn ($q) => $q->where('zone', $this->user->zone))
+        return Olt::visibleTo($this->user)
             ->orderBy('status')
             ->orderBy('name')
             ->get();
@@ -58,12 +53,14 @@ class NocOverview
         }
 
         if (Gate::forUser($this->user)->allows('access-olt-switches')) {
-            foreach (NetworkSwitch::where('is_active', true)->where('status', 0)->get(['id', 'name', 'ip']) as $s) {
+            $switchIds = NetworkSwitch::visibleTo($this->user)->pluck('id');
+
+            foreach (NetworkSwitch::whereIn('id', $switchIds)->where('is_active', true)->where('status', 0)->get(['id', 'name', 'ip']) as $s) {
                 $issues[] = ['danger', 'fas fa-server', "Switch {$s->name} is not responding", $s->ip, route('switches.show', $s)];
             }
 
             // Ports that went down in the last 24h and are still down.
-            $downPorts = SwitchPort::with('networkSwitch:id,name')
+            $downPorts = SwitchPort::whereIn('network_switch_id', $switchIds)->with('networkSwitch:id,name')
                 ->where('admin_status', 1)
                 ->where('oper_status', '!=', SwitchPort::UP)
                 ->where('last_change_at', '>=', now()->subDay())
@@ -77,7 +74,7 @@ class NocOverview
                     route('switches.ports.show', [$p->network_switch_id, $p->id])];
             }
 
-            foreach (SwitchPort::with('networkSwitch:id,name')->where('rx_alarm', true)->limit(10)->get() as $p) {
+            foreach (SwitchPort::whereIn('network_switch_id', $switchIds)->with('networkSwitch:id,name')->where('rx_alarm', true)->limit(10)->get() as $p) {
                 $issues[] = ['warning', 'fas fa-lightbulb', "Low Rx on {$p->label} ({$p->networkSwitch?->name})",
                     "{$p->rx_power} dBm" . ($p->alias ? " · {$p->alias}" : ''),
                     route('switches.ports.show', [$p->network_switch_id, $p->id])];

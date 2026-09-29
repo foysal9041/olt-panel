@@ -116,6 +116,7 @@
         </div>
 
         @include('users.partials.module-permissions', ['permissionState' => []])
+        @include('users.partials.device-access', ['user' => new \App\Models\User()])
 
         <br>
 

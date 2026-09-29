@@ -36,7 +36,7 @@ class OltController extends Controller
         $events = collect();
         $ports = null;
         if ($gate('access-olt-switches')) {
-            $switches = NetworkSwitch::where('is_active', true)
+            $switches = NetworkSwitch::visibleTo($user)->where('is_active', true)
                 ->withCount([
                     'ports',
                     'ports as ports_up_count' => fn ($q) => $q->where('oper_status', SwitchPort::UP),
@@ -54,7 +54,7 @@ class OltController extends Controller
                 'rx_alarms' => $switches->sum('ports_rx_alarm_count'),
             ];
 
-            $events = SwitchEvent::with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(10)->get();
+            $events = SwitchEvent::whereIn('network_switch_id', $switches->pluck('id'))->with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(10)->get();
         }
 
         $latencyTargets = $gate('access-latency-graphs')
@@ -69,7 +69,7 @@ class OltController extends Controller
             'support' => $gate('access-olt-support') ? ['Support Contacts', SupportContact::count(), 'fas fa-headset', 'support-contacts.index'] : null,
         ]);
 
-        $events24h = $gate('access-olt-switches') ? SwitchEvent::where('occurred_at', '>=', now()->subDay())->count() : null;
+        $events24h = $gate('access-olt-switches') ? SwitchEvent::whereIn('network_switch_id', $switches->pluck('id'))->where('occurred_at', '>=', now()->subDay())->count() : null;
 
         return view('olts.dashboard', compact(
             'olts', 'issues', 'switches', 'ports', 'events', 'events24h', 'latencyTargets', 'inventory'
@@ -78,21 +78,8 @@ class OltController extends Controller
 
     public function index(Request $request)
     {
-     $query = Olt::query();
-
-     $user = auth()->user();
-
-     if (
-    !in_array(
-        strtolower($user->role),
-        ['admin', 'noc']
-    )
-) {
-    $query->where(
-        'zone',
-        $user->zone
-    );
-}
+        // Only OLTs this user may see (all / their zone / hand-picked).
+        $query = Olt::visibleTo(auth()->user());
 
    if ($request->filled('status')) {
 
@@ -201,6 +188,10 @@ class OltController extends Controller
 
         $olt = Olt::create($request->except('status'));
 
+        if (auth()->user()->deviceAccess('olt') === 'selected') {
+            auth()->user()->allowedOlts()->syncWithoutDetaching([$olt->id]);
+        }
+
         $checker->refresh($olt);
 
         return redirect()
@@ -213,6 +204,8 @@ class OltController extends Controller
 
     public function show(Olt $olt)
     {
+        abort_unless(auth()->user()->canSeeOlt($olt), 403);
+
         return view(
             'olts.show',
             compact('olt')
@@ -221,6 +214,8 @@ class OltController extends Controller
 
     public function edit(Olt $olt)
     {
+        abort_unless(auth()->user()->canSeeOlt($olt), 403);
+
         $zones = Zone::orderBy('name')->pluck('name');
 
         return view(
@@ -231,6 +226,8 @@ class OltController extends Controller
 
     public function update(Request $request, Olt $olt, OltStatusChecker $checker)
     {
+        abort_unless(auth()->user()->canSeeOlt($olt), 403);
+
         $request->validate(
         [
             'zone'      => 'required|exists:zones,name',
@@ -264,6 +261,8 @@ class OltController extends Controller
 
     public function destroy(Olt $olt)
     {
+        abort_unless(auth()->user()->canSeeOlt($olt), 403);
+
         $olt->delete();
 
         return redirect()
@@ -276,6 +275,8 @@ class OltController extends Controller
 
     public function ping(Olt $olt)
     {
+        abort_unless(auth()->user()->canSeeOlt($olt), 403);
+
          $result = Process::timeout(15)
              ->run(['ping', '-n', '-c', '4', '-W', '2', $olt->ip]);
 
@@ -284,6 +285,8 @@ class OltController extends Controller
 
     public function web(Olt $olt)
     {
+        abort_unless(auth()->user()->canSeeOlt($olt), 403);
+
          $https = @fsockopen(
             $olt->ip,
             443,

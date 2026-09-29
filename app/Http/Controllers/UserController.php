@@ -48,7 +48,7 @@ class UserController extends Controller
 
    return view(
       'users.create',
-      compact('zones', 'modules')
+      compact('zones', 'modules') + $this->deviceLists()
    );
 
  }
@@ -81,6 +81,7 @@ class UserController extends Controller
     ]);
 
     $this->syncPermissions($user, $validated['permissions'] ?? []);
+    $this->syncDeviceAccess($user, $request);
 
     return redirect()
         ->route('users.index')
@@ -123,14 +124,14 @@ class UserController extends Controller
           $permissionState = $this->buildPermissionState($user);
 
           if ($authUser->role == 'admin') {
-              return view('users.edit', compact('user', 'zones', 'modules', 'permissionState'));
+              return view('users.edit', compact('user', 'zones', 'modules', 'permissionState') + $this->deviceLists());
          }
 
          if (
              $authUser->role == 'operator' &&
              $authUser->zone == $user->zone
          ) {
-             return view('users.edit', compact('user', 'zones', 'modules', 'permissionState'));
+             return view('users.edit', compact('user', 'zones', 'modules', 'permissionState') + $this->deviceLists());
          }
 
          abort(403);
@@ -179,8 +180,9 @@ class UserController extends Controller
                 'status'          => $request->status,
             ]);
 
-            // Only a full admin can change what modules another user can reach.
+            // Only a full admin can change what modules and devices another user can reach.
             $this->syncPermissions($user, $request->input('permissions', []));
+            $this->syncDeviceAccess($user, $request);
         }
 
         if ($request->filled('password')) {
@@ -273,5 +275,47 @@ class UserController extends Controller
         }
 
         return $state;
+    }
+
+    /**
+     * @return array{olts: \Illuminate\Support\Collection, switches: \Illuminate\Support\Collection}
+     */
+    private function deviceLists(): array
+    {
+        return [
+            'olts' => \App\Models\Olt::orderBy('zone')->orderBy('name')->get(['id', 'name', 'ip', 'zone']),
+            'switches' => \App\Models\NetworkSwitch::orderBy('zone')->orderBy('name')->get(['id', 'name', 'ip', 'zone']),
+        ];
+    }
+
+    /**
+     * Save which OLTs / switches the user may see. The picked lists only
+     * matter in "selected" mode, but are kept either way so switching
+     * modes back and forth doesn't lose the selection.
+     */
+    private function syncDeviceAccess(User $user, Request $request): void
+    {
+        $modes = implode(',', array_keys(User::DEVICE_ACCESS));
+
+        $validated = $request->validate([
+            'olt_access' => 'nullable|in:' . $modes,
+            'switch_access' => 'nullable|in:' . $modes,
+            'allowed_olts' => 'nullable|array',
+            'allowed_olts.*' => 'integer|exists:olts,id',
+            'allowed_switches' => 'nullable|array',
+            'allowed_switches.*' => 'integer|exists:network_switches,id',
+        ]);
+
+        if (! $request->has('olt_access')) {
+            return;   // form without the Device Access section
+        }
+
+        $user->forceFill([
+            'olt_access' => $validated['olt_access'] ?? 'zone',
+            'switch_access' => $validated['switch_access'] ?? 'zone',
+        ])->save();
+
+        $user->allowedOlts()->sync($validated['allowed_olts'] ?? []);
+        $user->allowedSwitches()->sync($validated['allowed_switches'] ?? []);
     }
 }

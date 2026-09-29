@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\LogsActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Olt extends Model
@@ -42,5 +43,20 @@ class Olt extends Model
             'olt_id'
         );
     }
-}
 
+    /**
+     * Only the devices this user may see (see User::deviceAccess()).
+     */
+    public function scopeVisibleTo(Builder $query, ?User $user): Builder
+    {
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return match ($user->deviceAccess('olt')) {
+            'all' => $query,
+            'selected' => $query->whereIn($this->getTable() . '.id', $user->allowedOlts()->select('olts.id')),
+            default => $user->zone ? $query->where($this->getTable() . '.zone', $user->zone) : $query->whereRaw('1 = 0'),
+        };
+    }
+}

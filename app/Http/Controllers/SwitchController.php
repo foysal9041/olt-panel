@@ -16,7 +16,7 @@ class SwitchController extends Controller
 {
     public function index()
     {
-        $switches = NetworkSwitch::withCount([
+        $switches = NetworkSwitch::visibleTo(auth()->user())->withCount([
             'ports',
             'ports as ports_up_count' => fn ($q) => $q->where('oper_status', SwitchPort::UP),
             'ports as ports_sfp_count' => fn ($q) => $q->whereNotNull('rx_power'),
@@ -27,7 +27,7 @@ class SwitchController extends Controller
             'total' => $switches->count(),
             'up' => $switches->where('status', 1)->count(),
             'down' => $switches->where('status', 0)->count(),
-            'ports_down' => SwitchPort::where('admin_status', 1)->where('oper_status', '!=', SwitchPort::UP)->count(),
+            'ports_down' => SwitchPort::whereIn('network_switch_id', $switches->pluck('id'))->where('admin_status', 1)->where('oper_status', '!=', SwitchPort::UP)->count(),
         ];
 
         return view('switches.index', compact('switches', 'summary'));
@@ -45,6 +45,10 @@ class SwitchController extends Controller
     {
         $switch = NetworkSwitch::create($this->validated($request));
 
+        if (auth()->user()->deviceAccess('switch') === 'selected') {
+            auth()->user()->allowedSwitches()->syncWithoutDetaching([$switch->id]);
+        }
+
         return $this->pollAndRedirect($switch, $poller, 'Switch Added');
     }
 
@@ -58,6 +62,8 @@ class SwitchController extends Controller
 
     public function show(NetworkSwitch $switch)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         $ports = $switch->ports()->get();
         $events = $switch->events()->with('port')->latest('occurred_at')->limit(25)->get();
         $settings = NocAlertSetting::current();
@@ -68,6 +74,8 @@ class SwitchController extends Controller
 
     public function portHistory(NetworkSwitch $switch, SwitchPort $port)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         abort_unless($port->network_switch_id === $switch->id, 404);
 
         $events = $switch->events()->where('switch_port_id', $port->id)->latest('occurred_at')->limit(30)->get();
@@ -85,6 +93,8 @@ class SwitchController extends Controller
      */
     public function portHistoryData(Request $request, NetworkSwitch $switch, SwitchPort $port)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         abort_unless($port->network_switch_id === $switch->id, 404);
 
         [, $span, $step] = self::HISTORY_RANGES[$request->query('range')] ?? self::HISTORY_RANGES['24h'];
@@ -224,6 +234,8 @@ class SwitchController extends Controller
 
     public function edit(NetworkSwitch $switch)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         return view('switches.edit', [
             'switch' => $switch,
             'zones' => Zone::orderBy('name')->pluck('name'),
@@ -232,6 +244,8 @@ class SwitchController extends Controller
 
     public function update(Request $request, NetworkSwitch $switch, SwitchPoller $poller)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         $switch->update($this->validated($request, $switch));
 
         return $this->pollAndRedirect($switch, $poller, 'Switch Updated');
@@ -239,6 +253,8 @@ class SwitchController extends Controller
 
     public function destroy(NetworkSwitch $switch)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         $switch->delete();
 
         return redirect()
@@ -248,11 +264,15 @@ class SwitchController extends Controller
 
     public function poll(NetworkSwitch $switch, SwitchPoller $poller)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         return $this->pollAndRedirect($switch, $poller, 'Poll finished', back: true);
     }
 
     public function togglePortNotify(NetworkSwitch $switch, SwitchPort $port)
     {
+        abort_unless(auth()->user()->canSeeSwitch($switch), 403);
+
         abort_unless($port->network_switch_id === $switch->id, 404);
 
         $port->update(['notify' => ! $port->notify]);

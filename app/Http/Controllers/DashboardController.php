@@ -55,18 +55,19 @@ class DashboardController extends Controller
         $switches = null;
         $events = collect();
         if ($can['switches']) {
-            $all = NetworkSwitch::where('is_active', true)->get(['id', 'name', 'ip', 'status']);
+            $all = NetworkSwitch::visibleTo($user)->where('is_active', true)->get(['id', 'name', 'ip', 'status']);
+            $ports = SwitchPort::whereIn('network_switch_id', $all->pluck('id'));
 
             $switches = [
                 'total' => $all->count(),
                 'up' => $all->where('status', 1)->count(),
                 'down' => $all->where('status', 0)->count(),
-                'ports_up' => SwitchPort::where('oper_status', SwitchPort::UP)->count(),
-                'ports' => SwitchPort::count(),
-                'rx_alarms' => SwitchPort::where('rx_alarm', true)->count(),
+                'ports_up' => (clone $ports)->where('oper_status', SwitchPort::UP)->count(),
+                'ports' => (clone $ports)->count(),
+                'rx_alarms' => (clone $ports)->where('rx_alarm', true)->count(),
             ];
 
-            $events = SwitchEvent::with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(8)->get();
+            $events = SwitchEvent::whereIn('network_switch_id', $all->pluck('id'))->with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(8)->get();
         }
 
         $latency = null;
