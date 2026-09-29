@@ -291,3 +291,26 @@ body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item
     background-color: var(--brand);
     color: #fff;
 }
+
+
+/* ---- View-only accounts (role "viewer") ------------------------------
+   Hide every add / edit / delete / poll / mute control. The server also
+   refuses these requests (ViewerReadOnly middleware); this just keeps the
+   pages clean. */
+
+.role-viewer a[href$="/create"],
+.role-viewer a[href*="/create?"],
+.role-viewer a[href$="/edit"],
+.role-viewer a[href*="/payments/receive"],
+.role-viewer form[method="POST"]:not(#logout-form),
+.role-viewer form[method="post"]:not(#logout-form),
+.role-viewer button[form],
+.role-viewer .qa-grid {
+    display: none !important;
+}
+
+/* ...but keep the IP address map's squares (they link to forms). */
+.role-viewer .ipmap a {
+    display: block !important;
+    pointer-events: none;
+}

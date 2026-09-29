@@ -8,7 +8,7 @@
     @yield('css')
 @stop
 
-@section('classes_body', $layoutHelper->makeBodyClasses())
+@section('classes_body', $layoutHelper->makeBodyClasses() . (auth()->user()?->isViewer() ? ' role-viewer' : ''))
 
 @section('body_data', $layoutHelper->makeBodyData())
 

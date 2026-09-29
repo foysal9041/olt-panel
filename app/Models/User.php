@@ -91,6 +91,12 @@ class User extends Authenticatable
         return strtolower((string) $this->role) === 'admin';
     }
 
+    /** View-only account: sees what it's allowed to, changes nothing. */
+    public function isViewer(): bool
+    {
+        return strtolower((string) $this->role) === 'viewer';
+    }
+
     public function allowedOlts()
     {
         return $this->belongsToMany(Olt::class);
