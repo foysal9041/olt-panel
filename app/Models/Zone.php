@@ -11,7 +11,23 @@ class Zone extends Model
 
     protected $fillable = [
         'name',
+        'code',
+        'username',
+        'contact_name',
+        'phone',
+        'email',
+        'notes',
     ];
+
+    /**
+     * Phone numbers as a list (the column may hold "01711..., 01920...").
+     *
+     * @return list<string>
+     */
+    public function phones(): array
+    {
+        return array_values(array_filter(array_map('trim', explode(',', (string) $this->phone))));
+    }
 
     /**
      * olts.zone is a plain string matching zones.name (not a foreign key to

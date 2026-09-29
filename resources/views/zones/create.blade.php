@@ -8,7 +8,7 @@
 
 @section('content')
 
-<div class="card card-outline card-primary col-md-6">
+<div class="card card-outline card-primary col-lg-8">
 
     <div class="card-header">
         <h3 class="card-title">Zone Details</h3>
@@ -29,11 +29,7 @@
                 </div>
             @endif
 
-            <div class="form-group">
-                <label>Zone Name</label>
-                <input type="text" name="name" class="form-control" value="{{ old('name') }}"
-                       placeholder="e.g. Jashore, Head Office" required autofocus>
-            </div>
+            @include('zones._fields', ['zone' => $zone ?? new \App\Models\Zone()])
 
         </div>
 

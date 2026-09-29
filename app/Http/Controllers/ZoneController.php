@@ -12,7 +12,11 @@ class ZoneController extends Controller
     {
         $zones = Zone::withCount('olts')->orderBy('name')->get();
 
-        return view('zones.index', compact('zones'));
+        // Switches also reference zones by name.
+        $switchCounts = \App\Models\NetworkSwitch::selectRaw('zone, COUNT(*) as c')->whereNotNull('zone')
+            ->groupBy('zone')->pluck('c', 'zone');
+
+        return view('zones.index', compact('zones', 'switchCounts'));
     }
 
     public function create()
@@ -24,7 +28,7 @@ class ZoneController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:zones,name',
-        ]);
+        ] + $this->contactRules());
 
         Zone::create($validated);
 
@@ -42,7 +46,7 @@ class ZoneController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:zones,name,' . $zone->id,
-        ]);
+        ] + $this->contactRules());
 
         $zone->update($validated);
 
@@ -62,5 +66,17 @@ class ZoneController extends Controller
         return redirect()
             ->route('zones.index')
             ->with('success', 'Zone Deleted Successfully');
+    }
+
+    protected function contactRules(): array
+    {
+        return [
+            'code' => 'nullable|string|max:50',
+            'username' => 'nullable|string|max:255',
+            'contact_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'notes' => 'nullable|string|max:1000',
+        ];
     }
 }
