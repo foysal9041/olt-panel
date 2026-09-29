@@ -156,9 +156,13 @@
                                 </a>
                             @endif
 
+                            @if ($transaction->isLockedFor(auth()->user()))
+                                <span class="text-muted small" title="Past day — only an admin can change it"><i class="fas fa-lock"></i></span>
+                            @else
                             <a href="{{ route('accounts.transactions.edit', $transaction->id) }}" class="btn btn-warning btn-sm">
                                 Edit
                             </a>
+                            @endif
 
                             @if(strtolower(auth()->user()->role) == 'admin')
                                 <form action="{{ route('accounts.transactions.destroy', $transaction->id) }}"

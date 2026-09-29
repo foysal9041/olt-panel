@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\BandwidthType;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\Olt;
 use App\Models\Product;
 use Illuminate\Http\Request;
 
@@ -14,7 +13,7 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        $customers = Customer::with(['product', 'bandwidthRates.bandwidthType', 'invoices.payments'])
+        $customers = Customer::with(['product', 'packages', 'bandwidthRates.bandwidthType', 'invoices.payments'])
             ->orderBy('name')
             ->get()
             ->each(function (Customer $customer) {
@@ -42,9 +41,9 @@ class CustomerController extends Controller
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:255',
-            'zone' => 'nullable|string|max:100',
+            'zone' => 'nullable|exists:zones,name',
             'product_id' => 'nullable|exists:products,id',
-            'customer_type' => 'required|in:mac_client,bandwidth_client,corporate_client',
+            'customer_type' => 'required|in:mac_client,bandwidth_client',
             'package_rate' => 'nullable|numeric|min:0',
             'kam_name' => 'nullable|string|max:255',
             'kam_phone' => 'nullable|string|max:50',
@@ -62,6 +61,13 @@ class CustomerController extends Controller
 
         $this->syncBandwidthRates($customer, $bandwidthRates);
 
+        // MAC clients are set up on their page (packages, products given).
+        if ($customer->usesPackage()) {
+            return redirect()
+                ->route('accounts.customers.show', $customer)
+                ->with('success', 'Customer added — now allow their packages below.');
+        }
+
         return redirect()
             ->route('accounts.customers.index')
             ->with('success', 'Customer Added Successfully');
@@ -69,10 +75,19 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        $customer->load(['product', 'bandwidthRates.bandwidthType']);
+        $customer->load(['product', 'bandwidthRates.bandwidthType', 'packages', 'givenProducts.invoice']);
         $invoices = $customer->invoices()->with('payments')->orderByDesc('billing_month')->get();
 
-        return view('accounts.customers.show', compact('customer', 'invoices'));
+        // MAC clients: packages are monthly products; goods are one-time ones.
+        $catalog = \App\Models\Product::with('category')->where('status', true)->orderBy('name')->get();
+        $packageOptions = $catalog->where('billing_cycle', 'monthly')->values();
+        $goodsOptions = $catalog->where('billing_cycle', '!=', 'monthly')->values();
+
+        // Next month to bill: the month after the latest invoice, else this month.
+        $lastBilled = $invoices->first()?->billing_month;
+        $nextMonth = $lastBilled ? $lastBilled->copy()->startOfMonth()->addMonthNoOverflow() : now()->startOfMonth();
+
+        return view('accounts.customers.show', compact('customer', 'invoices', 'packageOptions', 'goodsOptions', 'nextMonth'));
     }
 
     /**
@@ -194,9 +209,9 @@ class CustomerController extends Controller
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:50',
             'address' => 'nullable|string|max:255',
-            'zone' => 'nullable|string|max:100',
+            'zone' => 'nullable|exists:zones,name',
             'product_id' => 'nullable|exists:products,id',
-            'customer_type' => 'required|in:mac_client,bandwidth_client,corporate_client',
+            'customer_type' => 'required|in:mac_client,bandwidth_client',
             'package_rate' => 'nullable|numeric|min:0',
             'kam_name' => 'nullable|string|max:255',
             'kam_phone' => 'nullable|string|max:50',
@@ -268,11 +283,6 @@ class CustomerController extends Controller
 
     private function zones()
     {
-        return Olt::select('zone')
-            ->whereNotNull('zone')
-            ->where('zone', '!=', '')
-            ->distinct()
-            ->orderBy('zone')
-            ->pluck('zone');
+        return \App\Models\Zone::names();
     }
 }

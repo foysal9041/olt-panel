@@ -67,6 +67,9 @@ return [
             'customers'     => 'Customers',
             'products'      => 'Products',
             'payments-edit' => 'Edit/Delete Payment Entries',
+            'cashbook'      => 'Daily Cash Book (প্রতিদিনের হিসাব)',
+            'reports'       => 'Monthly Ledgers & Summary',
+            'salaries'      => 'Salary Sheet (বেতন)',
         ],
     ],
     'settings' => [

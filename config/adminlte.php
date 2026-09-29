@@ -465,6 +465,12 @@ return [
                 'can'  => 'access-accounts-dashboard',
             ],
             [
+                'text' => 'Daily Cash Book',
+                'url'  => 'accounts/cashbook',
+                'icon' => 'fas fa-book-open',
+                'can'  => 'access-accounts-cashbook',
+            ],
+            [
                 'text' => 'Receive Payment',
                 'url'  => 'accounts/payments/receive',
                 'icon' => 'fas fa-hand-holding-usd',
@@ -488,6 +494,18 @@ return [
                 'url'  => 'accounts/customers',
                 'icon' => 'fas fa-users',
                 'can'  => 'access-accounts-customers',
+            ],
+            [
+                'text' => 'Monthly Reports',
+                'url'  => 'accounts/reports/ledger',
+                'icon' => 'fas fa-calendar-alt',
+                'can'  => 'access-accounts-reports',
+            ],
+            [
+                'text' => 'Salary Sheet',
+                'url'  => 'accounts/salaries',
+                'icon' => 'fas fa-money-check-alt',
+                'can'  => 'access-accounts-salaries',
             ],
             [
                 'text' => 'Products',

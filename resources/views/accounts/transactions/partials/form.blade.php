@@ -47,6 +47,7 @@
     <div class="form-group">
         <label>Date</label>
         <input type="date" name="transaction_date" class="form-control"
+               @unless (auth()->user()->isAdmin()) min="{{ now()->toDateString() }}" @endunless
                value="{{ old('transaction_date', $transaction ? $transaction->transaction_date->toDateString() : now()->toDateString()) }}" required>
     </div>
 

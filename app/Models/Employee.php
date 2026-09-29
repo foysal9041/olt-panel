@@ -10,9 +10,12 @@ class Employee extends Model
     use LogsActivity;
 
     protected $fillable = [
+        'emp_code',
         'name',
         'phone',
         'designation',
+        'basic_salary',
+        'house_rent',
         'device_user_id',
         'zone',
         'duty_shift_id',

@@ -51,9 +51,7 @@
                         <td>{{ $customer->phone ?? '-' }}</td>
                         <td>{{ $customer->zone ?? '-' }}</td>
                         <td>
-                            @if($customer->customer_type == 'corporate_client')
-                                <span class="badge badge-primary">{{ $customer->customerTypeLabel() }}</span>
-                            @elseif($customer->isBandwidthClient())
+                            @if($customer->isBandwidthClient())
                                 <span class="badge badge-info">{{ $customer->customerTypeLabel() }}</span>
                             @else
                                 <span class="badge badge-secondary">{{ $customer->customerTypeLabel() }}</span>
@@ -62,7 +60,13 @@
                         <td>
                             @if($customer->usesPackage())
                                 <div>
-                                    @if($customer->product)
+                                    @php $active = $customer->packages->where('is_active', true); @endphp
+                                    @if($active->isNotEmpty())
+                                        @foreach($active as $package)
+                                            <div class="small">{{ $package->product->name }} — {{ $package->pricingLabel() }} × {{ number_format($package->quantity) }}</div>
+                                        @endforeach
+                                        <div class="font-weight-bold">&#2547;{{ number_format($active->sum(fn ($p) => $p->monthlyTotal()), 2) }}/month</div>
+                                    @elseif($customer->product)
                                         {{ $customer->product->name }}
                                         (&#2547;{{ number_format($customer->package_rate ?? $customer->product->price, 2) }})
                                     @else

@@ -64,6 +64,8 @@ class TransactionController extends Controller
             'transaction_date' => 'required|date',
         ]);
 
+        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, 'Only an admin can change entries for past days.');
+
         $validated['recorded_by'] = auth()->id();
         $validated['zone'] = auth()->user()->zone;
 
@@ -90,6 +92,8 @@ class TransactionController extends Controller
 
     public function edit(Transaction $transaction)
     {
+        abort_if($transaction->isLockedFor(auth()->user()), 403, 'Only an admin can change entries for past days.');
+
         $categories = TransactionCategory::orderBy('type')->orderBy('name')->get();
 
         return view('accounts.transactions.edit', compact('transaction', 'categories'));
@@ -103,6 +107,10 @@ class TransactionController extends Controller
             'description' => 'nullable|string|max:255',
             'transaction_date' => 'required|date',
         ]);
+
+        // Neither the old nor the new date may be a closed day.
+        abort_if($transaction->isLockedFor(auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, 'Only an admin can change entries for past days.');
 
         $transaction->update($validated);
 

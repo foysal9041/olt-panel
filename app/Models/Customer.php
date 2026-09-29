@@ -30,35 +30,41 @@ class Customer extends Model
         ];
     }
 
+    /** The two kinds of customer. */
+    public const TYPES = [
+        'mac_client' => 'MAC Client',
+        'bandwidth_client' => 'Bandwidth Client',
+    ];
+
     /**
-     * Whether this customer is billed per bandwidth type (rate × quantity)
-     * instead of a single fixed package — true for both resellers
-     * (bandwidth_client) and corporate accounts (corporate_client), which
-     * share the same rate-based billing shape.
+     * Bandwidth clients are billed per bandwidth type (rate × quantity).
      */
     public function isBandwidthClient(): bool
     {
-        return in_array($this->customer_type, ['bandwidth_client', 'corporate_client'], true);
+        return $this->customer_type === 'bandwidth_client';
     }
 
     /**
-     * Whether this customer is billed on a fixed product/package — true for
-     * both retail customers (mac_client) and corporate accounts
-     * (corporate_client), which can carry a package on top of their
-     * bandwidth rates.
+     * MAC clients are billed a fixed product/package.
      */
     public function usesPackage(): bool
     {
-        return in_array($this->customer_type, ['mac_client', 'corporate_client'], true);
+        return ! $this->isBandwidthClient();
     }
 
     public function customerTypeLabel(): string
     {
-        return match ($this->customer_type) {
-            'bandwidth_client' => 'Bandwidth Client',
-            'corporate_client' => 'Corporate Customer',
-            default => 'Mac Client',
-        };
+        return self::TYPES[$this->customer_type] ?? self::TYPES['mac_client'];
+    }
+
+    public function packages()
+    {
+        return $this->hasMany(CustomerPackage::class)->with('product');
+    }
+
+    public function givenProducts()
+    {
+        return $this->hasMany(CustomerProduct::class)->orderByDesc('given_on')->orderByDesc('id');
     }
 
     public function product()

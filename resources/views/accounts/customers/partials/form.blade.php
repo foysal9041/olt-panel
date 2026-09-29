@@ -48,40 +48,21 @@
     <div class="form-group">
         <label>Customer Type</label>
         <select name="customer_type" id="customer_type" class="form-control">
-            <option value="mac_client" {{ old('customer_type', $customer->customer_type ?? 'mac_client') == 'mac_client' ? 'selected' : '' }}>
-                Mac Client
-            </option>
-            <option value="bandwidth_client" {{ old('customer_type', $customer->customer_type ?? 'mac_client') == 'bandwidth_client' ? 'selected' : '' }}>
-                Bandwidth Client
-            </option>
-            <option value="corporate_client" {{ old('customer_type', $customer->customer_type ?? 'mac_client') == 'corporate_client' ? 'selected' : '' }}>
-                Corporate Customer
-            </option>
+            @foreach (\App\Models\Customer::TYPES as $value => $label)
+                <option value="{{ $value }}" @selected(old('customer_type', $customer->customer_type ?? 'mac_client') === $value)>{{ $label }}</option>
+            @endforeach
         </select>
     </div>
 
     <div id="mac-client-fields">
 
-        <div class="form-group">
-            <label>Product / Package</label>
-            <select name="product_id" class="form-control">
-                <option value="">No package</option>
-                @foreach($products as $product)
-                    <option value="{{ $product->id }}" {{ old('product_id', $customer->product_id ?? '') == $product->id ? 'selected' : '' }}>
-                        {{ $product->name }} (&#2547;{{ number_format($product->price, 2) }} / {{ $product->billing_cycle == 'monthly' ? 'month' : 'one-time' }})
-                    </option>
-                @endforeach
-            </select>
-            <small class="text-muted">
-                Drives what gets billed when generating invoices for this customer.
-            </small>
-        </div>
-
-        <div class="form-group">
-            <label>Package Rate (&#2547;)</label>
-            <input type="number" step="0.01" min="0" name="package_rate" class="form-control"
-                   value="{{ old('package_rate', $customer->package_rate ?? '') }}"
-                   placeholder="Leave blank to use the package's list price">
+        <div class="alert alert-light border small">
+            <i class="fas fa-info-circle text-primary mr-1"></i>
+            Allowed packages (fixed rate or commission %), users per package and products given
+            are set on the customer page{{ isset($customer) && $customer->exists ? '' : ' after you save' }}.
+            @if(isset($customer) && $customer->exists)
+                <a href="{{ route('accounts.customers.show', $customer) }}#monthly-invoice">Open customer page</a>
+            @endif
         </div>
 
     </div>
@@ -171,8 +152,8 @@
 
     function toggleFields() {
         var type = typeSelect.value;
-        var showPackage = type === 'mac_client' || type === 'corporate_client';
-        var showBandwidth = type === 'bandwidth_client' || type === 'corporate_client';
+        var showBandwidth = type === 'bandwidth_client';
+        var showPackage = !showBandwidth;
         macFields.classList.toggle('d-none', !showPackage);
         bandwidthFields.classList.toggle('d-none', !showBandwidth);
     }

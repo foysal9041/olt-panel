@@ -55,4 +55,23 @@ class Transaction extends Model
     {
         return $query->whereHas('category', fn ($q) => $q->where('type', 'expense'));
     }
+
+    /**
+     * Past days are closed books: only an admin may add, change or remove
+     * entries dated before today. Today's page stays open to everyone who
+     * can use the cash book.
+     */
+    public static function dayIsOpenFor(\DateTimeInterface|string $date, ?User $user): bool
+    {
+        if ($user?->isAdmin()) {
+            return true;
+        }
+
+        return \Illuminate\Support\Carbon::parse($date)->startOfDay()->gte(\Illuminate\Support\Carbon::today());
+    }
+
+    public function isLockedFor(?User $user): bool
+    {
+        return ! self::dayIsOpenFor($this->transaction_date, $user);
+    }
 }

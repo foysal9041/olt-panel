@@ -16,15 +16,26 @@
     <div class="alert alert-danger">{{ session('error') }}</div>
 @endif
 
+@if(session('print_invoice'))
+    <div class="alert alert-info d-flex align-items-center">
+        <span class="mr-auto">Invoice is ready.</span>
+        <a href="{{ route('accounts.invoices.print', session('print_invoice')) }}" target="_blank" class="btn btn-sm btn-light"><i class="fas fa-print"></i> Print Invoice</a>
+    </div>
+@endif
+
+@if($errors->any())
+    <div class="alert alert-danger mb-3">
+        @foreach($errors->all() as $e)<div>{{ $e }}</div>@endforeach
+    </div>
+@endif
+
 <div class="card card-outline card-info">
 
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-user mr-1"></i>
             {{ $customer->name }}
-            @if($customer->customer_type == 'corporate_client')
-                <span class="badge badge-primary ml-2">{{ $customer->customerTypeLabel() }}</span>
-            @elseif($customer->isBandwidthClient())
+            @if($customer->isBandwidthClient())
                 <span class="badge badge-info ml-2">{{ $customer->customerTypeLabel() }}</span>
             @else
                 <span class="badge badge-secondary ml-2">{{ $customer->customerTypeLabel() }}</span>
@@ -99,26 +110,34 @@
 
                 @if($customer->usesPackage())
 
-                    <h6 class="text-muted text-uppercase small font-weight-bold mb-3">Package</h6>
+                    <h6 class="text-muted text-uppercase small font-weight-bold mb-3">Billing</h6>
 
-                    @if($customer->product)
-                        <table class="table table-borderless table-sm">
+                    @php($activePackages = $customer->packages->where('is_active', true))
+                    @php($pendingGoods = $customer->givenProducts->filter->isPending())
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <th width="160">Allowed Packages</th>
+                            <td>{{ $activePackages->count() ?: '—' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Users / month</th>
+                            <td>{{ number_format($activePackages->sum('quantity')) }}</td>
+                        </tr>
+                        <tr>
+                            <th>Monthly Bill (est.)</th>
+                            <td class="font-weight-bold">&#2547;{{ number_format($activePackages->sum(fn ($p) => $p->monthlyTotal()), 2) }}</td>
+                        </tr>
+                        <tr>
+                            <th>Goods not billed</th>
+                            <td>{{ $pendingGoods->isEmpty() ? '—' : '৳' . number_format($pendingGoods->sum(fn ($g) => $g->total()), 2) . ' (' . $pendingGoods->count() . ')' }}</td>
+                        </tr>
+                        @if($customer->product && $activePackages->isEmpty())
                             <tr>
-                                <th width="140">Package</th>
-                                <td>{{ $customer->product->name }}</td>
+                                <th>Old package</th>
+                                <td>{{ $customer->product->name }} — &#2547;{{ number_format($customer->package_rate ?? $customer->product->price, 2) }}</td>
                             </tr>
-                            <tr>
-                                <th>List Price</th>
-                                <td>&#2547;{{ number_format($customer->product->price, 2) }}</td>
-                            </tr>
-                            <tr>
-                                <th>Billed Rate</th>
-                                <td>&#2547;{{ number_format($customer->package_rate ?? $customer->product->price, 2) }}</td>
-                            </tr>
-                        </table>
-                    @else
-                        <p class="text-muted">No package assigned.</p>
-                    @endif
+                        @endif
+                    </table>
 
                 @endif
 
@@ -186,17 +205,28 @@
             View Ledger
         </a>
 
-        <form action="{{ route('accounts.customers.invoices.generate', $customer->id) }}" method="POST" class="d-inline">
+@if($customer->usesPackage())
+        <a href="#monthly-invoice" class="btn btn-success">
+            <i class="fas fa-file-invoice"></i>
+            Monthly Invoice
+        </a>
+        @else
+                <form action="{{ route('accounts.customers.invoices.generate', $customer->id) }}" method="POST" class="d-inline">
             @csrf
             <button type="submit" class="btn btn-success">
                 <i class="fas fa-file-invoice"></i>
                 Generate This Month's Invoice
             </button>
         </form>
+        @endif
 
     </div>
 
 </div>
+
+@if($customer->usesPackage())
+    @include('accounts.customers.partials.mac-billing')
+@endif
 
 @include('accounts.customers.partials.invoice-history')
 

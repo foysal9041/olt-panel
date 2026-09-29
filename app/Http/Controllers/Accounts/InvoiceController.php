@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Accounts;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\CustomerProduct;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
@@ -71,7 +73,7 @@ class InvoiceController extends Controller
         $billingMonth = Carbon::parse($validated['month'] . '-01');
 
         $customers = Customer::where('status', true)
-            ->with(['product', 'bandwidthRates.bandwidthType'])
+            ->with(['product', 'bandwidthRates.bandwidthType', 'packages', 'givenProducts'])
             ->get();
 
         $nextNumber = Invoice::count() + 1;
@@ -98,6 +100,52 @@ class InvoiceController extends Controller
      * Generates this month's invoice for a single customer, from their
      * detail page — the one-off equivalent of the monthly batch generate().
      */
+    /**
+     * Monthly invoice for one client from the customer page: this month's
+     * users per package, and which handed-over goods to charge.
+     */
+    public function monthlyForCustomer(Request $request, Customer $customer)
+    {
+        $validated = $request->validate([
+            'month' => 'required|date_format:Y-m',
+            'quantities' => 'array',
+            'quantities.*' => 'nullable|integer|min:0|max:1000000',
+            'products' => 'array',
+            'products.*' => 'integer',
+        ]);
+
+        $month = Carbon::parse($validated['month'] . '-01');
+        $customer->load(['packages', 'givenProducts', 'product', 'bandwidthRates.bandwidthType']);
+
+        if (Invoice::where('customer_id', $customer->id)->whereYear('billing_month', $month->year)->whereMonth('billing_month', $month->month)->exists()) {
+            return back()->withInput()->with('error', "{$customer->name} already has an invoice for {$month->format('F Y')}.");
+        }
+
+        $quantities = collect($validated['quantities'] ?? [])
+            ->only($customer->packages->pluck('id')->all())
+            ->map(fn ($q) => (int) $q)
+            ->all();
+
+        $invoice = DB::transaction(function () use ($customer, $month, $quantities, $validated) {
+            // Remember this month's counts as the default for next time.
+            foreach ($customer->packages as $package) {
+                if (array_key_exists($package->id, $quantities)) {
+                    $package->update(['quantity' => $quantities[$package->id]]);
+                }
+            }
+
+            return $this->generateInvoiceFor($customer, $month, Invoice::count() + 1, $quantities, $validated['products'] ?? []);
+        });
+
+        if (! $invoice) {
+            return back()->withInput()->with('error', 'Nothing to bill — enter users for at least one package or tick a product.');
+        }
+
+        return redirect()->route('accounts.customers.show', $customer)
+            ->with('success', "Invoice {$invoice->invoice_number} created for {$month->format('F Y')} — ৳" . number_format((float) $invoice->amount, 2) . '.')
+            ->with('print_invoice', $invoice->id);
+    }
+
     public function generateForCustomer(Customer $customer)
     {
         $billingMonth = Carbon::today()->startOfMonth();
@@ -116,7 +164,7 @@ class InvoiceController extends Controller
      * or returns null if they're already invoiced that month or there's
      * nothing to bill them for (no package/bandwidth rate on record).
      */
-    private function generateInvoiceFor(Customer $customer, Carbon $billingMonth, int $invoiceNumber): ?Invoice
+    private function generateInvoiceFor(Customer $customer, Carbon $billingMonth, int $invoiceNumber, ?array $quantities = null, ?array $productIds = null): ?Invoice
     {
         $exists = Invoice::where('customer_id', $customer->id)
             ->whereYear('billing_month', $billingMonth->year)
@@ -127,7 +175,7 @@ class InvoiceController extends Controller
             return null;
         }
 
-        $billing = $this->resolveBilling($customer);
+        $billing = $this->resolveBilling($customer, $quantities, $productIds);
 
         if (! $billing) {
             return null;
@@ -147,22 +195,33 @@ class InvoiceController extends Controller
             $invoice->items()->create($item);
         }
 
+        // Goods on this invoice are billed now; they won't be charged again.
+        if ($billing['given_product_ids']) {
+            CustomerProduct::whereIn('id', $billing['given_product_ids'])->update(['invoice_id' => $invoice->id]);
+        }
+
         return $invoice;
     }
 
     /**
-     * Works out what to bill $customer for one billing period: bandwidth
-     * rates (bandwidth_client, corporate_client), a fixed package
-     * (mac_client, corporate_client), or — for corporate accounts that
-     * carry both — the sum of the two. Returns null when there's nothing
-     * to bill them for.
+     * Works out what to bill $customer for one billing period:
+     *  - bandwidth_client: bandwidth rates (rate × Mbps per type);
+     *  - mac_client: each allowed package × its users at the client's rate
+     *    (fixed, or list price less commission) — or, for clients set up
+     *    before packages existed, their single product/package;
+     *  - plus any chargeable goods handed over and not billed yet.
      *
-     * @return array{amount: float, product_id: ?int, items: list<array{label: string, amount: float, rate: float, quantity: float}>}|null
+     * $quantities (package id => users) and $productIds (goods to include)
+     * override the saved values when invoicing a client by hand.
+     * Returns null when there's nothing to bill.
+     *
+     * @return array{amount: float, product_id: ?int, items: list<array>, given_product_ids: list<int>}|null
      */
-    private function resolveBilling(Customer $customer): ?array
+    private function resolveBilling(Customer $customer, ?array $quantities = null, ?array $productIds = null): ?array
     {
         $amount = 0.0;
         $items = [];
+        $productId = null;
 
         if ($customer->isBandwidthClient()) {
             // Billed per bandwidth type — each line is (rate per Mbps ×
@@ -178,22 +237,58 @@ class InvoiceController extends Controller
                     'quantity' => (float) $rate->quantity,
                 ];
             }
+        } else {
+            $packages = $customer->packages->where('is_active', true);
+
+            if ($packages->isNotEmpty()) {
+                foreach ($packages as $package) {
+                    $qty = (int) ($quantities[$package->id] ?? $package->quantity);
+
+                    if ($qty <= 0 || $package->unitPrice() <= 0) {
+                        continue;
+                    }
+
+                    $line = $package->monthlyTotal($qty);
+                    $amount += $line;
+                    $items[] = [
+                        'label' => $package->product->name . ' — ' . $qty . ' ' . ($qty === 1 ? 'user' : 'users'),
+                        'amount' => $line,
+                        'rate' => $package->unitPrice(),
+                        'quantity' => $qty,
+                        'remark' => $package->pricing === 'commission'
+                            ? 'List ৳' . number_format((float) $package->product->price, 2) . ' less ' . (float) $package->commission_percent . '%'
+                            : null,
+                    ];
+                }
+            } elseif ($customer->product_id) {
+                // The customer's own package_rate overrides the catalog price
+                // when set, so a negotiated discount doesn't get lost.
+                $packageAmount = (float) ($customer->package_rate ?? $customer->product->price);
+                $amount += $packageAmount;
+                $productId = $customer->product_id;
+
+                $items[] = [
+                    'label' => $customer->product->name,
+                    'amount' => $packageAmount,
+                    'rate' => $packageAmount,
+                    'quantity' => 1,
+                ];
+            }
         }
 
-        $productId = null;
+        // Goods handed over and not billed yet.
+        $given = $customer->givenProducts->filter(fn (CustomerProduct $p) => $p->isPending());
+        if ($productIds !== null) {
+            $given = $given->whereIn('id', $productIds);
+        }
 
-        if ($customer->usesPackage() && $customer->product_id) {
-            // The customer's own package_rate overrides the catalog price
-            // when set, so a negotiated discount doesn't get lost.
-            $packageAmount = (float) ($customer->package_rate ?? $customer->product->price);
-            $amount += $packageAmount;
-            $productId = $customer->product_id;
-
+        foreach ($given as $goods) {
+            $amount += $goods->total();
             $items[] = [
-                'label' => $customer->product->name,
-                'amount' => $packageAmount,
-                'rate' => $packageAmount,
-                'quantity' => 1,
+                'label' => $goods->name . ' (given ' . $goods->given_on->format('d M Y') . ')',
+                'amount' => $goods->total(),
+                'rate' => $goods->unit_price,
+                'quantity' => $goods->quantity,
             ];
         }
 
@@ -201,7 +296,12 @@ class InvoiceController extends Controller
             return null;
         }
 
-        return ['amount' => $amount, 'product_id' => $productId, 'items' => $items];
+        return [
+            'amount' => round($amount, 2),
+            'product_id' => $productId,
+            'items' => $items,
+            'given_product_ids' => $given->pluck('id')->values()->all(),
+        ];
     }
 
     public function markPaid(Invoice $invoice)
