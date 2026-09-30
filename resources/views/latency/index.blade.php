@@ -25,7 +25,7 @@
     @include('partials.telegram-off-banner')
 @endif
 
-<div class="row">
+<div class="row" data-live="lat-stats">
     @foreach ([
         ['Total Targets', $targets->count(), 'bg-info', 'fas fa-bullseye'],
         ['Up', $counts['up'] ?? 0, 'bg-success', 'fas fa-check'],
@@ -64,7 +64,7 @@
     <div class="row">
         @foreach ($groupTargets as $target)
             <div class="col-xl-4 col-lg-6">
-                <div class="card latency-card {{ $target->alert_active ? 'latency-card--alert' : '' }}">
+                <div class="card latency-card {{ $target->alert_active ? 'latency-card--alert' : '' }}" data-live="lat-{{ $target->id }}">
                     <div class="card-header">
                         <div>
                             <div class="latency-card-title">
@@ -87,7 +87,7 @@
 
                     <div class="card-body pt-2 pb-2 px-2">
                         <a href="{{ route('latency.show', $target) }}" class="d-block text-reset" title="Open full graphs">
-                            <div class="js-smokegraph"
+                            <div class="js-smokegraph" data-live-keep="graph-{{ $target->id }}"
                                  data-url="{{ route('latency.data', ['target' => $target, 'range' => '3h', 'points' => 120]) }}"></div>
                         </a>
                     </div>
@@ -117,13 +117,12 @@
 @stop
 
 @section('js')
+<script>LiveRefresh.start(30000);</script>
 <script src="{{ asset('js/smokegraph.js') }}?v={{ filemtime(public_path('js/smokegraph.js')) }}"></script>
 <script>
+// Graphs refresh themselves; status badges and numbers update in place.
 document.querySelectorAll('.js-smokegraph').forEach(function (el) {
     SmokeGraph.create(el, { url: el.dataset.url, height: 130, compact: true, refresh: 60 });
 });
-
-// Status badges and numbers come from the server; refresh them now and then.
-setTimeout(function () { location.reload(); }, 5 * 60 * 1000);
 </script>
 @stop

@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\NocAlertSetting;
 use App\Models\NttnLink;
 use App\Services\NttnMonitor;
-use App\Services\TelegramNotifier;
+use App\Services\AlertNotifier;
 use Illuminate\Console\Command;
 
 class CheckNttnLinks extends Command
@@ -14,7 +14,7 @@ class CheckNttnLinks extends Command
 
     protected $description = 'Ping monitored NTTN links and send Telegram alerts when one goes down or comes back';
 
-    public function handle(NttnMonitor $monitor, TelegramNotifier $telegram)
+    public function handle(NttnMonitor $monitor, AlertNotifier $notifier)
     {
         $links = NttnLink::where('monitor', true)
             ->where('status', 'active')
@@ -40,7 +40,7 @@ class CheckNttnLinks extends Command
         }
 
         if ($alerts && NocAlertSetting::current()->alert_nttn_status) {
-            $telegram->send(implode("\n\n", $alerts));
+            $notifier->send(implode("\n\n", $alerts));
         }
 
         return Command::SUCCESS;

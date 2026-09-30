@@ -42,7 +42,7 @@
 
     <div class="card-body p-0">
 
-        <table class="table table-bordered table-striped data-table mb-0">
+        <table class="table table-bordered table-striped data-table mb-0" data-live-table="nttn">
 
             <thead>
                 <tr>
@@ -63,8 +63,8 @@
 
                 @forelse($nttnLinks as $link)
 
-                    <tr>
-                        <td class="text-center text-muted js-sl">{{ $loop->iteration }}</td>
+                    <tr data-key="{{ $link->id }}">
+                        <td class="text-center text-muted js-sl" data-live-ignore>{{ $loop->iteration }}</td>
                         <td class="font-weight-bold">{{ $link->link_id }}</td>
                         <td>{{ $link->provider ?? '—' }}</td>
                         <td class="nttn-address" title="{{ $link->address }}"><span>{{ $link->address }}</span></td>
@@ -138,7 +138,7 @@ $(function () {
     }, 0);
 });
 
-// Link status comes from the every-minute monitor; keep it current.
-setTimeout(function () { location.reload(); }, 60000);
+// Link status comes from the every-minute monitor; it updates in place.
+LiveRefresh.start(30000);
 </script>
 @stop

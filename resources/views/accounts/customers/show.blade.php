@@ -53,6 +53,10 @@
 
                 <table class="table table-borderless table-sm">
                     <tr>
+                        <th width="140">Username</th>
+                        <td>{{ $customer->username ?? '—' }}</td>
+                    </tr>
+                    <tr>
                         <th width="140">Phone</th>
                         <td>{{ $customer->phone ?? '—' }}</td>
                     </tr>

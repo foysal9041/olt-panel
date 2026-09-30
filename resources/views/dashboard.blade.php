@@ -30,6 +30,7 @@
             <h1>{{ $greeting }}, {{ auth()->user()->name }} 👋</h1>
             <div class="dash-hero-sub">Sunlit Network ERP — here's what's happening across your network today.</div>
 
+            <div data-live="hero-status">
             @if ($anyModule)
                 <a href="#needs-attention" class="dash-health {{ $issues ? 'dash-health--bad' : '' }}">
                     <span class="dash-health-dot"></span>
@@ -44,7 +45,7 @@
 
             @php
                 $chips = array_filter([
-                    $olt ? ['fas fa-network-wired', $olt['total'] . ' ' . Str::plural('OLT', $olt['total'])] : null,
+                    $olt ? ['fas fa-network-wired', $olt['total'] . ' OLT' . ($olt['total'] === 1 ? '' : 's')] : null,
                     $switches ? ['fas fa-server', $switches['total'] . ' ' . Str::plural('switch', $switches['total'])] : null,
                     $nttn ? ['fas fa-project-diagram', $nttn['total'] . ' NTTN ' . Str::plural('link', $nttn['total'])] : null,
                     $ip ? ['fas fa-globe', $ip['blocks']->count() . ' IP ' . Str::plural('block', $ip['blocks']->count())] : null,
@@ -58,11 +59,12 @@
                     @endforeach
                 </div>
             @endif
+            </div>
         </div>
         <div class="col-sm-4">
             <div class="dash-hero-side">
                 @if ($health !== null)
-                    <div class="health-ring" style="--p: {{ $health }}; --c: {{ $healthColor }}" title="{{ $healthy }} of {{ $checks }} checks healthy">
+                    <div class="health-ring" data-live="hero-ring" style="--p: {{ $health }}; --c: {{ $healthColor }}" title="{{ $healthy }} of {{ $checks }} checks healthy">
                         <div class="health-ring-inner">
                             <b>{{ $health }}%</b>
                             <span>network<br>health</span>
@@ -103,7 +105,7 @@
     <div class="dash-section"><i class="fas fa-satellite-dish"></i> Network</div>
 @endif
 
-<div class="kpi-grid">
+<div class="kpi-grid" data-live="kpis">
 
     @if ($olt)
         <a href="{{ route('olt.dashboard') }}" class="kpi">
@@ -186,8 +188,8 @@
 <div class="row">
 
     @if ($olt || $switches || $latency)
-        <div class="{{ $switches ? 'col-lg-7' : 'col-12' }}">
-            <div class="card dash-panel" id="needs-attention">
+        <div class="{{ $switches || $team ? 'col-lg-7' : 'col-12' }}">
+            <div class="card dash-panel" id="needs-attention" data-live="issues">
                 <div class="card-header">
                     <h3 class="card-title"><i class="fas fa-bell mr-1 text-danger"></i> Needs Attention</h3>
                     @if ($issues)
@@ -215,26 +217,63 @@
         </div>
     @endif
 
-    @if ($switches)
+    @if ($switches || $team)
+        @php
+            $teamColors = ['login' => '#22c55e', 'logout' => '#94a3b8', 'login_failed' => '#ef4444', 'created' => '#0ea5e9',
+                'updated' => '#f59e0b', 'deleted' => '#ef4444', 'access' => '#6366f1'];
+        @endphp
         <div class="col-lg-5">
             <div class="card dash-panel">
                 <div class="card-header">
                     <h3 class="card-title"><i class="fas fa-history mr-1 text-primary"></i> Recent Activity</h3>
-                    <a href="{{ route('switch-events.index') }}" class="small">View all</a>
+                    <ul class="nav dash-tabs" role="tablist">
+                        @if ($switches)
+                            <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#ra-network" role="tab"><i class="fas fa-network-wired"></i> Network</a></li>
+                        @endif
+                        @if ($team)
+                            <li class="nav-item"><a class="nav-link {{ $switches ? '' : 'active' }}" data-toggle="tab" href="#ra-team" role="tab"><i class="fas fa-users"></i> Team</a></li>
+                        @endif
+                    </ul>
                 </div>
-                <div class="card-body p-0">
-                    @if ($events->isEmpty())
-                        <div class="dash-empty"><i class="fas fa-stream" style="color:#cbd5e1"></i>No port or switch events yet.</div>
-                    @else
-                        <ul class="timeline-mini">
-                            @foreach ($events as $event)
-                                @php [$label, $color] = \App\Models\SwitchEvent::TYPES[$event->type] ?? [$event->type, 'secondary']; @endphp
-                                <li style="--dot: {{ $eventColors[$color] ?? '#94a3b8' }}">
-                                    <div class="tl-time">{{ $event->occurred_at->format('d M, h:i A') }} · {{ $event->occurred_at->diffForHumans() }}</div>
-                                    <div class="tl-text"><strong>{{ $label }}</strong> — {{ $event->message }}</div>
-                                </li>
-                            @endforeach
-                        </ul>
+                <div class="card-body p-0 tab-content">
+                    @if ($switches)
+                        <div class="tab-pane fade show active" id="ra-network" role="tabpanel">
+                            <div class="dash-feed" data-live="events">
+                                @if ($events->isEmpty())
+                                    <div class="dash-empty"><i class="fas fa-stream" style="color:#cbd5e1"></i>No port or switch events yet.</div>
+                                @else
+                                    <ul class="timeline-mini">
+                                        @foreach ($events as $event)
+                                            @php [$label, $color] = \App\Models\SwitchEvent::TYPES[$event->type] ?? [$event->type, 'secondary']; @endphp
+                                            <li style="--dot: {{ $eventColors[$color] ?? '#94a3b8' }}">
+                                                <div class="tl-time">{{ $event->occurred_at->format('d M, h:i A') }} · {{ $event->occurred_at->diffForHumans() }}</div>
+                                                <div class="tl-text"><strong>{{ $label }}</strong> — {{ $event->message }}</div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                            <a href="{{ route('switch-events.index') }}" class="dash-feed-foot">All network events <i class="fas fa-arrow-right"></i></a>
+                        </div>
+                    @endif
+                    @if ($team)
+                        <div class="tab-pane fade {{ $switches ? '' : 'show active' }}" id="ra-team" role="tabpanel">
+                            <div class="dash-feed" data-live="team">
+                                @if ($team->isEmpty())
+                                    <div class="dash-empty"><i class="fas fa-users" style="color:#cbd5e1"></i>No activity recorded yet.</div>
+                                @else
+                                    <ul class="timeline-mini">
+                                        @foreach ($team as $log)
+                                            <li style="--dot: {{ $teamColors[$log->action] ?? '#94a3b8' }}">
+                                                <div class="tl-time">{{ $log->created_at->format('d M, h:i A') }} · {{ $log->created_at->diffForHumans() }}</div>
+                                                <div class="tl-text"><strong>{{ $log->user?->name ?? 'Unknown' }}</strong> — {{ $log->description }}</div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                            <a href="{{ route('activity.index') }}" class="dash-feed-foot">Full activity log <i class="fas fa-arrow-right"></i></a>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -254,14 +293,14 @@
             <div class="row">
                 @foreach ($latency['targets']->sortByDesc('alert_active')->take(4) as $t)
                     <div class="col-xl-3 col-md-6 mb-3">
-                        <div class="lat-card {{ $t->alert_active ? 'alert-on' : '' }}">
+                        <div class="lat-card {{ $t->alert_active ? 'alert-on' : '' }}" data-live="lat-{{ $t->id }}">
                             <div class="d-flex justify-content-between align-items-baseline">
                                 <a href="{{ route('latency.show', $t) }}" class="font-weight-bold text-truncate" style="color:#0f172a">{{ $t->name }}</a>
                                 <span class="small font-weight-bold {{ $t->alert_active ? 'text-danger' : 'text-muted' }} text-nowrap">
                                     {{ $t->last_median !== null ? round($t->last_median, 1) . ' ms' : '—' }}
                                 </span>
                             </div>
-                            <div class="js-smokegraph" data-url="{{ route('latency.data', ['target' => $t, 'range' => '3h', 'points' => 90]) }}"></div>
+                            <div class="js-smokegraph" data-live-keep="graph-{{ $t->id }}" data-url="{{ route('latency.data', ['target' => $t, 'range' => '3h', 'points' => 90]) }}"></div>
                         </div>
                     </div>
                 @endforeach
@@ -281,7 +320,7 @@
                     <h3 class="card-title"><i class="fas fa-globe mr-1 text-success"></i> IP Space</h3>
                     <a href="{{ route('ip-pools.index') }}" class="small">IP Management</a>
                 </div>
-                <div class="card-body">
+                <div class="card-body" data-live="ip">
                     @foreach ($ip['blocks'] as $block)
                         @php
                             $bUsed = $block->usedCount($block->allocations);
@@ -309,7 +348,7 @@
                     <h3 class="card-title"><i class="fas fa-project-diagram mr-1" style="color:#7c3aed"></i> NTTN Links</h3>
                     <a href="{{ route('nttn-links.index') }}" class="small">All links</a>
                 </div>
-                <div class="card-body">
+                <div class="card-body" data-live="nttn">
                     @php
                         $segments = [
                             ['Up', $nttn['up'], '#22c55e'],
@@ -345,7 +384,7 @@
 
 {{-- ================= Office & Billing ================= --}}
 @if ($attendance || $accounts)
-    <div class="dash-section"><i class="fas fa-building"></i> Office &amp; Billing</div>
+    <div class="dash-section"><i class="fas fa-building"></i> Office &amp; Accounts</div>
 
     <div class="row">
         @if ($attendance)
@@ -365,6 +404,7 @@
                         <a href="{{ route('attendance.dashboard') }}" class="small">Open</a>
                     </div>
                     <div class="card-body">
+                        <div data-live="att-now">
                         <div class="d-flex align-items-end justify-content-between flex-wrap mb-2" style="gap:.5rem">
                             <div>
                                 <div class="small text-muted text-uppercase font-weight-bold">In office today</div>
@@ -383,6 +423,7 @@
                                 @endif
                             @endforeach
                         </div>
+                        </div>
                         <div class="small text-muted mb-1">Last 7 days</div>
                         <div style="position: relative; height: 150px;"><canvas id="att-chart"></canvas></div>
                     </div>
@@ -392,30 +433,57 @@
 
         @if ($accounts)
             <div class="{{ $attendance ? 'col-lg-6' : 'col-12' }}">
+                @php
+                    $cash = $accounts['cash'];
+                    $tk = fn ($v) => '৳' . number_format((float) $v);
+                @endphp
                 <div class="card dash-panel">
                     <div class="card-header">
-                        <h3 class="card-title"><i class="fas fa-file-invoice-dollar mr-1 text-warning"></i> Billing</h3>
-                        <div>
+                        <h3 class="card-title"><i class="fas fa-book-open mr-1 text-warning"></i> Accounts</h3>
+                        <div class="d-flex align-items-center" style="gap:.35rem">
                             @can('access-accounts-invoices')
-                                <a href="{{ route('accounts.payments.create') }}" class="btn btn-success btn-xs mr-1"><i class="fas fa-hand-holding-usd"></i> Receive</a>
+                                <a href="{{ route('accounts.payments.create') }}" class="btn btn-success btn-xs"><i class="fas fa-hand-holding-usd"></i> Receive</a>
                             @endcan
-                            <a href="{{ route('accounts.dashboard') }}" class="small">Open</a>
+                            @can('access-accounts-cashbook')
+                                <a href="{{ route('accounts.cashbook.index') }}" class="btn btn-outline-primary btn-xs"><i class="fas fa-book-open"></i> Cash Book</a>
+                            @endcan
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="d-flex align-items-end justify-content-between flex-wrap mb-2" style="gap:.5rem">
+                        <div data-live="acct-now">
+                        <div class="d-flex align-items-end justify-content-between flex-wrap mb-3" style="gap:.75rem">
                             <div>
-                                <div class="small text-muted text-uppercase font-weight-bold">Collected in {{ now()->format('F') }}</div>
-                                <div class="big-num money">&#2547;{{ number_format($accounts['collected']) }}
-                                    <small>/ &#2547;{{ number_format($accounts['invoiced']) }}</small></div>
+                                <div class="small text-muted text-uppercase font-weight-bold">Cash in hand now</div>
+                                @if ($cash['counted_on'])
+                                    <div class="big-num money {{ $cash['closing'] < 0 ? 'text-danger' : '' }}">{{ $tk($cash['closing']) }}</div>
+                                    <div class="small text-muted">অবশিষ্ট টাকা · counted {{ $cash['counted_on']->format('d M') }}</div>
+                                @else
+                                    <div class="big-num" style="font-size:1.15rem; color:#b45309"><i class="fas fa-exclamation-circle"></i> Not counted yet</div>
+                                    <div class="small text-muted">
+                                        Set today's হাতে নগদ once in the
+                                        @can('access-accounts-cashbook')
+                                            <a href="{{ route('accounts.cashbook.index') }}">Cash Book</a>
+                                        @else
+                                            Cash Book
+                                        @endcan
+                                        — then it's tracked every day.
+                                    </div>
+                                @endif
                             </div>
-                            <div class="mini-legend">
-                                <span><i style="background:#f43f5e"></i>Outstanding <b class="money">&#2547;{{ number_format($accounts['outstanding']) }}</b></span>
-                                <span><i style="background:#94a3b8"></i>Unpaid <b>{{ $accounts['unpaid'] }}</b></span>
+                            <div class="acct-mini-grid">
+                                <div><span>Today in</span><b class="text-income">{{ $tk($cash['in']) }}</b></div>
+                                <div><span>Today out</span><b class="text-expense">{{ $tk($cash['out']) }}</b></div>
+                                <div><span>{{ now()->format('F') }} in</span><b class="text-income">{{ $tk($cash['month_in']) }}</b></div>
+                                <div><span>{{ now()->format('F') }} out</span><b class="text-expense">{{ $tk($cash['month_out']) }}</b></div>
                             </div>
                         </div>
-                        <div class="stack-bar mb-3">
-                            <span style="width: {{ $pct($accounts['collected'], $accounts['invoiced']) }}%; background: #22c55e"></span>
+                        @if ($accounts['dues'] > 0)
+                            <a href="{{ route('accounts.invoices.index') }}" class="dash-due">
+                                <span><i class="fas fa-file-invoice mr-1"></i> Invoice dues</span>
+                                <b class="money">{{ $tk($accounts['dues']) }}</b>
+                                <span class="text-muted small">{{ $accounts['dues_count'] }} {{ Str::plural('invoice', $accounts['dues_count']) }}</span>
+                            </a>
+                        @endif
                         </div>
                         <div class="small text-muted mb-1">Income vs expense, last 6 months</div>
                         <div style="position: relative; height: 150px;"><canvas id="bill-chart"></canvas></div>
@@ -431,6 +499,7 @@
 @stop
 
 @section('js')
+<script>LiveRefresh.start(30000);</script>
 <script src="{{ asset('js/smokegraph.js') }}?v={{ filemtime(public_path('js/smokegraph.js')) }}"></script>
 <script>
 document.querySelectorAll('.js-smokegraph').forEach(function (el) {
@@ -490,8 +559,7 @@ document.querySelectorAll('.js-smokegraph').forEach(function (el) {
     tick();
     setInterval(tick, 1000);
 
-    // Fresh numbers every minute (pollers run every minute too).
-    setTimeout(function () { location.reload(); }, 60000);
+    // Fresh numbers every 30s without reloading the page (graphs refresh themselves).
 })();
 </script>
 @stop

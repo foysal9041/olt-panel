@@ -12,17 +12,19 @@ class UserController extends Controller
   {
     $user = auth()->user();
 
-    if (strtolower($user->role) == 'admin') {
+    // When each user last did anything (and last signed in).
+    $lastActivity = fn (?string $action = null) => \App\Models\ActivityLog::select('created_at')
+        ->whereColumn('user_id', 'users.id')
+        ->when($action, fn ($q) => $q->where('action', $action))
+        ->latest('id')->limit(1);
 
-        $users = User::with('modulePermissions')->latest()->get();
-
-    } else {
-
-        $users = User::with('modulePermissions')->where(
-            'zone',
-            $user->zone
-        )->latest()->get();
-    }
+    $users = User::with('modulePermissions')
+        ->select('users.*')
+        ->addSelect(['last_active_at' => $lastActivity(), 'last_login_at' => $lastActivity('login')])
+        ->withCasts(['last_active_at' => 'datetime', 'last_login_at' => 'datetime'])
+        ->when(strtolower($user->role) != 'admin', fn ($q) => $q->where('zone', $user->zone))
+        ->latest()
+        ->get();
 
     return view(
         'users.index',
@@ -75,8 +77,10 @@ class UserController extends Controller
         'status'          => $validated['status'],
     ]);
 
+    $before = $this->accessSnapshot($user);
     $this->syncPermissions($user, $validated['permissions'] ?? []);
     $this->syncDeviceAccess($user, $request);
+    $this->logAccessChange($user, $before);
 
     return redirect()
         ->route('users.index')
@@ -172,13 +176,16 @@ class UserController extends Controller
             ]);
 
             // Only a full admin can change what modules and devices another user can reach.
+            $before = $this->accessSnapshot($user);
             $this->syncPermissions($user, $request->input('permissions', []));
             $this->syncDeviceAccess($user, $request);
+            $this->logAccessChange($user, $before);
         }
 
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
             $user->save();
+            \App\Models\ActivityLog::record('updated', "Changed the password of {$user->name}", $user);
         }
 
         return redirect()
@@ -320,5 +327,49 @@ class UserController extends Controller
                 $fail('Choose a zone from the list.');
             }
         };
+    }
+
+    /**
+     * What a user can open, in words — for the activity log.
+     *
+     * @return array{modules: string, olts: string, switches: string}
+     */
+    private function accessSnapshot(User $user): array
+    {
+        $user->unsetRelation('modulePermissions');
+        $modules = $user->modulePermissions()->get()->groupBy('module')->map(function ($grants, $key) {
+            $label = config("modules.{$key}.label", $key);
+            if ($grants->contains('submodule', '')) {
+                return "{$label} (all)";
+            }
+
+            return $label . ': ' . $grants->map(fn ($g) => config("modules.{$key}.submodules.{$g->submodule}", $g->submodule))->implode(', ');
+        })->sort()->implode('; ');
+
+        $user->refresh();
+        $devices = fn (string $kind, $relation) => (User::DEVICE_ACCESS[$user->{$kind . '_access'}] ?? $user->{$kind . '_access'})
+            . ($user->{$kind . '_access'} === 'selected' ? ' (' . $user->{$relation}()->count() . ')' : '');
+
+        return [
+            'modules' => $modules ?: 'none',
+            'olts' => $devices('olt', 'allowedOlts'),
+            'switches' => $devices('switch', 'allowedSwitches'),
+        ];
+    }
+
+    private function logAccessChange(User $user, array $before): void
+    {
+        $after = $this->accessSnapshot($user);
+        $changes = [];
+
+        foreach ($after as $key => $value) {
+            if ($before[$key] !== $value) {
+                $changes[$key] = ['old' => $before[$key], 'new' => $value];
+            }
+        }
+
+        if ($changes) {
+            \App\Models\ActivityLog::record('access', "Changed what {$user->name} can open", $user, $changes);
+        }
     }
 }

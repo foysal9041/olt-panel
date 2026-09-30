@@ -469,3 +469,52 @@
 .mini-legend { display: flex; flex-wrap: wrap; gap: .25rem .9rem; font-size: .8rem; color: #475569; }
 .mini-legend i { display: inline-block; width: .55rem; height: .55rem; border-radius: 2px; margin-right: .3rem; }
 .mini-legend b { color: #0f172a; margin-left: .15rem; }
+
+/* Accounts card: four small figures and the invoice-dues strip */
+.acct-mini-grid { display: grid; grid-template-columns: repeat(2, minmax(7.5rem, 1fr)); gap: .45rem .9rem; }
+.acct-mini-grid div { display: flex; flex-direction: column; line-height: 1.2; }
+.acct-mini-grid span { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #94a3b8; }
+.acct-mini-grid b { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.text-income { color: #16a34a !important; }
+.text-expense { color: #dc2626 !important; }
+
+.dash-due {
+    display: flex; align-items: center; gap: .75rem;
+    margin-bottom: .9rem; padding: .55rem .8rem;
+    border-radius: .6rem; background: #fff7ed; border: 1px solid #fed7aa;
+    color: #9a3412; font-size: .88rem;
+}
+.dash-due b { margin-left: auto; font-size: 1rem; }
+.dash-due:hover { color: #7c2d12; text-decoration: none; background: #ffedd5; }
+
+/* ---- Recent activity: tabs + scrollable feed ---------------------------- */
+
+.dash-tabs { gap: .25rem; margin-left: auto; }
+.dash-tabs .nav-link {
+    padding: .25rem .65rem;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.dash-tabs .nav-link:hover { color: #4f46e5; background: #eef2ff; }
+.dash-tabs .nav-link.active { color: #fff; background: #4f46e5; }
+.dash-tabs .nav-link i { font-size: .72rem; margin-right: .2rem; }
+
+.dash-feed {
+    height: 372px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.dash-feed-foot {
+    display: block;
+    padding: .55rem 1.1rem;
+    border-top: 1px solid #eef2f7;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #4f46e5;
+}
+.dash-feed-foot:hover { background: #f8fafc; text-decoration: none; }
+.dash-feed-foot i { font-size: .7rem; margin-left: .2rem; }

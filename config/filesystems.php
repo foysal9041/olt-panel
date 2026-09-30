@@ -36,6 +36,13 @@ return [
             'serve' => true,
             'throw' => false,
             'report' => false,
+            // Group-writable, so folders made by the web server (www-data) and
+            // by artisan / deploy commands (the app user) work for both — the
+            // storage ACL grants www-data through the group bits.
+            'permissions' => [
+                'file' => ['public' => 0664, 'private' => 0660],
+                'dir' => ['public' => 0775, 'private' => 0770],
+            ],
         ],
 
         'public' => [

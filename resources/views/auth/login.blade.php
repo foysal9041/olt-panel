@@ -1,8 +1,8 @@
 <x-guest-layout>
 
     <div class="auth-heading">
-        <h2>Welcome back</h2>
-        <p>Sign in to your account to continue</p>
+        <h2>Sign in</h2>
+        <p>Welcome back — use your panel username and password.</p>
     </div>
 
     <x-auth-session-status class="mb-6" :status="session('status')" />
@@ -65,7 +65,8 @@
                 <span>Remember me</span>
             </label>
 
-            @if (Route::has('password.request'))
+            {{-- Only when mail is set up — with the "log" mailer the reset email never arrives. --}}
+            @if (Route::has('password.request') && ! in_array(config('mail.default'), ['log', 'array'], true))
                 <a href="{{ route('password.request') }}" class="auth-link">Forgot password?</a>
             @endif
         </div>
@@ -78,6 +79,11 @@
         </button>
 
     </form>
+
+    <p class="auth-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>Sign-ins are recorded. Can't get in? Ask your administrator to reset your password.</span>
+    </p>
 
     <script>
         (function () {

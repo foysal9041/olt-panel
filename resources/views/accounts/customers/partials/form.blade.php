@@ -15,10 +15,17 @@
         </div>
     @endif
 
-    <div class="form-group">
-        <label>Name</label>
-        <input type="text" name="name" class="form-control"
-               value="{{ old('name', $customer->name ?? '') }}" required autofocus>
+    <div class="form-row">
+        <div class="col-md-7 form-group">
+            <label>Name</label>
+            <input type="text" name="name" class="form-control"
+                   value="{{ old('name', $customer->name ?? '') }}" required autofocus>
+        </div>
+        <div class="col-md-5 form-group">
+            <label>Username</label>
+            <input type="text" name="username" class="form-control"
+                   value="{{ old('username', $customer->username ?? '') }}" placeholder="e.g. strkamrul" autocomplete="off">
+        </div>
     </div>
 
     <div class="form-group">

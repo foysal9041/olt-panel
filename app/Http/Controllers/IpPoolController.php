@@ -27,15 +27,50 @@ class IpPoolController extends Controller
 
         // One register of every IP in the panel (OLTs, switches, subnets, NTTN …).
         $inventory = new IpInventory;
-        $entries = $inventory->entries();
+        // NTTN ping targets aren't our records — left out of the list (the
+        // free-IP finder and "Check an IP" still know about them).
+        $entries = $inventory->entries()->where('role', '!=', 'ping')->values();
 
-        $source = array_key_exists($request->query('src'), IpInventory::SOURCES) ? $request->query('src') : null;
-        $zone = $request->query('zone') ?: null;
-        $records = $entries
-            ->when($source, fn ($c) => $c->where('source', $source))
-            ->when($zone === '_none', fn ($c) => $c->whereNull('zone'))
-            ->when($zone && $zone !== '_none', fn ($c) => $c->where('zone', $zone))
-            ->values();
+        // Register filters: type (public/private …), role, source, zone,
+        // single IP vs subnet, and a range/block (anything overlapping it).
+        $pick = fn (string $key, array $allowed) => in_array($request->query($key), $allowed, true) ? $request->query($key) : null;
+        $netRange = filled($request->query('net')) ? IpInventory::parseRange((string) $request->query('net')) : null;
+        $filter = [
+            'scope' => $pick('scope', array_keys(IpInventory::SCOPES)),
+            'role' => $pick('role', array_diff(array_keys(IpInventory::ROLES), ['ping'])),
+            'src' => $pick('src', array_keys(IpInventory::SOURCES)),
+            'kind' => $pick('kind', ['host', 'subnet']),
+            'zone' => $request->query('zone') ?: null,
+            'net' => $netRange ? trim((string) $request->query('net')) : null,
+        ];
+
+        $applyFilters = function ($rows, ?string $except = null) use ($filter, $netRange) {
+            foreach (['scope' => 'scope', 'role' => 'role', 'src' => 'source', 'kind' => 'kind'] as $key => $field) {
+                if ($key !== $except && $filter[$key]) {
+                    $rows = $rows->where($field, $filter[$key]);
+                }
+            }
+            if ($except !== 'zone' && $filter['zone']) {
+                $rows = $filter['zone'] === '_none' ? $rows->whereNull('zone') : $rows->where('zone', $filter['zone']);
+            }
+            if ($except !== 'net' && $netRange) {
+                $rows = $rows->filter(fn ($e) => $e['min'] <= $netRange[1] && $e['max'] >= $netRange[0]);
+            }
+
+            return $rows->values();
+        };
+
+        $records = $applyFilters($entries);
+
+        // Counts next to each option follow the other filters in use.
+        $facets = [
+            'scope' => $applyFilters($entries, 'scope')->countBy('scope'),
+            'role' => $applyFilters($entries, 'role')->countBy('role'),
+            'src' => $applyFilters($entries, 'src')->countBy('source'),
+            'kind' => $applyFilters($entries, 'kind')->countBy('kind'),
+            'zone' => $applyFilters($entries, 'zone')->countBy(fn ($e) => $e['zone'] ?? '_none'),
+            'all' => $applyFilters($entries, 'scope')->count(),
+        ];
 
         $lookupQuery = trim((string) $request->query('ip', ''));
         $lookup = $lookupQuery !== '' ? $inventory->lookup($lookupQuery) : null;
@@ -55,7 +90,8 @@ class IpPoolController extends Controller
             'blocks' => $blocks,
             'standalone' => $standalone,
             'records' => $records,
-            'sourceCounts' => $entries->countBy('source'),
+            'facets' => $facets,
+            'totalRecords' => $entries->count(),
             'duplicates' => $inventory->duplicates(),
             'lookupQuery' => $lookupQuery,
             'lookup' => $lookup,
@@ -63,7 +99,7 @@ class IpPoolController extends Controller
             'findRange' => $findRange,
             'found' => $found,
             'series' => $inventory->series(),
-            'filter' => ['src' => $source, 'zone' => $zone],
+            'filter' => $filter,
             'zones' => Zone::names(),
         ]);
     }

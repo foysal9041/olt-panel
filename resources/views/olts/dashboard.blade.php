@@ -16,7 +16,7 @@
 
 @section('content_header')
 <x-noc.header title="NOC Overview" icon="fas fa-satellite-dish" subtitle="Live network health — OLTs, switches, links and latency">
-    <span class="dash-live {{ $issues ? 'dash-live--bad' : '' }}">
+    <span class="dash-live {{ $issues ? 'dash-live--bad' : '' }}" data-live="noc-status">
         <span class="dash-health-dot"></span>
         {{ $issues ? count($issues) . ' ' . Str::plural('issue', count($issues)) : 'All systems normal' }}
     </span>
@@ -96,7 +96,7 @@
 @section('content')
 
 {{-- ============ KPIs ============ --}}
-<div class="kpi-grid">
+<div class="kpi-grid" data-live="kpis">
 
     <a href="{{ $canManageOlt ? route('olt.index') : '#olts' }}" class="kpi">
         <div class="kpi-top"><span class="kpi-label">OLTs Online</span><span class="kpi-icon tone-indigo"><i class="fas fa-network-wired"></i></span></div>
@@ -165,11 +165,13 @@
         <div class="card dash-panel">
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-bell mr-1 text-danger"></i> Needs Attention</h3>
+                <span data-live="issue-count">
                 @if ($issues)
                     <span class="badge {{ $dangerCount ? 'badge-danger' : 'badge-warning' }}">{{ count($issues) }}</span>
                 @endif
+                </span>
             </div>
-            <div class="card-body p-0" style="max-height: 360px; overflow-y: auto;">
+            <div class="card-body p-0" style="max-height: 360px; overflow-y: auto;" data-live="issues">
                 @forelse ($issues as [$severity, $icon, $title, $detail, $url])
                     <a href="{{ $url }}" class="issue">
                         <span class="issue-icon {{ $severity === 'danger' ? 'tone-rose' : 'tone-amber' }}"><i class="{{ $icon }}"></i></span>
@@ -196,7 +198,7 @@
                     <h3 class="card-title"><i class="fas fa-history mr-1 text-primary"></i> Recent Events</h3>
                     <a href="{{ route('switch-events.index') }}" class="small">View all</a>
                 </div>
-                <div class="card-body p-0" style="max-height: 360px; overflow-y: auto;">
+                <div class="card-body p-0" style="max-height: 360px; overflow-y: auto; overscroll-behavior: contain;" data-live="events">
                     @if ($events->isEmpty())
                         <div class="dash-empty"><i class="fas fa-stream" style="color:#cbd5e1"></i>No port or switch events yet.</div>
                     @else
@@ -235,15 +237,13 @@
 <div class="card dash-panel" id="olts">
     <div class="card-header d-flex flex-wrap align-items-center" style="gap:.5rem">
         <h3 class="card-title mr-auto"><i class="fas fa-network-wired mr-1" style="color:#4f46e5"></i> OLTs by Zone
-            <small class="text-muted ml-1">{{ $oltZones->count() }} zones</small>
+            <small class="text-muted ml-1" data-live="oz-zones">{{ $oltZones->count() }} zones</small>
         </h3>
         <div class="oz-tools">
-            <span class="oz-pill up"><i class="fas fa-circle" style="font-size:.5rem"></i> {{ $oltOnline }} online</span>
-            @if ($oltOffline)
-                <button type="button" class="oz-pill down border-0" id="oz-offline" title="Show only zones with an offline OLT">
-                    <i class="fas fa-circle" style="font-size:.5rem"></i> {{ $oltOffline }} offline
-                </button>
-            @endif
+            <span class="oz-pill up" data-live="oz-online"><i class="fas fa-circle" style="font-size:.5rem"></i> {{ $oltOnline }} online</span>
+            <button type="button" class="oz-pill down border-0 {{ $oltOffline ? '' : 'd-none' }}" id="oz-offline" data-live="oz-offline" title="Show only zones with an offline OLT">
+                <i class="fas fa-circle" style="font-size:.5rem"></i> {{ $oltOffline }} offline
+            </button>
             <input type="search" id="oz-search" class="form-control form-control-sm" placeholder="Search zone, OLT or IP…">
             @if ($canManageOlt)
                 <a href="{{ route('olt.index') }}" class="small ml-1">Manage</a>
@@ -254,7 +254,7 @@
         @if ($olts->isEmpty())
             <div class="dash-empty"><i class="fas fa-network-wired" style="color:#cbd5e1"></i>No OLTs yet.</div>
         @else
-            <div class="oz-grid" id="oz-grid">
+            <div class="oz-grid" id="oz-grid" data-live="olt-zones">
                 @foreach ($oltZones as $z)
                     <div class="oz-tile {{ $z['down'] ? 'has-down' : '' }}" data-zone="{{ $z['zone'] }}" data-down="{{ $z['down'] }}"
                          data-search="{{ strtolower($z['zone'] . ' ' . $z['olts']->map(fn ($o) => $o->name . ' ' . $o->ip . ' ' . $o->vlan)->implode(' ')) }}">
@@ -275,7 +275,7 @@
                         @if ($z['down'])
                             <div class="oz-down"><i class="fas fa-exclamation-circle"></i> {{ $z['olts']->where('status', 0)->pluck('name')->implode(', ') }}</div>
                         @endif
-                        <details class="oz-more">
+                        <details class="oz-more" data-key="{{ $z['zone'] }}">
                             <summary>{{ $z['olts']->count() }} {{ Str::plural('OLT', $z['olts']->count()) }}</summary>
                             <ul class="oz-list">
                                 @foreach ($z['olts'] as $olt)
@@ -311,7 +311,7 @@
             <h3 class="card-title"><i class="fas fa-server mr-1" style="color:#0284c7"></i> Switch Health</h3>
             <a href="{{ route('switches.index') }}" class="small">All switches</a>
         </div>
-        <div class="card-body p-0 table-responsive">
+        <div class="card-body p-0 table-responsive" data-live="sw-health">
             <table class="table table-hover sw-table mb-0">
                 <thead>
                     <tr>
@@ -365,7 +365,7 @@
             <div class="row">
                 @foreach ($latencyTargets->take(6) as $t)
                     <div class="col-xl-4 col-md-6 mb-3">
-                        <div class="lat-mini {{ $t->alert_active ? 'alert-on' : '' }}">
+                        <div class="lat-mini {{ $t->alert_active ? 'alert-on' : '' }}" data-live="lat-{{ $t->id }}">
                             <div class="lat-mini-head">
                                 <a href="{{ route('latency.show', $t) }}">{{ $t->name }}</a>
                                 <span class="small {{ $t->alert_active ? 'text-danger font-weight-bold' : 'text-muted' }}">
@@ -373,7 +373,7 @@
                                     @if ($t->last_loss > 0) · {{ round($t->last_loss) }}% loss @endif
                                 </span>
                             </div>
-                            <div class="js-smokegraph" data-url="{{ route('latency.data', ['target' => $t, 'range' => '3h', 'points' => 100]) }}"></div>
+                            <div class="js-smokegraph" data-live-keep="graph-{{ $t->id }}" data-url="{{ route('latency.data', ['target' => $t, 'range' => '3h', 'points' => 100]) }}"></div>
                         </div>
                     </div>
                 @endforeach
@@ -387,7 +387,7 @@
 
 {{-- ============ Inventory ============ --}}
 @if ($inventory)
-    <div class="inv-grid mb-3">
+    <div class="inv-grid mb-3" data-live="inventory">
         @foreach ($inventory as [$label, $count, $icon, $route])
             <a href="{{ route($route) }}" class="inv-tile">
                 <span class="kpi-icon tone-indigo"><i class="{{ $icon }}"></i></span>
@@ -400,56 +400,69 @@
 @stop
 
 @section('js')
+<script>LiveRefresh.start(30000);</script>
 <script src="{{ asset('js/smokegraph.js') }}?v={{ filemtime(public_path('js/smokegraph.js')) }}"></script>
 <script>
 document.querySelectorAll('.js-smokegraph').forEach(function (el) {
     SmokeGraph.create(el, { url: el.dataset.url, height: 110, compact: true, refresh: 60 });
 });
 
-// OLTs by zone: search, "offline only", and open lists survive the reload.
+// OLTs by zone: search, "offline only" and open lists — kept while the
+// numbers update live (tiles are re-bound after each update).
 (function () {
-    var grid = document.getElementById('oz-grid');
-    if (!grid) return;
-    var tiles = Array.prototype.slice.call(grid.querySelectorAll('.oz-tile'));
     var search = document.getElementById('oz-search');
     var offlineBtn = document.getElementById('oz-offline');
+    if (!document.getElementById('oz-grid') || !search) return;
+
     var store = {
         get: function (k) { try { return JSON.parse(sessionStorage.getItem('noc-oz-' + k)); } catch (e) { return null; } },
         set: function (k, v) { try { sessionStorage.setItem('noc-oz-' + k, JSON.stringify(v)); } catch (e) {} }
     };
-    var offlineOnly = !!store.get('offline') && !!offlineBtn;
+    var offlineOnly = !!store.get('offline');
     search.value = store.get('q') || '';
+
+    function tiles() {
+        return Array.prototype.slice.call(document.querySelectorAll('#oz-grid .oz-tile'));
+    }
 
     function apply() {
         var q = search.value.trim().toLowerCase(), shown = 0;
-        tiles.forEach(function (t) {
+        var hasOffline = !offlineBtn.classList.contains('d-none');
+        if (!hasOffline) offlineOnly = false;
+        tiles().forEach(function (t) {
             var ok = (!q || t.dataset.search.indexOf(q) !== -1) && (!offlineOnly || t.dataset.down !== '0');
             t.style.display = ok ? '' : 'none';
             if (ok) shown++;
         });
         document.getElementById('oz-empty').style.display = shown ? 'none' : 'block';
-        if (offlineBtn) offlineBtn.style.boxShadow = offlineOnly ? '0 0 0 2px #be123c' : '';
+        offlineBtn.style.boxShadow = offlineOnly ? '0 0 0 2px #be123c' : '';
         store.set('q', search.value);
         store.set('offline', offlineOnly);
     }
 
-    search.addEventListener('input', apply);
-    if (offlineBtn) offlineBtn.addEventListener('click', function () { offlineOnly = !offlineOnly; apply(); });
-
-    var open = store.get('open') || [];
-    tiles.forEach(function (t) {
-        var d = t.querySelector('details');
-        if (open.indexOf(t.dataset.zone) !== -1) d.open = true;
-        d.addEventListener('toggle', function () {
-            var list = tiles.filter(function (x) { return x.querySelector('details').open; }).map(function (x) { return x.dataset.zone; });
-            store.set('open', list);
+    // Remember which zone lists are open (and reopen them on the next visit).
+    function bindTiles(restore) {
+        var open = store.get('open') || [];
+        tiles().forEach(function (t) {
+            var d = t.querySelector('details');
+            if (restore && open.indexOf(t.dataset.zone) !== -1) d.open = true;
+            d.addEventListener('toggle', function () {
+                store.set('open', tiles().filter(function (x) { return x.querySelector('details').open; }).map(function (x) { return x.dataset.zone; }));
+            });
         });
+    }
+
+    search.addEventListener('input', apply);
+    offlineBtn.addEventListener('click', function () { offlineOnly = !offlineOnly; apply(); });
+    document.addEventListener('live:updated', function (e) {
+        if (e.detail.keys.indexOf('olt-zones') !== -1) bindTiles(false);
+        apply();
     });
 
+    bindTiles(true);
     apply();
 })();
 
-// OLT status is checked every 30 seconds; keep the page in step.
-setTimeout(function () { location.reload(); }, 30000);
+// OLT status is checked every 30 seconds; the page updates itself in step.
 </script>
 @stop

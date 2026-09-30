@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\LatencyProbe;
 use App\Models\LatencyTarget;
 use App\Services\LatencyProber;
-use App\Services\TelegramNotifier;
+use App\Services\AlertNotifier;
 use Illuminate\Console\Command;
 
 class ProbeLatency extends Command
@@ -14,7 +14,7 @@ class ProbeLatency extends Command
 
     protected $description = 'Ping every active latency target and record the results';
 
-    public function handle(LatencyProber $prober, TelegramNotifier $telegram)
+    public function handle(LatencyProber $prober, AlertNotifier $notifier)
     {
         $probedAt = now()->startOfMinute();
 
@@ -68,7 +68,7 @@ class ProbeLatency extends Command
         }
 
         if ($alerts) {
-            $telegram->send(implode("\n\n", $alerts));
+            $notifier->send(implode("\n\n", $alerts));
         }
 
         return Command::SUCCESS;

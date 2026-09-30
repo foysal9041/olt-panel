@@ -2,7 +2,8 @@
 
 {{--
     Shared page header for module pages: title row + section tabs.
-    $tabs: list of [route name, active pattern(s), label, icon, ability].
+    $tabs: list of [route name, active pattern(s), label, icon, ability];
+    a null ability means every signed-in user sees the tab.
     Optional named slot $badge renders next to the title (e.g. UP/DOWN).
 --}}
 
@@ -30,11 +31,11 @@
     @if ($tabs)
     <nav class="acct-tabs">
         @foreach ($tabs as [$route, $pattern, $label, $tabIcon, $ability])
-            @can($ability)
+            @if (! $ability || Gate::allows($ability))
                 <a href="{{ route($route) }}" class="{{ request()->routeIs(...(array) $pattern) ? 'active' : '' }}">
                     <i class="{{ $tabIcon }}"></i> <span>{{ $label }}</span>
                 </a>
-            @endcan
+            @endif
         @endforeach
     </nav>
     @endif

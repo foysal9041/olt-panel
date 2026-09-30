@@ -70,6 +70,7 @@ return [
             'cashbook'      => 'Daily Cash Book (প্রতিদিনের হিসাব)',
             'reports'       => 'Monthly Ledgers & Summary',
             'salaries'      => 'Salary Sheet (বেতন)',
+            'settlements'   => 'Zone Settlement (Excel · bKash)',
         ],
     ],
     'settings' => [

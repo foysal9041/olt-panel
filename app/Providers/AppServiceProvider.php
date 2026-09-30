@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\ActivityLog;
 use App\Models\User;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Pagination\Paginator;
@@ -36,6 +38,21 @@ class AppServiceProvider extends ServiceProvider
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
+        });
+
+        // Wrong password / unknown username — only the username is kept,
+        // never what was typed as the password.
+        Event::listen(function (Failed $event) {
+            $username = \Illuminate\Support\Str::limit((string) ($event->credentials['username'] ?? $event->credentials['email'] ?? '?'), 60, '…');
+
+            ActivityLog::record('login_failed', "Failed sign-in as \"{$username}\"", userId: $event->user?->id, orCurrentUser: false);
+        });
+
+        Event::listen(function (Lockout $event) {
+            $username = \Illuminate\Support\Str::limit((string) $event->request->input('username', '?'), 60, '…');
+            $user = User::where('username', $event->request->input('username'))->first();
+
+            ActivityLog::record('login_failed', "Too many sign-in attempts as \"{$username}\" — locked out for a while", userId: $user?->id, orCurrentUser: false);
         });
 
         Event::listen(function (Logout $event) {

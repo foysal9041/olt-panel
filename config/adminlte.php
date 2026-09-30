@@ -502,6 +502,12 @@ return [
                 'can'  => 'access-accounts-reports',
             ],
             [
+                'text' => 'Zone Settlement',
+                'url'  => 'accounts/settlements',
+                'icon' => 'fas fa-file-excel',
+                'can'  => 'access-accounts-settlements',
+            ],
+            [
                 'text' => 'Salary Sheet',
                 'url'  => 'accounts/salaries',
                 'icon' => 'fas fa-money-check-alt',
@@ -669,6 +675,11 @@ return [
                     'type' => 'js',
                     'asset' => true,
                     'location' => 'js/custom.js?v=' . @filemtime(public_path('js/custom.js')),
+                ],
+                [
+                    'type' => 'js',
+                    'asset' => true,
+                    'location' => 'js/live-refresh.js?v=' . @filemtime(public_path('js/live-refresh.js')),
                 ],
                 [
                     'type' => 'css',

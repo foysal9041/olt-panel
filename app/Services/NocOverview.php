@@ -46,9 +46,19 @@ class NocOverview
         if (Gate::forUser($this->user)->allows('access-olt')) {
             $canManageOlt = Gate::forUser($this->user)->allows('access-olt-manage');
 
-            foreach (($olts ?? $this->olts())->where('status', 0) as $o) {
-                $issues[] = ['danger', 'fas fa-network-wired', "OLT {$o->name} is offline", trim("{$o->ip} · {$o->zone}", ' ·'),
-                    $canManageOlt ? route('olt.show', $o) : route('olt.dashboard')];
+            // One line per OLT, or one per zone when several OLTs there are
+            // down at once (a POP or its uplink is out) — keeps the list short.
+            foreach (($olts ?? $this->olts())->where('status', 0)->groupBy(fn ($o) => $o->zone ?: '') as $zone => $down) {
+                if ($down->count() === 1) {
+                    $o = $down->first();
+                    $issues[] = ['danger', 'fas fa-network-wired', "OLT {$o->name} is offline", trim("{$o->ip} · {$o->zone}", ' ·'),
+                        $canManageOlt ? route('olt.show', $o) : route('olt.dashboard')];
+                    continue;
+                }
+
+                $issues[] = ['danger', 'fas fa-network-wired', "{$down->count()} OLTs offline in " . ($zone ?: 'no zone'),
+                    $down->map(fn ($o) => "{$o->name} ({$o->ip})")->implode(', '),
+                    $canManageOlt ? route('olt.index', array_filter(['zone' => $zone, 'status' => 0], fn ($v) => $v !== '')) : route('olt.dashboard')];
             }
         }
 

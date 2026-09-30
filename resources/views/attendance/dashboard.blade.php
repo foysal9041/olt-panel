@@ -52,7 +52,7 @@
 @endif
 
 {{-- ============ Today ============ --}}
-<div class="acct-stats">
+<div class="acct-stats" data-live="att-stats">
 
     <div class="acct-stat" style="--accent:#4f46e5">
         <div class="acct-stat-label">In Office <i class="fas fa-user-check"></i></div>
@@ -93,6 +93,7 @@
 
 </div>
 
+<div data-live="att-unmapped-alert">
 @if($unmappedCount > 0)
     <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap">
         <span>
@@ -102,6 +103,7 @@
         <a href="#unmapped" class="btn btn-sm btn-dark mt-1 mt-md-0">Review</a>
     </div>
 @endif
+</div>
 
 <div class="row">
 
@@ -110,7 +112,7 @@
         <div class="card acct-panel">
             <div class="card-header">
                 <h3 class="card-title">Today's Attendance</h3>
-                <span class="text-muted small">{{ $board->count() }} employees</span>
+                <span class="text-muted small" data-live="att-board-count">{{ $board->count() }} employees</span>
             </div>
             <div class="card-body p-0 table-responsive" style="max-height: 460px; overflow-y: auto;">
                 <table class="table table-hover att-board mb-0">
@@ -123,7 +125,7 @@
                             <th class="text-right pr-3">Hours</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody data-live="att-board">
                         @forelse ($board as $row)
                             @php [$label, $color] = $statusMeta[$row['status']] ?? [ucfirst($row['status']), 'secondary']; @endphp
                             <tr>
@@ -173,11 +175,11 @@
         <div class="card acct-panel">
             <div class="card-header">
                 <h3 class="card-title">Devices</h3>
-                <span class="small {{ $onlineDevices < $devices->count() ? 'text-danger' : 'text-success' }}">
+                <span class="small {{ $onlineDevices < $devices->count() ? 'text-danger' : 'text-success' }}" data-live="att-dev-count">
                     {{ $onlineDevices }} / {{ $devices->count() }} online
                 </span>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body p-0" data-live="att-devices">
                 @forelse ($devices as $device)
                     <div class="att-device">
                         <span class="att-dot {{ $device->isOnline() ? 'on' : 'off' }}"></span>
@@ -195,6 +197,7 @@
             </div>
         </div>
 
+        <div data-live="att-leaves">
         @if ($pendingLeaves->isNotEmpty())
             <div class="card acct-panel">
                 <div class="card-header">
@@ -219,12 +222,13 @@
                 </div>
             </div>
         @endif
+        </div>
 
         <div class="card acct-panel">
             <div class="card-header">
                 <h3 class="card-title">Recent Punches</h3>
             </div>
-            <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;">
+            <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;" data-live="att-punches">
                 @forelse($recentPunches as $punch)
                     <div class="acct-list-row">
                         <span class="acct-avatar" style="background:#f1f5f9;color:#475569"><i class="fas fa-fingerprint"></i></span>
@@ -247,6 +251,7 @@
 
 </div>
 
+<div data-live="att-unmapped">
 @if($unmappedCount > 0)
     <div class="card acct-panel" id="unmapped">
         <div class="card-header">
@@ -289,10 +294,12 @@
         </div>
     </div>
 @endif
+</div>
 
 @stop
 
 @section('js')
+<script>LiveRefresh.start(30000);</script>
 <script>
 new Chart(document.getElementById('attendanceTrendChart').getContext('2d'), {
     type: 'bar',
@@ -322,7 +329,6 @@ new Chart(document.getElementById('attendanceTrendChart').getContext('2d'), {
     },
 });
 
-// Punches arrive from the devices continuously; refresh once a minute.
-setTimeout(function () { location.reload(); }, 60000);
+// Punches arrive from the devices continuously; the lists update in place.
 </script>
 @stop

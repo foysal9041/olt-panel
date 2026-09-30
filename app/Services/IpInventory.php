@@ -32,6 +32,14 @@ class IpInventory
         'device' => 'Attendance',
     ];
 
+    /** Address type, from the address itself (RFC 1918 / RFC 6598 …). */
+    public const SCOPES = [
+        'public' => 'Public',
+        'private' => 'Private',
+        'cgnat' => 'CGNAT',
+        'reserved' => 'Reserved',
+    ];
+
     public const ROLES = [
         'mgmt' => 'Management IP',
         'subnet' => 'Subnet',
@@ -55,7 +63,8 @@ class IpInventory
 
     /**
      * One row per recorded IP or subnet:
-     * [min, max, text, kind (host|subnet), role, checked, source, id, label, detail, zone, url].
+     * [min, max, text, kind (host|subnet), scope (public|private|cgnat|reserved),
+     *  role, checked, source, id, label, detail, zone, url].
      *
      * @return Collection<int, array>
      */
@@ -77,8 +86,9 @@ class IpInventory
             $kind = str_contains($value, '/') && $min !== $max ? 'subnet' : 'host';
             $text = $kind === 'subnet' ? (SubnetRange::normalize($value) ?? $value) : long2ip($min);
             $zone = $zone ?: null;
+            $scope = self::scopeOf($min);
 
-            $rows->push(compact('min', 'max', 'text', 'kind', 'role', 'checked', 'source', 'id', 'label', 'detail', 'zone', 'url'));
+            $rows->push(compact('min', 'max', 'text', 'kind', 'scope', 'role', 'checked', 'source', 'id', 'label', 'detail', 'zone', 'url'));
         };
 
         foreach (Olt::get(['id', 'name', 'ip', 'zone', 'vlan']) as $o) {
@@ -406,5 +416,25 @@ class IpInventory
         uasort($out, fn ($a, $b) => SubnetRange::parse($a['cidr'])[0] <=> SubnetRange::parse($b['cidr'])[0]);
 
         return array_values($out);
+    }
+
+    /**
+     * public, private (10/8, 172.16/12, 192.168/16), cgnat (100.64/10) or
+     * reserved (loopback, link-local, multicast, 0/8 …) for an address.
+     */
+    public static function scopeOf(int $ip): string
+    {
+        $in = fn (string $cidr) => (function () use ($ip, $cidr) {
+            [$min, $max] = SubnetRange::parse($cidr);
+
+            return $ip >= $min && $ip <= $max;
+        })();
+
+        return match (true) {
+            $in('10.0.0.0/8'), $in('172.16.0.0/12'), $in('192.168.0.0/16') => 'private',
+            $in('100.64.0.0/10') => 'cgnat',
+            $in('0.0.0.0/8'), $in('127.0.0.0/8'), $in('169.254.0.0/16'), $in('224.0.0.0/3') => 'reserved',
+            default => 'public',
+        };
     }
 }

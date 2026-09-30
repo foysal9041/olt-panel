@@ -1,149 +1,36 @@
 @extends('adminlte::page')
 
-@section('title','Add User')
+@section('title', 'Add User')
+
+@section('content_header')
+<x-settings.header title="Add User" subtitle="Create a sign-in and choose what they can open" :back="route('users.index')" />
+@stop
 
 @section('content')
 
-<div class="card">
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul class="mb-0">@foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+    </div>
+@endif
 
-<div class="card-header">
-    <h3 class="card-title">Add User</h3>
-</div>
+<form method="POST" action="{{ route('users.store') }}">
+    @csrf
 
-<div class="card-body">
+    @include('users.partials.account-fields', ['user' => new \App\Models\User()])
 
-    <form method="POST" action="{{ route('users.store') }}">
-
-        @csrf
-
-        <div class="form-group">
-            <label>Name</label>
-
-            <input type="text"
-                   name="name"
-                   class="form-control"
-                   required>
+    <div class="card acct-panel">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-key mr-1 text-primary"></i> Module &amp; device access</h3></div>
+        <div class="card-body">
+            @include('users.partials.module-permissions', ['permissionState' => []])
+            @include('users.partials.device-access', ['user' => new \App\Models\User()])
         </div>
+    </div>
 
-        <div class="form-group">
-            <label>Email</label>
-
-            <input type="email"
-                   name="email"
-                   class="form-control"
-                   required>
-        </div>
-
-        <div class="form-group">
-            <label>Username</label>
-
-            <input type="text"
-                   name="username"
-                   class="form-control"
-                   required>
-        </div>
-
-        <div class="form-group">
-            <label>Password</label>
-
-            <input type="password"
-                   name="password"
-                   class="form-control"
-                   required>
-        </div>
-
-        <div class="form-group">
-            <label>Role</label>
-
-            <select name="role" class="form-control">
-
-                <option value="admin">
-                    Admin
-                </option>
-
-                <option value="noc">
-                    NOC
-                </option>
-
-                <option value="operator">
-                    Operator
-                </option>
-
-                <option value="viewer">
-                    Viewer
-                </option>
-
-            </select>
-
-        </div>
-
-        <div class="form-group">
-            <label>Zone</label>
-
-            <select name="zone" class="form-control select2-zone">
-
-                <option value="all">
-                    All Zones
-                </option>
-
-                @foreach($zones as $zone)
-
-                    <option value="{{ $zone }}">
-                        {{ $zone }}
-                    </option>
-
-                @endforeach
-
-            </select>
-
-        </div>
-
-        <div class="form-group">
-            <label>Status</label>
-
-            <select name="status" class="form-control">
-
-                <option value="1">
-                    Active
-                </option>
-
-                <option value="0">
-                    Disabled
-                </option>
-
-            </select>
-
-        </div>
-
-        @include('users.partials.module-permissions', ['permissionState' => []])
-        @include('users.partials.device-access', ['user' => new \App\Models\User()])
-
-        <br>
-
-        <button type="submit"
-                class="btn btn-success">
-            Create User
-        </button>
-
-        <a href="{{ route('users.index') }}"
-           class="btn btn-secondary">
-            Cancel
-        </a>
-
-    </form>
-
-</div>
-
-</div>
-
-<script>
-$(function () {
-    $('.select2-zone').select2({
-        theme: 'bootstrap4',
-        width: '100%',
-    });
-});
-</script>
+    <div class="mb-4">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create User</button>
+        <a href="{{ route('users.index') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
 
 @stop
-

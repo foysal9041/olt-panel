@@ -3,8 +3,8 @@
 @section('title', 'Telegram')
 
 @section('content_header')
-<h1>Telegram Alerts</h1>
-<p class="text-muted mb-0">One bot for every alert in the panel: switch ports, switch reachability, transceiver Rx and latency thresholds.</p>
+<x-settings.header title="Telegram Alerts" icon="fab fa-telegram-plane"
+    subtitle="One bot for every alert: switch ports and reachability, transceiver Rx, latency thresholds and NTTN links — also sent to WhatsApp if that's on" />
 @stop
 
 @section('content')
@@ -70,7 +70,7 @@
 
                     <hr>
 
-                    <label class="d-block">Alert me when…</label>
+                    <label class="d-block">Alert me when… <small class="text-muted font-weight-normal">(Telegram and WhatsApp)</small></label>
 
                     <div class="custom-control custom-checkbox">
                         <input type="hidden" name="alert_port_status" value="0">

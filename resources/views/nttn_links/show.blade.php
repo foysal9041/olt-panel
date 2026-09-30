@@ -12,7 +12,7 @@
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-heartbeat mr-1"></i> Link Status</h3>
     </div>
-    <div class="card-body d-flex align-items-center flex-wrap" style="gap: .5rem 2rem">
+    <div class="card-body d-flex align-items-center flex-wrap" style="gap: .5rem 2rem" data-live="link-status">
         <div>@include('nttn_links._ping', ['link' => $nttnLink])</div>
         @if ($nttnLink->pingTarget())
             <div class="text-muted small">
@@ -146,5 +146,5 @@
 @stop
 
 @section('js')
-<script>setTimeout(function () { location.reload(); }, 60000);</script>
+<script>LiveRefresh.start(30000);</script>
 @stop

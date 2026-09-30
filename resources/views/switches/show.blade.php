@@ -5,7 +5,7 @@
 @section('content_header')
 <x-noc.header :title="$switch->name" :back="route('switches.index')"
     subtitle="{{ $switch->ip }} · {{ $switch->vendor_label }}{{ $switch->zone ? ' · ' . $switch->zone : '' }}{{ $switch->notify ? '' : ' · alerts muted' }}{{ $switch->is_active ? '' : ' · paused' }}">
-    <x-slot:badge>@include('switches._status', ['status' => $switch->status])</x-slot:badge>
+    <x-slot:badge><span data-live="sw-status">@include('switches._status', ['status' => $switch->status])</span></x-slot:badge>
     <form action="{{ route('switches.poll', $switch) }}" method="POST" class="d-inline" id="poll-form">
         @csrf
         <button class="btn btn-primary btn-sm" id="poll-btn"><i class="fas fa-sync-alt"></i> Poll Now</button>
@@ -70,7 +70,7 @@
     };
 @endphp
 
-<div class="row">
+<div class="row" data-live="sw-summary">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-body py-3">
@@ -121,16 +121,16 @@
 
     <div class="card-body pb-0">
         <div class="port-filter" id="port-filter">
-            <button type="button" class="btn btn-sm btn-primary" data-filter="all">All ({{ $ports->count() }})</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="up">Up ({{ $up }})</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="down">Down ({{ $ports->count() - $up }})</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="sfp">SFP only ({{ $sfp }})</button>
+            <button type="button" class="btn btn-sm btn-primary" data-filter="all">All (<span data-live="pf-all">{{ $ports->count() }}</span>)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="up">Up (<span data-live="pf-up">{{ $up }}</span>)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="down">Down (<span data-live="pf-down">{{ $ports->count() - $up }}</span>)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="sfp">SFP only (<span data-live="pf-sfp">{{ $sfp }}</span>)</button>
         </div>
     </div>
 
     <div class="card-body p-0 table-responsive">
 
-        <table class="table table-sm table-hover port-table mb-0">
+        <table class="table table-sm table-hover port-table mb-0" data-live-table="ports">
             <thead class="thead-light">
                 <tr>
                     <th class="pl-3">Port</th>
@@ -152,7 +152,7 @@
                         $isUp = $port->oper_status === \App\Models\SwitchPort::UP;
                         $adminDown = $port->admin_status === 2;
                     @endphp
-                    <tr data-state="{{ $isUp ? 'up' : 'down' }}" data-sfp="{{ $port->has_transceiver ? 1 : 0 }}"
+                    <tr data-key="{{ $port->id }}" data-state="{{ $isUp ? 'up' : 'down' }}" data-sfp="{{ $port->has_transceiver ? 1 : 0 }}"
                         class="{{ $adminDown ? 'port-muted' : '' }}">
                         <td class="pl-3">
                             <a href="{{ route('switches.ports.show', [$switch, $port]) }}" class="text-reset" title="Rx/Tx history">
@@ -244,7 +244,7 @@
             <a href="{{ route('switch-events.index', ['switch' => $switch->id]) }}" class="btn btn-tool">View all</a>
         </div>
     </div>
-    <div class="card-body p-0">
+    <div class="card-body p-0" data-live="sw-events">
         @include('switches._events_table', ['events' => $events, 'showSwitch' => false])
     </div>
 </div>
@@ -253,20 +253,24 @@
 
 @section('js')
 <script>
+LiveRefresh.start(30000);
+
 (function () {
     var buttons = document.querySelectorAll('#port-filter [data-filter]');
-    var rows = document.querySelectorAll('.port-table tbody tr[data-state]');
+    var rows = function () { return document.querySelectorAll('.port-table tbody tr[data-state]'); };
+    var current = 'all';
 
     buttons.forEach(function (btn) {
         btn.addEventListener('click', function () {
             var f = btn.dataset.filter;
+            current = f;
 
             buttons.forEach(function (b) {
                 b.classList.toggle('btn-primary', b === btn);
                 b.classList.toggle('btn-outline-secondary', b !== btn);
             });
 
-            rows.forEach(function (row) {
+            rows().forEach(function (row) {
                 var show = f === 'all'
                     || (f === 'sfp' && row.dataset.sfp === '1')
                     || row.dataset.state === f;
@@ -289,8 +293,11 @@
         b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Polling…';
     });
 
-    // Keep port states fresh (the scheduler polls every minute).
-    setTimeout(function () { location.reload(); }, 60000);
+    // Ports update in place every 30s; keep the chosen filter applied.
+    document.addEventListener('live:updated', function () {
+        var btn = document.querySelector('#port-filter [data-filter="' + current + '"]');
+        if (btn) btn.click();
+    });
 })();
 </script>
 @stop

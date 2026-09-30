@@ -47,7 +47,10 @@
                 @forelse($customers as $customer)
 
                     <tr>
-                        <td>{{ $customer->name }}</td>
+                        <td>
+                            {{ $customer->name }}
+                            @if ($customer->username)<div class="small text-muted">{{ $customer->username }}</div>@endif
+                        </td>
                         <td>{{ $customer->phone ?? '-' }}</td>
                         <td>{{ $customer->zone ?? '-' }}</td>
                         <td>

@@ -26,6 +26,11 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .badge-purple { background: #6f42c1; color: #fff; }
     .badge-orange { background: #fd7e14; color: #fff; }
+    .ipr-seg .btn { font-weight: 600; }
+    .ipr-n { display: inline-block; min-width: 1.4rem; margin-left: .2rem; padding: 0 .35rem; border-radius: 999px; background: rgba(15, 23, 42, .08); font-size: .72rem; }
+    .ipr-seg .btn-primary .ipr-n { background: rgba(255, 255, 255, .25); }
+    .ipr-filters { background: #fbfcfe; border-bottom: 1px solid #eef2f7; }
+    .ipr-filters label { font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #64748b; margin-bottom: .2rem; }
 </style>
 @stop
 
@@ -351,32 +356,102 @@
                 @endif
             </div>
             <div class="card-footer small text-muted">
-                Same IP on two records, or two overlapping subnets. A host inside a subnet is fine; NTTN ping targets and
-                attendance devices' connecting addresses are listed but not counted. Saving an OLT or switch refuses an IP that's already used.
+                Same IP on two records, or two overlapping subnets. A host inside a subnet is fine; attendance devices'
+                connecting addresses are listed but not counted. Saving an OLT or switch refuses an IP that's already used.
             </div>
         </div>
 
 
 {{-- The register --}}
+@php
+    $scopeLabels = \App\Services\IpInventory::SCOPES;
+    $scopeStyle = ['public' => 'badge-primary', 'private' => 'badge-secondary', 'cgnat' => 'badge-warning', 'reserved' => 'badge-light border'];
+    $activeFilters = collect($filter)->filter(fn ($v) => $v !== null && $v !== '');
+    $recUrl = fn (array $over) => route('ip-pools.index', collect($filter)->merge($over)->filter(fn ($v) => $v !== null && $v !== '')->all()) . '#records';
+@endphp
 <div class="card card-outline card-primary" id="records">
-    <div class="card-header d-flex flex-wrap align-items-center">
-        <h3 class="card-title mr-auto"><i class="fas fa-list-ol mr-1"></i> All IP Records <span class="badge badge-light border ml-1">{{ $records->count() }}</span></h3>
-        <form method="GET" action="{{ route('ip-pools.index') }}#records" class="form-inline">
-            <select name="src" class="form-control form-control-sm mr-2 mb-1" onchange="this.form.submit()">
-                <option value="">All sources</option>
-                @foreach($srcLabels as $key => $label)
-                    <option value="{{ $key }}" @selected($filter['src'] === $key)>{{ $label }} ({{ $sourceCounts[$key] ?? 0 }})</option>
-                @endforeach
-            </select>
-            <select name="zone" class="form-control form-control-sm mb-1" onchange="this.form.submit()">
-                <option value="">All zones</option>
-                <option value="_none" @selected($filter['zone'] === '_none')>— No zone —</option>
-                @foreach($zones as $z)
-                    <option value="{{ $z }}" @selected($filter['zone'] === $z)>{{ $z }}</option>
-                @endforeach
-            </select>
+    <div class="card-header d-flex flex-wrap align-items-center" style="gap:.5rem">
+        <h3 class="card-title mr-auto"><i class="fas fa-list-ol mr-1"></i> All IP Records
+            <span class="badge badge-light border ml-1">{{ $records->count() }}{{ $activeFilters->isNotEmpty() ? ' of ' . $totalRecords : '' }}</span>
+        </h3>
+
+        {{-- Type: Public / Private / CGNAT … --}}
+        <div class="btn-group btn-group-sm ipr-seg" role="group" aria-label="Address type">
+            <a href="{{ $recUrl(['scope' => null]) }}" class="btn {{ $filter['scope'] ? 'btn-outline-secondary' : 'btn-primary' }}">All <span class="ipr-n">{{ $facets['all'] }}</span></a>
+            @foreach ($scopeLabels as $key => $label)
+                @if (($facets['scope'][$key] ?? 0) > 0 || $filter['scope'] === $key)
+                    <a href="{{ $recUrl(['scope' => $key]) }}" class="btn {{ $filter['scope'] === $key ? 'btn-primary' : 'btn-outline-secondary' }}">
+                        {{ $label }} <span class="ipr-n">{{ $facets['scope'][$key] ?? 0 }}</span>
+                    </a>
+                @endif
+            @endforeach
+        </div>
+    </div>
+
+    <div class="card-body ipr-filters pb-1">
+        <form method="GET" action="{{ route('ip-pools.index') }}#records" class="form-row align-items-end">
+            @if ($filter['scope']) <input type="hidden" name="scope" value="{{ $filter['scope'] }}"> @endif
+
+            <div class="col-6 col-md-2 form-group">
+                <label>Role</label>
+                <select name="role" class="form-control form-control-sm" onchange="this.form.submit()">
+                    <option value="">All roles</option>
+                    @foreach ($roleLabels as $key => $label)
+                        @if (($facets['role'][$key] ?? 0) > 0 || $filter['role'] === $key)
+                            <option value="{{ $key }}" @selected($filter['role'] === $key)>{{ $label }} ({{ $facets['role'][$key] ?? 0 }})</option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-6 col-md-2 form-group">
+                <label>Source</label>
+                <select name="src" class="form-control form-control-sm" onchange="this.form.submit()">
+                    <option value="">All sources</option>
+                    @foreach ($srcLabels as $key => $label)
+                        <option value="{{ $key }}" @selected($filter['src'] === $key)>{{ $label }} ({{ $facets['src'][$key] ?? 0 }})</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-6 col-md-2 form-group">
+                <label>IP or subnet</label>
+                <select name="kind" class="form-control form-control-sm" onchange="this.form.submit()">
+                    <option value="">Both</option>
+                    <option value="host" @selected($filter['kind'] === 'host')>Single IPs ({{ $facets['kind']['host'] ?? 0 }})</option>
+                    <option value="subnet" @selected($filter['kind'] === 'subnet')>Subnets ({{ $facets['kind']['subnet'] ?? 0 }})</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2 form-group">
+                <label>Zone</label>
+                <select name="zone" class="form-control form-control-sm" onchange="this.form.submit()">
+                    <option value="">All zones</option>
+                    <option value="_none" @selected($filter['zone'] === '_none')>— No zone — ({{ $facets['zone']['_none'] ?? 0 }})</option>
+                    @foreach ($zones as $z)
+                        @if (($facets['zone'][$z] ?? 0) > 0 || $filter['zone'] === $z)
+                            <option value="{{ $z }}" @selected($filter['zone'] === $z)>{{ $z }} ({{ $facets['zone'][$z] ?? 0 }})</option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-8 col-md-3 form-group">
+                <label>Range / block</label>
+                <input type="text" name="net" value="{{ $filter['net'] }}" list="ipr-nets" class="form-control form-control-sm mono"
+                       placeholder="e.g. 192.168.50.0/24 or 10.0.0.1-50" onchange="this.form.submit()">
+                <datalist id="ipr-nets">
+                    @foreach ($series as $sr)
+                        <option value="{{ $sr['cidr'] }}">{{ $sr['block'] ? 'IP block' : 'recorded IPs' }} · {{ $sr['used'] }} used</option>
+                    @endforeach
+                </datalist>
+            </div>
+            <div class="col-4 col-md-1 form-group">
+                @if ($activeFilters->isNotEmpty())
+                    <a href="{{ route('ip-pools.index') }}#records" class="btn btn-light btn-sm btn-block" title="Clear all filters"><i class="fas fa-times"></i> Clear</a>
+                @else
+                    <button class="btn btn-primary btn-sm btn-block"><i class="fas fa-filter"></i></button>
+                @endif
+            </div>
         </form>
     </div>
+
     <div class="card-body p-0">
         <div class="table-responsive">
         <table class="table table-sm table-striped table-hover data-table mb-0">
@@ -384,6 +459,7 @@
                 <tr>
                     <th class="pl-3">IP / Subnet</th>
                     <th>Type</th>
+                    <th>Role</th>
                     <th>Source</th>
                     <th>Name</th>
                     <th>Zone</th>
@@ -395,6 +471,7 @@
             @foreach($records as $e)
                 <tr>
                     <td class="pl-3 mono font-weight-bold" data-order="{{ sprintf('%010d', $e['min']) }}">{{ $e['text'] }}</td>
+                    <td><a href="{{ $recUrl(['scope' => $e['scope']]) }}" class="badge {{ $scopeStyle[$e['scope']] }}">{{ $scopeLabels[$e['scope']] }}</a></td>
                     <td class="small">{{ $roleLabels[$e['role']] }}</td>
                     <td><span class="badge badge-{{ $srcColor[$e['source']] }}">{{ $srcLabels[$e['source']] }}</span></td>
                     <td>{{ $e['label'] }}</td>

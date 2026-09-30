@@ -50,6 +50,7 @@ Route::any('/iclock/fdata', [ZkPushController::class, 'fdata']);
 // Users now lives under the Settings module (Settings > Users in the sidebar).
 Route::middleware(['auth', 'can:access-settings-users'])->group(function () {
     Route::resource('users', UserController::class);
+    Route::get('activity', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity.index');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -61,6 +62,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile',
         [ProfileController::class,'edit']
     )->name('profile.edit');
+
+    Route::get('/profile/activity', [\App\Http\Controllers\ActivityLogController::class, 'mine'])
+        ->name('profile.activity');
 
     Route::patch('/profile',
         [ProfileController::class,'update']
@@ -139,6 +143,10 @@ Route::middleware(['auth', 'can:access-settings-telegram'])->prefix('settings')-
     Route::get('telegram', [NocAlertSettingController::class, 'edit'])->name('telegram');
     Route::put('telegram', [NocAlertSettingController::class, 'update'])->name('telegram.update');
     Route::post('telegram/test', [NocAlertSettingController::class, 'test'])->name('telegram.test');
+
+    Route::get('whatsapp', [NocAlertSettingController::class, 'editWhatsapp'])->name('whatsapp');
+    Route::put('whatsapp', [NocAlertSettingController::class, 'updateWhatsapp'])->name('whatsapp.update');
+    Route::post('whatsapp/test', [NocAlertSettingController::class, 'testWhatsapp'])->name('whatsapp.test');
 
 });
 
@@ -289,6 +297,21 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
         ->name('reports.summary')->middleware('can:access-accounts-reports');
 
     // বেতন শিট
+    Route::prefix('settlements')->name('settlements.')->middleware('can:access-accounts-settlements')
+        ->controller(\App\Http\Controllers\Accounts\ZoneSettlementController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('upload', 'upload')->name('upload');
+            Route::get('preview', 'preview')->name('preview');
+            Route::post('/', 'store')->name('store');
+            Route::get('{settlement}', 'show')->name('show');
+            Route::get('{settlement}/invoices', 'invoices')->name('invoices');
+            Route::get('{settlement}/invoices/{row}', 'invoice')->name('invoice');
+            Route::get('{settlement}/export', 'export')->name('export');
+            Route::get('{settlement}/source', 'source')->name('source');
+            Route::put('{settlement}/signatory', 'signatory')->name('signatory');
+            Route::delete('{settlement}', 'destroy')->name('destroy');
+        });
+
     Route::get('salaries', [SalaryController::class, 'index'])
         ->name('salaries.index')->middleware('can:access-accounts-salaries');
     Route::post('salaries', [SalaryController::class, 'save'])

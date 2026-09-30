@@ -51,7 +51,7 @@ class SwitchPoller
 
     public function __construct(
         protected TransceiverReader $transceivers,
-        protected TelegramNotifier $telegram,
+        protected AlertNotifier $alerts,
     ) {
     }
 
@@ -333,13 +333,13 @@ class SwitchPoller
     }
 
     /**
-     * One Telegram message per poll, listing every alert-worthy change.
+     * One alert per poll (Telegram / WhatsApp), listing every alert-worthy change.
      */
     protected function notify(NetworkSwitch $switch, NocAlertSetting $settings): void
     {
         $toSend = array_column(array_filter($this->events, fn ($e) => $e['notify']), 'event');
 
-        if (! $toSend || ! $settings->telegram_enabled) {
+        if (! $toSend || ! $settings->anyChannelEnabled()) {
             return;
         }
 
@@ -385,9 +385,8 @@ class SwitchPoller
             $lines[] = $block;
         }
 
-        $errors = $this->telegram->send(implode("\n\n", $lines), $settings);
-
-        if (! $errors) {
+        // Delivered on at least one channel: don't send these again.
+        if ($this->alerts->send(implode("\n\n", $lines), $settings)['sent']) {
             SwitchEvent::whereKey(array_map(fn ($e) => $e->id, $toSend))->update(['notified' => true]);
         }
     }

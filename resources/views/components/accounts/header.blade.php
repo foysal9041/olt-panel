@@ -10,4 +10,5 @@
     ['accounts.products.index', 'accounts.products.*', 'Products', 'fas fa-box', 'access-accounts-products'],
     ['accounts.reports.ledger', 'accounts.reports.*', 'Monthly Reports', 'fas fa-calendar-alt', 'access-accounts-reports'],
     ['accounts.salaries.index', 'accounts.salaries.*', 'Salary', 'fas fa-money-check-alt', 'access-accounts-salaries'],
+    ['accounts.settlements.index', 'accounts.settlements.*', 'Zone Settlement', 'fas fa-file-excel', 'access-accounts-settlements'],
 ]">{{ $slot }}</x-module-header>

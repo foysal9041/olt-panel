@@ -43,20 +43,17 @@
 <body>
     <div class="actions">
         <a href="@yield('back')">← Back</a>
+        @yield('actions')
         <button onclick="window.print()">Print</button>
     </div>
     <div class="sheet">
-        <div class="sheet-head">
-            <div class="brand">
-                <div class="brand-title">
-                    <img src="{{ asset('images/logo-icon.png') }}?v={{ filemtime(public_path('images/logo-icon.png')) }}" alt="Sunlit Network DC">
-                    <h1>Sunlit Network DC</h1>
-                </div>
-                <p>Navaron, Sharsha, Jashore</p>
-                <p>Email: account@sunlitnetwork.com · Website: sunlitnetwork.com</p>
+        {{-- Pages that print several documents (e.g. all invoices) put the letterhead on each one themselves. --}}
+        @unless (View::hasSection('bare'))
+            <div class="sheet-head">
+                @include('layouts.partials.print-letterhead')
+                <h2>@yield('heading')</h2>
             </div>
-            <h2>@yield('heading')</h2>
-        </div>
+        @endunless
         @yield('content')
     </div>
 </body>

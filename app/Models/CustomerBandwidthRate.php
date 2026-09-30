@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class CustomerBandwidthRate extends Model
 {
+    use LogsActivity;
+
     protected $fillable = [
         'customer_id',
         'bandwidth_type_id',
@@ -34,5 +37,15 @@ class CustomerBandwidthRate extends Model
     public function lineTotal(): float
     {
         return (float) $this->rate * (float) $this->quantity;
+    }
+
+    protected function activityLogLabel(): string
+    {
+        return 'Bandwidth Rate';
+    }
+
+    protected function activityLogTitle(): string
+    {
+        return trim(($this->customer?->name ?? 'customer #' . $this->customer_id) . ' · ' . ($this->bandwidthType?->name ?? ''), ' ·');
     }
 }

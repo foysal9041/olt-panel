@@ -23,7 +23,7 @@
     @include('partials.telegram-off-banner')
 @endif
 
-<div class="row">
+<div class="row" data-live="sw-stats">
     @foreach ([
         ['Total Switches', $summary['total'], 'bg-info', 'fas fa-server'],
         ['Switches Up', $summary['up'], 'bg-success', 'fas fa-check'],
@@ -50,7 +50,7 @@
 
     <div class="card-body p-0 table-responsive">
 
-        <table class="table table-bordered table-striped table-hover data-table mb-0">
+        <table class="table table-bordered table-striped table-hover data-table mb-0" data-live-table="switches">
 
             <thead>
                 <tr>
@@ -72,8 +72,8 @@
 
                 @foreach($switches as $switch)
 
-                    <tr>
-                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
+                    <tr data-key="{{ $switch->id }}">
+                        <td class="text-center text-muted" data-live-ignore>{{ $loop->iteration }}</td>
                         <td data-order="{{ $switch->status ?? -1 }}">
                             @include('switches._status', ['status' => $switch->status])
                             @unless ($switch->is_active)
@@ -163,6 +163,7 @@ $(function () {
     }, 0);
 });
 
-setTimeout(function () { location.reload(); }, 60000);
+// Status, ports and Rx update in place every 30s.
+LiveRefresh.start(30000);
 </script>
 @stop
