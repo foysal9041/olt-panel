@@ -108,6 +108,7 @@
                                 <tr>
                                     <td class="pl-3">
                                         <a href="{{ route('accounts.settlements.show', $s) }}" class="font-weight-bold">{{ $s->month->format('F Y') }}</a>
+                                        @if ($s->isPosted())<span class="badge badge-success ml-1" title="Net Bill posted to income on {{ $s->posted_on->format('d M Y') }}"><i class="fas fa-check"></i> Posted</span>@endif
                                         <div class="small text-muted">{{ $s->source_name }} · {{ $s->creator?->name ?? '—' }}, {{ $s->created_at->format('d M') }}</div>
                                     </td>
                                     <td class="text-center">{{ $t['count'] }} @if ($flags)<span class="badge badge-warning" title="Rows to check">{{ $flags }}</span>@endif</td>

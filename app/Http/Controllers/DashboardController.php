@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendanceSetting;
 use App\Models\Employee;
-use App\Models\Invoice;
 use App\Models\IpBlock;
 use App\Models\NttnLink;
 use App\Models\LatencyTarget;
@@ -97,25 +96,12 @@ class DashboardController extends Controller
 
         $accounts = null;
         if ($can['accounts']) {
-            $month = Carbon::today();
-            $invoices = Invoice::with('payments')
-                ->whereYear('billing_month', $month->year)
-                ->whereMonth('billing_month', $month->month)
-                ->get(['id', 'amount', 'status']);
-
-            // Partial payments count as collected, same as the Invoices page.
-            $accounts = [
-                'invoiced' => (float) $invoices->sum('amount'),
-                'collected' => (float) $invoices->sum(fn (Invoice $invoice) => $invoice->amountPaid()),
-                'count' => $invoices->count(),
-                'unpaid' => $invoices->where('status', '!=', 'paid')->count(),
-            ];
-            $accounts['outstanding'] = $accounts['invoiced'] - $accounts['collected'];
-
-            // All invoice dues, whatever month they're for.
-            $open = Invoice::with('payments')->whereIn('status', ['unpaid', 'partially_paid'])->get(['id', 'amount', 'status']);
-            $accounts['dues'] = (float) $open->sum(fn (Invoice $invoice) => $invoice->remainingDue());
-            $accounts['dues_count'] = $open->count();
+            // Latest zone settlement: its Net Bill and whether it's posted to income.
+            $settlement = \App\Models\ZoneSettlement::with('rows')->latest('month')->latest('id')->first();
+            $accounts = ['settlement' => $settlement ? [
+                'model' => $settlement,
+                'income' => $settlement->totals()['income'],
+            ] : null];
 
             // The office's books: today's cash book and this month's totals.
             $today = Carbon::today();
@@ -185,7 +171,7 @@ class DashboardController extends Controller
             Gate::allows('access-olt-vlans') ? ['Find Free VLAN', 'fas fa-stream', route('vlans.index') . '#finder', 'violet'] : null,
             $can['nttn'] ? ['Add NTTN Link', 'fas fa-project-diagram', route('nttn-links.create'), 'violet'] : null,
             Gate::allows('access-accounts-cashbook') ? ['Cash Book', 'fas fa-book-open', route('accounts.cashbook.index'), 'amber'] : null,
-            Gate::allows('access-accounts-invoices') ? ['Receive Payment', 'fas fa-hand-holding-usd', route('accounts.payments.create'), 'green'] : null,
+            Gate::allows('access-accounts-settlements') ? ['Zone Settlement', 'fas fa-file-excel', route('accounts.settlements.index'), 'green'] : null,
             Gate::allows('access-accounts-salaries') ? ['Salary Sheet', 'fas fa-money-check-alt', route('accounts.salaries.index'), 'amber'] : null,
             Gate::allows('access-attendance-leaves') ? ['Add Leave', 'fas fa-plane-departure', route('attendance.leaves.create'), 'rose'] : null,
         ]));

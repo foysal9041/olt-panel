@@ -22,7 +22,7 @@ class CashBookController extends Controller
     {
         $date = $this->date($request->query('date'));
 
-        $entries = Transaction::with('category', 'invoice.customer')
+        $entries = Transaction::with('category', 'recordedBy:id,name')
             ->whereDate('transaction_date', $date)
             ->orderBy('id')
             ->get();
@@ -78,11 +78,6 @@ class CashBookController extends Controller
     public function destroy(Transaction $transaction)
     {
         abort_if($transaction->isLockedFor(auth()->user()), 403, 'Only an admin can change entries for past days.');
-
-        // Invoice payments belong to their invoice; remove them from there.
-        if ($transaction->invoice_id) {
-            return back()->with('error', 'This is an invoice payment — edit or remove it from the invoice.');
-        }
 
         $date = $transaction->transaction_date->toDateString();
         $transaction->delete();

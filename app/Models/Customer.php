@@ -15,9 +15,7 @@ class Customer extends Model
         'phone',
         'address',
         'zone',
-        'product_id',
         'customer_type',
-        'package_rate',
         'kam_name',
         'kam_phone',
         'status',
@@ -27,7 +25,6 @@ class Customer extends Model
     {
         return [
             'status' => 'boolean',
-            'package_rate' => 'decimal:2',
         ];
     }
 
@@ -45,37 +42,18 @@ class Customer extends Model
         return $this->customer_type === 'bandwidth_client';
     }
 
-    /**
-     * MAC clients are billed a fixed product/package.
-     */
-    public function usesPackage(): bool
-    {
-        return ! $this->isBandwidthClient();
-    }
-
     public function customerTypeLabel(): string
     {
         return self::TYPES[$this->customer_type] ?? self::TYPES['mac_client'];
     }
 
-    public function packages()
+    /** This customer's lines in the monthly zone settlements, newest month first. */
+    public function settlementRows()
     {
-        return $this->hasMany(CustomerPackage::class)->with('product');
-    }
-
-    public function givenProducts()
-    {
-        return $this->hasMany(CustomerProduct::class)->orderByDesc('given_on')->orderByDesc('id');
-    }
-
-    public function product()
-    {
-        return $this->belongsTo(Product::class);
-    }
-
-    public function invoices()
-    {
-        return $this->hasMany(Invoice::class);
+        return $this->hasMany(ZoneSettlementRow::class)
+            ->join('zone_settlements', 'zone_settlements.id', '=', 'zone_settlement_rows.zone_settlement_id')
+            ->orderByDesc('zone_settlements.month')
+            ->select('zone_settlement_rows.*');
     }
 
     public function bandwidthRates()
@@ -86,20 +64,5 @@ class Customer extends Model
     public function bandwidthRatesTotal(): float
     {
         return (float) $this->bandwidthRates->sum(fn ($rate) => $rate->lineTotal());
-    }
-
-    /**
-     * Total unpaid balance on record for this customer — their running
-     * ledger. Pass an invoice id to exclude it (used on that invoice's own
-     * print page, where "previous due" should mean everything except the
-     * invoice currently being viewed).
-     */
-    public function outstandingDue(?int $excludingInvoiceId = null): float
-    {
-        return (float) $this->invoices()
-            ->whereIn('status', ['unpaid', 'partially_paid'])
-            ->when($excludingInvoiceId, fn ($q) => $q->where('id', '!=', $excludingInvoiceId))
-            ->get()
-            ->sum(fn (Invoice $invoice) => $invoice->remainingDue());
     }
 }

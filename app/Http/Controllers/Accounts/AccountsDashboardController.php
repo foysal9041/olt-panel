@@ -4,141 +4,96 @@ namespace App\Http\Controllers\Accounts;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Invoice;
-use App\Models\Product;
+use App\Models\SalarySheet;
 use App\Models\Transaction;
+use App\Models\ZoneSettlement;
+use App\Services\CashBalance;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Accounts at a glance: this month's income and expense, cash in hand now,
+ * the zone settlements and salary sheets, and where the money came from and
+ * went.
+ */
 class AccountsDashboardController extends Controller
 {
     public function index()
     {
-        $monthStart = Carbon::today()->startOfMonth();
-        $monthEnd = Carbon::today()->endOfMonth();
-        $lastMonthStart = $monthStart->copy()->subMonth();
-        $lastMonthEnd = $lastMonthStart->copy()->endOfMonth();
+        $today = Carbon::today();
+        $monthStart = $today->copy()->startOfMonth();
+        $month = [$monthStart->toDateString(), $monthStart->copy()->endOfMonth()->toDateString()];
+        $lastStart = $monthStart->copy()->subMonthNoOverflow();
+        $lastMonth = [$lastStart->toDateString(), $lastStart->copy()->endOfMonth()->toDateString()];
 
-        $monthlyIncome = (float) Transaction::income()
-            ->whereBetween('transaction_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->sum('amount');
+        $sum = fn (string $type, array $range) => (float) Transaction::{$type}()->whereBetween('transaction_date', $range)->sum('amount');
 
-        $monthlyExpense = (float) Transaction::expense()
-            ->whereBetween('transaction_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->sum('amount');
+        $income = $sum('income', $month);
+        $expense = $sum('expense', $month);
+        $lastIncome = $sum('income', $lastMonth);
+        $lastExpense = $sum('expense', $lastMonth);
 
-        $lastMonthIncome = (float) Transaction::income()
-            ->whereBetween('transaction_date', [$lastMonthStart->toDateString(), $lastMonthEnd->toDateString()])
-            ->sum('amount');
-
-        $lastMonthExpense = (float) Transaction::expense()
-            ->whereBetween('transaction_date', [$lastMonthStart->toDateString(), $lastMonthEnd->toDateString()])
-            ->sum('amount');
-
-        $monthlyInvoices = Invoice::with('payments')
-            ->whereYear('billing_month', $monthStart->year)
-            ->whereMonth('billing_month', $monthStart->month)
-            ->get();
-
-        // Partial payments count as collected, same as the Invoices page.
-        $totalInvoiced = (float) $monthlyInvoices->sum('amount');
-        $totalCollected = (float) $monthlyInvoices->sum(fn (Invoice $invoice) => $invoice->amountPaid());
-        $totalOutstanding = max(0.0, $totalInvoiced - $totalCollected);
-        $collectionRate = $totalInvoiced > 0 ? round($totalCollected / $totalInvoiced * 100, 1) : 0;
-
-        $invoiceStatus = [
-            'paid' => $monthlyInvoices->where('status', 'paid')->count(),
-            'partially_paid' => $monthlyInvoices->where('status', 'partially_paid')->count(),
-            'unpaid' => $monthlyInvoices->where('status', 'unpaid')->count(),
+        // Cash in hand right now: today's জের plus today's entries.
+        ['amount' => $opening, 'base' => $count] = CashBalance::before($today);
+        $dayIn = (float) Transaction::income()->whereDate('transaction_date', $today)->sum('amount');
+        $dayOut = (float) Transaction::expense()->whereDate('transaction_date', $today)->sum('amount');
+        $cash = [
+            'now' => $opening + $dayIn - $dayOut,
+            'in' => $dayIn,
+            'out' => $dayOut,
+            'counted_on' => $count?->date,
         ];
 
-        // All-time dues across every open invoice, largest first.
-        $openInvoices = Invoice::with(['payments', 'customer:id,name,phone,zone'])
-            ->whereIn('status', ['unpaid', 'partially_paid'])
-            ->get();
+        $settlements = ZoneSettlement::with('rows')->latest('month')->latest('id')->limit(6)->get()
+            ->map(fn (ZoneSettlement $s) => ['model' => $s, 'totals' => $s->totals()]);
 
-        $totalReceivable = (float) $openInvoices->sum(fn (Invoice $invoice) => $invoice->remainingDue());
+        $salary = SalarySheet::withSum('items as net_total', 'net')->withCount('items')->latest('month')->first();
 
-        $topDues = $openInvoices
-            ->groupBy('customer_id')
-            ->map(fn ($invoices) => [
-                'customer' => $invoices->first()->customer,
-                'due' => (float) $invoices->sum(fn (Invoice $invoice) => $invoice->remainingDue()),
-                'invoices' => $invoices->count(),
-                'oldest' => $invoices->min('billing_month'),
-            ])
-            ->filter(fn ($row) => $row['customer'] && $row['due'] > 0)
-            ->sortByDesc('due')
-            ->take(6)
-            ->values();
-
-        $recentTransactions = Transaction::with('category')
-            ->latest('transaction_date')
-            ->latest('id')
-            ->limit(8)
-            ->get();
-
-        $expenseByCategory = Transaction::query()
-            ->join('transaction_categories', 'transaction_categories.id', '=', 'transactions.transaction_category_id')
-            ->where('transaction_categories.type', 'expense')
-            ->whereBetween('transaction_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->groupBy('transaction_categories.name')
+        $byCategory = fn (string $type) => Transaction::query()
+            ->join('transaction_categories as c', 'c.id', '=', 'transactions.transaction_category_id')
+            ->where('c.type', $type)
+            ->whereBetween('transaction_date', $month)
+            ->groupBy('c.name')
             ->orderByDesc(DB::raw('SUM(transactions.amount)'))
-            ->limit(5)
-            ->get(['transaction_categories.name', DB::raw('SUM(transactions.amount) as total')]);
+            ->limit(6)
+            ->get(['c.name', DB::raw('SUM(transactions.amount) as total'), DB::raw('COUNT(*) as entries')]);
 
-        $activeCustomers = Customer::where('status', true)->count();
-        $activeProducts = Product::where('status', true)->count();
+        $recent = Transaction::with('category')->latest('transaction_date')->latest('id')->limit(8)->get();
 
-        $trend = $this->sixMonthTrend();
+        $customers = Customer::where('status', true)
+            ->selectRaw('customer_type, COUNT(*) as c')->groupBy('customer_type')->pluck('c', 'customer_type');
 
-        return view('accounts.dashboard', compact(
-            'monthStart',
-            'monthlyIncome',
-            'monthlyExpense',
-            'lastMonthIncome',
-            'lastMonthExpense',
-            'totalInvoiced',
-            'totalCollected',
-            'totalOutstanding',
-            'collectionRate',
-            'invoiceStatus',
-            'totalReceivable',
-            'topDues',
-            'recentTransactions',
-            'expenseByCategory',
-            'activeCustomers',
-            'activeProducts',
-            'trend'
-        ));
+        return view('accounts.dashboard', [
+            'monthStart' => $monthStart,
+            'income' => $income,
+            'expense' => $expense,
+            'lastIncome' => $lastIncome,
+            'lastExpense' => $lastExpense,
+            'cash' => $cash,
+            'settlements' => $settlements,
+            'salary' => $salary,
+            'incomeByCategory' => $byCategory('income'),
+            'expenseByCategory' => $byCategory('expense'),
+            'recent' => $recent,
+            'customers' => $customers,
+            'trend' => $this->trend(),
+        ]);
     }
 
     /**
-     * @return array<int, array{label: string, income: float, expense: float}>
+     * @return list<array{label: string, income: float, expense: float}>
      */
-    private function sixMonthTrend(): array
+    private function trend(): array
     {
-        $trend = [];
+        return collect(range(5, 0))->map(function (int $i) {
+            $start = Carbon::today()->subMonthsNoOverflow($i)->startOfMonth();
+            $range = [$start->toDateString(), $start->copy()->endOfMonth()->toDateString()];
 
-        for ($i = 5; $i >= 0; $i--) {
-            $month = Carbon::today()->subMonths($i)->startOfMonth();
-            $end = $month->copy()->endOfMonth();
-
-            $income = Transaction::income()
-                ->whereBetween('transaction_date', [$month->toDateString(), $end->toDateString()])
-                ->sum('amount');
-
-            $expense = Transaction::expense()
-                ->whereBetween('transaction_date', [$month->toDateString(), $end->toDateString()])
-                ->sum('amount');
-
-            $trend[] = [
-                'label' => $month->format('M Y'),
-                'income' => (float) $income,
-                'expense' => (float) $expense,
+            return [
+                'label' => $start->format('M Y'),
+                'income' => (float) Transaction::income()->whereBetween('transaction_date', $range)->sum('amount'),
+                'expense' => (float) Transaction::expense()->whereBetween('transaction_date', $range)->sum('amount'),
             ];
-        }
-
-        return $trend;
+        })->all();
     }
 }

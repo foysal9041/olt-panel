@@ -3,34 +3,25 @@
 @section('title', 'Accounts Dashboard')
 
 @php
-    $net = $monthlyIncome - $monthlyExpense;
-    $lastNet = $lastMonthIncome - $lastMonthExpense;
-    $delta = function ($now, $before) {
-        if ($before == 0) return null;
-        return round(($now - $before) / abs($before) * 100, 1);
-    };
-    $incomeDelta = $delta($monthlyIncome, $lastMonthIncome);
-    $expenseDelta = $delta($monthlyExpense, $lastMonthExpense);
-    $invoiceCount = array_sum($invoiceStatus);
-    $maxExpense = max(1, (float) ($expenseByCategory->max('total') ?? 0));
+    $net = $income - $expense;
+    $lastNet = $lastIncome - $lastExpense;
+    $delta = fn ($now, $before) => $before == 0 ? null : round(($now - $before) / abs($before) * 100, 1);
+    $pct = fn ($d) => abs($d) >= 1000 ? '999+%' : abs($d) . '%';
+    $incomeDelta = $delta($income, $lastIncome);
+    $expenseDelta = $delta($expense, $lastExpense);
     $tk = fn ($v, $d = 0) => '৳' . number_format((float) $v, $d);
+    $signed = fn ($v) => ($v < 0 ? '−' : '') . '৳' . number_format(abs((float) $v));
+    $latest = $settlements->first();
 @endphp
 
 @section('content_header')
-<x-accounts.header title="Accounts & Billing" icon="fas fa-chart-pie"
-    subtitle="{{ $monthStart->format('F Y') }} overview — income, billing and receivables">
+<x-accounts.header title="Accounts" icon="fas fa-chart-pie"
+    subtitle="{{ $monthStart->format('F Y') }} at a glance — cash, income, expenses and settlements">
     @can('access-accounts-transactions')
-        <a href="{{ route('accounts.transactions.create') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-plus"></i> Add Transaction
-        </a>
+        <a href="{{ route('accounts.transactions.create') }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-plus"></i> Add Entry</a>
     @endcan
-    @can('access-accounts-invoices')
-        <a href="{{ route('accounts.invoices.index') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-file-invoice-dollar"></i> Invoices
-        </a>
-        <a href="{{ route('accounts.payments.create') }}" class="btn btn-success btn-sm">
-            <i class="fas fa-hand-holding-usd"></i> Receive Payment
-        </a>
+    @can('access-accounts-cashbook')
+        <a href="{{ route('accounts.cashbook.index') }}" class="btn btn-primary btn-sm"><i class="fas fa-book-open"></i> Today's Cash Book</a>
     @endcan
 </x-accounts.header>
 @stop
@@ -40,198 +31,204 @@
 {{-- ============ Headline numbers ============ --}}
 <div class="acct-stats">
 
+    <div class="acct-stat acct-stat-hero">
+        <div class="acct-stat-label">Cash in hand <i class="fas fa-wallet"></i></div>
+        <div class="acct-stat-value {{ $cash['now'] < 0 ? 'text-warning' : '' }}">{{ $signed($cash['now']) }}</div>
+        <div class="acct-stat-foot">
+            Today <span class="hero-in">+{{ $tk($cash['in']) }}</span> · <span class="hero-out">−{{ $tk($cash['out']) }}</span>
+            @unless ($cash['counted_on'])
+                <div class="mt-1"><i class="fas fa-exclamation-circle"></i> Cash not counted yet</div>
+            @endunless
+        </div>
+    </div>
+
     <div class="acct-stat" style="--accent:#16a34a">
-        <div class="acct-stat-label">Income <i class="fas fa-arrow-down"></i></div>
-        <div class="acct-stat-value">{{ $tk($monthlyIncome) }}</div>
+        <div class="acct-stat-label">Income · {{ $monthStart->format('M') }} <i class="fas fa-arrow-down"></i></div>
+        <div class="acct-stat-value">{{ $tk($income) }}</div>
         <div class="acct-stat-foot">
             @if ($incomeDelta !== null)
-                <span class="acct-delta {{ $incomeDelta >= 0 ? 'up' : 'down' }}">
-                    <i class="fas fa-caret-{{ $incomeDelta >= 0 ? 'up' : 'down' }}"></i> {{ abs($incomeDelta) }}%
-                </span> vs last month
+                <span class="acct-pill {{ $incomeDelta >= 0 ? 'up' : 'down' }}"><i class="fas fa-caret-{{ $incomeDelta >= 0 ? 'up' : 'down' }}"></i> {{ $pct($incomeDelta) }}</span> vs {{ $tk($lastIncome) }} last month
             @else
-                This month
+                This month so far
             @endif
         </div>
     </div>
 
     <div class="acct-stat" style="--accent:#e11d48">
-        <div class="acct-stat-label">Expense <i class="fas fa-arrow-up"></i></div>
-        <div class="acct-stat-value">{{ $tk($monthlyExpense) }}</div>
+        <div class="acct-stat-label">Expense · {{ $monthStart->format('M') }} <i class="fas fa-arrow-up"></i></div>
+        <div class="acct-stat-value">{{ $tk($expense) }}</div>
         <div class="acct-stat-foot">
             @if ($expenseDelta !== null)
                 {{-- Rising expense is bad news, so the colours are flipped --}}
-                <span class="acct-delta {{ $expenseDelta <= 0 ? 'up' : 'down' }}">
-                    <i class="fas fa-caret-{{ $expenseDelta >= 0 ? 'up' : 'down' }}"></i> {{ abs($expenseDelta) }}%
-                </span> vs last month
+                <span class="acct-pill {{ $expenseDelta <= 0 ? 'up' : 'down' }}"><i class="fas fa-caret-{{ $expenseDelta >= 0 ? 'up' : 'down' }}"></i> {{ $pct($expenseDelta) }}</span> vs {{ $tk($lastExpense) }} last month
             @else
-                This month
+                This month so far
             @endif
         </div>
     </div>
 
     <div class="acct-stat" style="--accent:{{ $net >= 0 ? '#4f46e5' : '#e11d48' }}">
-        <div class="acct-stat-label">Net Profit <i class="fas fa-balance-scale"></i></div>
-        <div class="acct-stat-value {{ $net < 0 ? 'text-expense' : '' }}">{{ $net < 0 ? '−' : '' }}{{ $tk(abs($net)) }}</div>
-        <div class="acct-stat-foot">Last month {{ $lastNet < 0 ? '−' : '' }}{{ $tk(abs($lastNet)) }}</div>
-    </div>
-
-    <div class="acct-stat" style="--accent:#d97706">
-        <div class="acct-stat-label">Collection Rate <i class="fas fa-hand-holding-usd"></i></div>
-        <div class="acct-stat-value">{{ $collectionRate }}%</div>
-        <div class="acct-stat-foot">{{ $tk($totalCollected) }} of {{ $tk($totalInvoiced) }} billed</div>
-        <div class="acct-progress"><span style="width: {{ min(100, $collectionRate) }}%"></span></div>
-    </div>
-
-    <div class="acct-stat" style="--accent:#0284c7">
-        <div class="acct-stat-label">Total Receivable <i class="fas fa-file-invoice"></i></div>
-        <div class="acct-stat-value">{{ $tk($totalReceivable) }}</div>
-        <div class="acct-stat-foot">All open invoices · {{ $activeCustomers }} active customers</div>
+        <div class="acct-stat-label">Net · {{ $monthStart->format('M') }} <i class="fas fa-balance-scale"></i></div>
+        <div class="acct-stat-value {{ $net < 0 ? 'text-expense' : '' }}">{{ $signed($net) }}</div>
+        <div class="acct-stat-foot">Last month {{ $signed($lastNet) }}</div>
     </div>
 
 </div>
 
-{{-- ============ Charts ============ --}}
 <div class="row">
 
-    <div class="col-lg-8">
+    {{-- ============ Trend ============ --}}
+    <div class="col-xl-8">
         <div class="card acct-panel">
             <div class="card-header">
-                <h3 class="card-title">Income vs Expense — last 6 months</h3>
+                <h3 class="card-title"><i class="fas fa-chart-bar mr-1 text-primary"></i> Income vs Expense <small class="text-muted">last 6 months</small></h3>
                 @can('access-accounts-transactions')
-                    <a href="{{ route('accounts.transactions.index') }}" class="small">All transactions</a>
+                    <a href="{{ route('accounts.transactions.index') }}" class="small">All entries <i class="fas fa-arrow-right"></i></a>
                 @endcan
             </div>
             <div class="card-body">
-                <div style="position: relative; height: 290px;">
-                    <canvas id="incomeExpenseTrend"></canvas>
+                <div style="position: relative; height: 300px;"><canvas id="incomeExpenseTrend"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ============ Zone settlement + salary ============ --}}
+    <div class="col-xl-4">
+        <div class="card acct-panel">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-file-excel mr-1 text-success"></i> Zone Settlement</h3>
+                @can('access-accounts-settlements')
+                    <a href="{{ route('accounts.settlements.index') }}" class="small">All <i class="fas fa-arrow-right"></i></a>
+                @endcan
+            </div>
+            @if ($latest)
+                @php $s = $latest['model']; $t = $latest['totals']; @endphp
+                <div class="card-body pb-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="acct-kicker">{{ $s->month->format('F Y') }} · {{ $t['count'] }} zones</div>
+                            <div class="acct-big text-income">{{ $tk($t['income'], 2) }}</div>
+                            <div class="small text-muted">Net Bill (company income)</div>
+                        </div>
+                        @if ($s->isPosted())
+                            <span class="badge badge-success"><i class="fas fa-check"></i> Posted</span>
+                        @else
+                            <span class="badge badge-warning"><i class="fas fa-clock"></i> Not posted</span>
+                        @endif
+                    </div>
+                    <div class="acct-split mt-3">
+                        <div><span>Total Payment</span><b>{{ $tk($t['payment']) }}</b></div>
+                        <div><span>Total Payable</span><b>{{ $tk($t['invoice']) }}</b></div>
+                        <div><span>bKash</span><b>{{ $tk($t['bkash']) }}</b></div>
+                    </div>
+                    @can('access-accounts-settlements')
+                        <a href="{{ route('accounts.settlements.show', $s) }}" class="btn btn-sm btn-block mt-3 {{ $s->isPosted() ? 'btn-light border' : 'btn-success' }}">
+                            {!! $s->isPosted() ? '<i class="fas fa-eye"></i> Open settlement' : '<i class="fas fa-check"></i> Review &amp; post income' !!}
+                        </a>
+                    @endcan
+                </div>
+                @if ($settlements->count() > 1)
+                    <div class="border-top">
+                        @foreach ($settlements->skip(1) as ['model' => $old, 'totals' => $ot])
+                            <a href="{{ Gate::allows('access-accounts-settlements') ? route('accounts.settlements.show', $old) : '#' }}" class="acct-list-row py-2">
+                                <span class="acct-list-main small">{{ $old->month->format('F Y') }}</span>
+                                <span class="money small font-weight-bold">{{ $tk($ot['income']) }}</span>
+                                <i class="fas {{ $old->isPosted() ? 'fa-check-circle text-success' : 'fa-clock text-warning' }}" title="{{ $old->isPosted() ? 'Posted' : 'Not posted' }}"></i>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            @else
+                <div class="acct-empty"><i class="fas fa-file-excel"></i>No settlement yet.
+                    @can('access-accounts-settlements')
+                        <div class="mt-2"><a href="{{ route('accounts.settlements.index') }}" class="btn btn-sm btn-success">Upload Excel</a></div>
+                    @endcan
+                </div>
+            @endif
+            <div class="card-footer small text-muted d-flex justify-content-between">
+                <span><i class="fas fa-users mr-1"></i> Active customers</span>
+                <span>{{ $customers['mac_client'] ?? 0 }} MAC · {{ $customers['bandwidth_client'] ?? 0 }} Bandwidth</span>
+            </div>
+        </div>
+
+        <div class="card acct-panel">
+            <div class="card-body d-flex align-items-center" style="gap:.85rem">
+                <span class="acct-tile" style="--accent:#d97706"><i class="fas fa-money-check-alt"></i></span>
+                <div class="flex-grow-1" style="min-width:0">
+                    <div class="acct-kicker">Salary · {{ $salary?->month?->format('F Y') ?? 'no sheet yet' }}</div>
+                    @if ($salary)
+                        <div class="font-weight-bold money" style="font-size:1.15rem">{{ $tk($salary->net_total) }}</div>
+                        <div class="small text-muted">{{ $salary->items_count }} staff · {{ $salary->isPosted() ? 'posted to expenses' : 'not posted yet' }}</div>
+                    @else
+                        <div class="small text-muted">Make the month's salary sheet</div>
+                    @endif
+                </div>
+                @can('access-accounts-salaries')
+                    <a href="{{ route('accounts.salaries.index') }}" class="btn btn-sm btn-light border"><i class="fas fa-arrow-right"></i></a>
+                @endcan
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="row">
+
+    {{-- ============ By head ============ --}}
+    @foreach ([
+        ['Income by head', $incomeByCategory, '#16a34a', 'fas fa-arrow-down', $income],
+        ['Expense by head', $expenseByCategory, '#e11d48', 'fas fa-arrow-up', $expense],
+    ] as [$title, $rows, $color, $icon, $total])
+        <div class="col-lg-4 col-md-6">
+            <div class="card acct-panel">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="{{ $icon }} mr-1" style="color: {{ $color }}"></i> {{ $title }}</h3>
+                    <span class="small text-muted">{{ $monthStart->format('F') }}</span>
+                </div>
+                <div class="card-body">
+                    @forelse ($rows as $row)
+                        <div class="acct-bar-row">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>{{ $row->name }} <span class="text-muted small">× {{ $row->entries }}</span></span>
+                                <strong class="money">{{ $tk($row->total) }}</strong>
+                            </div>
+                            <div class="acct-progress mt-0" style="--accent: {{ $color }}">
+                                <span style="width: {{ $total > 0 ? round($row->total / $total * 100, 1) : 0 }}%"></span>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="acct-empty"><i class="fas fa-chart-bar"></i>Nothing recorded this month.</div>
+                    @endforelse
                 </div>
             </div>
         </div>
-    </div>
+    @endforeach
 
-    <div class="col-lg-4">
+    {{-- ============ Recent entries ============ --}}
+    <div class="col-lg-4 col-md-12">
         <div class="card acct-panel">
             <div class="card-header">
-                <h3 class="card-title">{{ $monthStart->format('F') }} Invoices</h3>
-                <span class="text-muted small">{{ $invoiceCount }} total</span>
-            </div>
-            <div class="card-body">
-                @if ($invoiceCount)
-                    <div style="position: relative; height: 180px;">
-                        <canvas id="invoiceStatus"></canvas>
-                    </div>
-                    <div class="mt-3">
-                        @foreach ([['Paid', 'paid', '#22c55e'], ['Partially paid', 'partially_paid', '#f59e0b'], ['Unpaid', 'unpaid', '#f43f5e']] as [$label, $key, $color])
-                            <div class="d-flex justify-content-between align-items-center py-1" style="font-size:.88rem">
-                                <span><i class="fas fa-circle mr-2" style="color:{{ $color }}; font-size:.6rem"></i>{{ $label }}</span>
-                                <strong>{{ $invoiceStatus[$key] }}</strong>
-                            </div>
-                        @endforeach
-                    </div>
-                    <div class="d-flex justify-content-between border-top pt-2 mt-2" style="font-size:.88rem">
-                        <span class="text-muted">Outstanding this month</span>
-                        <strong class="text-expense money">{{ $tk($totalOutstanding) }}</strong>
-                    </div>
-                @else
-                    <div class="acct-empty">
-                        <i class="fas fa-file-invoice"></i>
-                        No invoices for {{ $monthStart->format('F') }} yet.
-                        @can('access-accounts-invoices')
-                            <div class="mt-2"><a href="{{ route('accounts.invoices.index') }}" class="btn btn-sm btn-primary">Generate invoices</a></div>
-                        @endcan
-                    </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-</div>
-
-{{-- ============ Lists ============ --}}
-<div class="row">
-
-    <div class="col-lg-4 col-md-6">
-        <div class="card acct-panel">
-            <div class="card-header">
-                <h3 class="card-title">Top Dues</h3>
-                @can('access-accounts-customers')
-                    <a href="{{ route('accounts.customers.index') }}" class="small">Customers</a>
-                @endcan
-            </div>
-            <div class="card-body p-0">
-                @forelse ($topDues as $row)
-                    <a href="{{ Gate::allows('access-accounts-customers') ? route('accounts.customers.show', $row['customer']) : '#' }}" class="acct-list-row">
-                        <span class="acct-avatar">{{ mb_substr($row['customer']->name, 0, 2) }}</span>
-                        <span class="acct-list-main">
-                            <div class="acct-list-title">{{ $row['customer']->name }}</div>
-                            <div class="acct-list-sub">
-                                {{ $row['invoices'] }} open {{ Str::plural('invoice', $row['invoices']) }}
-                                @if ($row['oldest']) · since {{ \Illuminate\Support\Carbon::parse($row['oldest'])->format('M Y') }} @endif
-                            </div>
-                        </span>
-                        <span class="acct-list-amount text-expense">{{ $tk($row['due']) }}</span>
-                    </a>
-                @empty
-                    <div class="acct-empty"><i class="fas fa-check-circle" style="color:#22c55e"></i>No outstanding dues.</div>
-                @endforelse
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4 col-md-6">
-        <div class="card acct-panel">
-            <div class="card-header">
-                <h3 class="card-title">Recent Transactions</h3>
+                <h3 class="card-title"><i class="fas fa-receipt mr-1 text-primary"></i> Recent entries</h3>
                 @can('access-accounts-transactions')
-                    <a href="{{ route('accounts.transactions.index') }}" class="small">View all</a>
+                    <a href="{{ route('accounts.transactions.index') }}" class="small">View all <i class="fas fa-arrow-right"></i></a>
                 @endcan
             </div>
             <div class="card-body p-0">
-                @forelse ($recentTransactions as $tx)
+                @forelse ($recent as $tx)
                     @php $isIncome = $tx->category?->type === 'income'; @endphp
                     <div class="acct-list-row">
                         <span class="acct-avatar" style="background: {{ $isIncome ? '#dcfce7' : '#ffe4e6' }}; color: {{ $isIncome ? '#16a34a' : '#e11d48' }}">
                             <i class="fas fa-arrow-{{ $isIncome ? 'down' : 'up' }}"></i>
                         </span>
                         <span class="acct-list-main">
-                            <div class="acct-list-title">{{ $tx->description ?: ($tx->category?->name ?? 'Transaction') }}</div>
+                            <div class="acct-list-title">{{ $tx->description ?: ($tx->category?->name ?? 'Entry') }}</div>
                             <div class="acct-list-sub">{{ $tx->category?->name }} · {{ $tx->transaction_date?->format('d M Y') }}</div>
                         </span>
-                        <span class="acct-list-amount {{ $isIncome ? 'text-income' : 'text-expense' }}">
-                            {{ $isIncome ? '+' : '−' }}{{ $tk($tx->amount) }}
-                        </span>
+                        <span class="acct-list-amount {{ $isIncome ? 'text-income' : 'text-expense' }}">{{ $isIncome ? '+' : '−' }}{{ $tk($tx->amount) }}</span>
                     </div>
                 @empty
-                    <div class="acct-empty"><i class="fas fa-receipt"></i>No transactions yet.</div>
+                    <div class="acct-empty"><i class="fas fa-receipt"></i>No entries yet.</div>
                 @endforelse
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4 col-md-12">
-        <div class="card acct-panel">
-            <div class="card-header">
-                <h3 class="card-title">{{ $monthStart->format('F') }} Expenses by Category</h3>
-            </div>
-            <div class="card-body">
-                @forelse ($expenseByCategory as $row)
-                    <div class="acct-bar-row">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span>{{ $row->name }}</span>
-                            <strong class="money">{{ $tk($row->total) }}</strong>
-                        </div>
-                        <div class="acct-progress mt-0" style="--accent:#e11d48">
-                            <span style="width: {{ round($row->total / $maxExpense * 100) }}%"></span>
-                        </div>
-                    </div>
-                @empty
-                    <div class="acct-empty"><i class="fas fa-chart-bar"></i>No expenses recorded this month.</div>
-                @endforelse
-
-                <div class="d-flex justify-content-between border-top pt-3 mt-3 small text-muted">
-                    <span><i class="fas fa-users mr-1"></i> {{ $activeCustomers }} active customers</span>
-                    <span><i class="fas fa-box mr-1"></i> {{ $activeProducts }} active products</span>
-                </div>
             </div>
         </div>
     </div>
@@ -276,27 +273,6 @@
             },
         },
     });
-
-    var statusEl = document.getElementById('invoiceStatus');
-    if (statusEl) {
-        new Chart(statusEl.getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Paid', 'Partially paid', 'Unpaid'],
-                datasets: [{
-                    data: [{{ $invoiceStatus['paid'] }}, {{ $invoiceStatus['partially_paid'] }}, {{ $invoiceStatus['unpaid'] }}],
-                    backgroundColor: ['#22c55e', '#f59e0b', '#f43f5e'],
-                    borderWidth: 2,
-                    borderColor: '#fff',
-                }],
-            },
-            options: {
-                maintainAspectRatio: false,
-                cutoutPercentage: 68,
-                legend: { display: false },
-            },
-        });
-    }
 })();
 </script>
 @stop

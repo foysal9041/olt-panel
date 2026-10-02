@@ -23,6 +23,12 @@
 @if (session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
+@if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+@endif
+@if ($errors->any())
+    <div class="alert alert-danger">{{ $errors->first() }}</div>
+@endif
 
 <div class="row">
     <div class="col-lg-4">
@@ -49,6 +55,67 @@
                 @if ($settlement->notes)<div class="mt-1">{{ $settlement->notes }}</div>@endif
             </div>
         </div>
+
+        {{-- Company income → Accounts (one income entry per zone under "Zone Settlement") --}}
+        @if ($settlement->isPosted())
+            @php
+                $posted = $settlement->rows->pluck('transaction')->filter();
+                $postedCategory = $posted->first()?->transaction_category_id;
+                $postedSum = $posted->reduce(fn ($t, $x) => Dec::add($t, $x->amount), '0');
+            @endphp
+            <div class="card acct-panel" style="border-left:3px solid #16a34a">
+                <div class="card-body py-2 small">
+                    <div class="font-weight-bold text-success mb-1"><i class="fas fa-check-circle"></i> Posted to Income</div>
+                    <div><span class="money font-weight-bold" style="color:#0f172a">{{ Dec::taka($postedSum) }}</span>
+                        as {{ $posted->count() }} {{ Str::plural('entry', $posted->count()) }} under <strong>Zone Settlement</strong></div>
+                    @if ($posted->count() === $totals['count'] && Dec::round($postedSum, 2) !== Dec::round($totals['income'], 2))
+                        <div class="text-muted" style="font-size:.75rem">Each entry is rounded to the paisa like its invoice, so the sum differs slightly from the summary's {{ Dec::taka($totals['income']) }}.</div>
+                    @endif
+                    <div class="text-muted">Dated {{ $settlement->posted_on->format('d M Y') }} · by {{ $settlement->poster?->name ?? '—' }}, {{ $settlement->posted_at->format('d M, h:i A') }}</div>
+                    @if ($posted->count() < $totals['count'])
+                        <div class="text-warning mt-1"><i class="fas fa-exclamation-triangle"></i> {{ $totals['count'] - $posted->count() }} zone(s) have no income entry (zero Net Bill, or the entry was deleted in Transactions).</div>
+                    @endif
+                </div>
+                <div class="card-footer d-flex flex-wrap align-items-center py-2" style="gap:.4rem">
+                    @can('access-accounts-transactions')
+                        <a href="{{ route('accounts.transactions.index', array_filter(['start' => $settlement->posted_on->toDateString(), 'end' => $settlement->posted_on->toDateString(), 'type' => 'income', 'category_id' => $postedCategory])) }}" class="btn btn-light btn-sm"><i class="fas fa-list"></i> View entries</a>
+                    @endcan
+                    @can('access-accounts-cashbook')
+                        <a href="{{ route('accounts.cashbook.index', ['date' => $settlement->posted_on->toDateString()]) }}" class="btn btn-light btn-sm"><i class="fas fa-book"></i> Cash book</a>
+                    @endcan
+                    @if (\App\Models\Transaction::dayIsOpenFor($settlement->posted_on, auth()->user()))
+                        <form method="POST" action="{{ route('accounts.settlements.unpost', $settlement) }}" class="js-confirm-delete ml-auto"
+                              data-confirm-message="Remove the {{ $settlement->month->format('F Y') }} Zone Settlement income entries from Accounts?">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-link btn-sm text-danger p-0"><i class="fas fa-undo"></i> Undo posting</button>
+                        </form>
+                    @else
+                        <span class="ml-auto small text-muted" title="Past days are closed books"><i class="fas fa-lock"></i> Admin can undo</span>
+                    @endif
+                </div>
+            </div>
+        @else
+            <div class="card acct-panel" style="border-left:3px solid #2563eb">
+                <div class="card-body py-2 small">
+                    <div class="font-weight-bold mb-1"><i class="fas fa-hand-holding-usd text-primary"></i> Post income to Accounts</div>
+                    <div class="text-muted mb-2">Adds each zone's Net Bill as income under <strong>Zone Settlement</strong> — {{ $totals['count'] }} entries, {{ Dec::taka($totals['income']) }} in all.</div>
+                    <form method="POST" action="{{ route('accounts.settlements.post', $settlement) }}" class="form-row align-items-end"
+                          onsubmit="return confirm('Post {{ Dec::taka($totals['income']) }} to income as {{ $totals['count'] }} Zone Settlement entries?')">
+                        @csrf
+                        <div class="col-7 form-group mb-0">
+                            <label class="small mb-0 font-weight-bold">Income date</label>
+                            <input type="date" name="income_date" value="{{ old('income_date', $settlement->invoice_date->toDateString()) }}" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-5 form-group mb-0">
+                            <button class="btn btn-success btn-sm btn-block"><i class="fas fa-check"></i> Post</button>
+                        </div>
+                    </form>
+                    @unless (auth()->user()->isAdmin())
+                        <div class="text-muted mt-1" style="font-size:.75rem"><i class="fas fa-info-circle"></i> Past days are closed books — only an admin can post to a date before today.</div>
+                    @endunless
+                </div>
+            </div>
+        @endif
 
         @if ($reconcile)
             @php $allOk = collect($reconcile)->every('ok'); @endphp
@@ -86,11 +153,15 @@
                 @if ($settlement->source_path)
                     <a href="{{ route('accounts.settlements.source', $settlement) }}" class="btn btn-light btn-sm"><i class="fas fa-download"></i> Original file</a>
                 @endif
-                <form method="POST" action="{{ route('accounts.settlements.destroy', $settlement) }}" class="js-confirm-delete ml-auto"
-                      data-confirm-message="Delete the {{ $settlement->month->format('F Y') }} settlement and its {{ $counted->count() }} invoices?">
-                    @csrf @method('DELETE')
-                    <button class="btn btn-light btn-sm text-danger"><i class="fas fa-trash"></i> Delete</button>
-                </form>
+                @if ($settlement->isPosted())
+                    <span class="ml-auto small text-muted align-self-center" title="Undo the income posting first"><i class="fas fa-lock"></i> Posted — undo to delete</span>
+                @else
+                    <form method="POST" action="{{ route('accounts.settlements.destroy', $settlement) }}" class="js-confirm-delete ml-auto"
+                          data-confirm-message="Delete the {{ $settlement->month->format('F Y') }} settlement and its {{ $counted->count() }} invoices?">
+                        @csrf @method('DELETE')
+                        <button class="btn btn-light btn-sm text-danger"><i class="fas fa-trash"></i> Delete</button>
+                    </form>
+                @endif
             </div>
         </div>
     </div>

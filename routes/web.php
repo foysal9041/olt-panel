@@ -24,14 +24,8 @@ use App\Http\Controllers\Attendance\ZkPushController;
 use App\Http\Controllers\Accounts\AccountsDashboardController;
 use App\Http\Controllers\Accounts\BandwidthTypeController;
 use App\Http\Controllers\Accounts\CustomerController;
-use App\Http\Controllers\Accounts\CustomerPackageController;
-use App\Http\Controllers\Accounts\InvoiceController;
-use App\Http\Controllers\Accounts\PaymentController;
 use App\Http\Controllers\Accounts\CashBookController;
-use App\Http\Controllers\Accounts\AccountReportController;
 use App\Http\Controllers\Accounts\SalaryController;
-use App\Http\Controllers\Accounts\ProductCategoryController;
-use App\Http\Controllers\Accounts\ProductController;
 use App\Http\Controllers\Accounts\TransactionCategoryController;
 use App\Http\Controllers\Accounts\TransactionController;
 use App\Http\Controllers\Latency\LatencyController;
@@ -229,50 +223,9 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
     Route::delete('transaction-categories/{category}', [TransactionCategoryController::class, 'destroy'])
         ->name('transaction-categories.destroy')->middleware('can:access-accounts-transactions');
 
-    Route::resource('products', ProductController::class)
-        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
-        ->middleware('can:access-accounts-products');
-
-    Route::post('product-categories', [ProductCategoryController::class, 'store'])
-        ->name('product-categories.store')->middleware('can:access-accounts-products');
-    Route::delete('product-categories/{category}', [ProductCategoryController::class, 'destroy'])
-        ->name('product-categories.destroy')->middleware('can:access-accounts-products');
-
     Route::resource('customers', CustomerController::class)
         ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
         ->middleware('can:access-accounts-customers');
-
-    Route::get('customers/{customer}/ledger', [CustomerController::class, 'ledger'])
-        ->name('customers.ledger')->middleware('can:access-accounts-customers');
-
-    Route::get('customers/{customer}/ledger/print', [CustomerController::class, 'printLedger'])
-        ->name('customers.ledger.print')->middleware('can:access-accounts-customers');
-
-    Route::post('customers/{customer}/invoices/generate', [InvoiceController::class, 'generateForCustomer'])
-        ->name('customers.invoices.generate')->middleware('can:access-accounts-invoices');
-
-    Route::post('customers/{customer}/packages', [CustomerPackageController::class, 'store'])
-        ->name('customers.packages.store')->middleware('can:access-accounts-customers');
-    Route::put('customers/{customer}/packages/{package}', [CustomerPackageController::class, 'update'])
-        ->name('customers.packages.update')->middleware('can:access-accounts-customers');
-    Route::delete('customers/{customer}/packages/{package}', [CustomerPackageController::class, 'destroy'])
-        ->name('customers.packages.destroy')->middleware('can:access-accounts-customers');
-    Route::post('customers/{customer}/goods', [CustomerPackageController::class, 'storeProduct'])
-        ->name('customers.goods.store')->middleware('can:access-accounts-customers');
-    Route::delete('customers/{customer}/goods/{product}', [CustomerPackageController::class, 'destroyProduct'])
-        ->name('customers.goods.destroy')->middleware('can:access-accounts-customers');
-    Route::post('customers/{customer}/invoices/monthly', [InvoiceController::class, 'monthlyForCustomer'])
-        ->name('customers.invoices.monthly')->middleware('can:access-accounts-invoices');
-
-    Route::post('customers/{customer}/payments', [CustomerController::class, 'recordPayment'])
-        ->name('customers.payments.store')->middleware('can:access-accounts-invoices');
-
-    Route::get('payments/receive', [PaymentController::class, 'create'])
-        ->name('payments.create')->middleware('can:access-accounts-invoices');
-    Route::post('payments/receive', [PaymentController::class, 'store'])
-        ->name('payments.store')->middleware('can:access-accounts-invoices');
-    Route::get('payments/receipt', [PaymentController::class, 'receipt'])
-        ->name('payments.receipt')->middleware('can:access-accounts-invoices');
 
     // প্রতিদিনের হিসাব
     Route::get('cashbook', [CashBookController::class, 'index'])
@@ -290,13 +243,8 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
     Route::delete('cashbook/{transaction}', [CashBookController::class, 'destroy'])
         ->name('cashbook.destroy')->middleware('can:access-accounts-cashbook');
 
-    // মাসিক খাত-ভিত্তিক হিসাব ও সারাংশ
-    Route::get('reports/ledger', [AccountReportController::class, 'ledger'])
-        ->name('reports.ledger')->middleware('can:access-accounts-reports');
-    Route::get('reports/summary', [AccountReportController::class, 'summary'])
-        ->name('reports.summary')->middleware('can:access-accounts-reports');
 
-    // বেতন শিট
+    // Zone settlement (monthly partner billing from Excel)
     Route::prefix('settlements')->name('settlements.')->middleware('can:access-accounts-settlements')
         ->controller(\App\Http\Controllers\Accounts\ZoneSettlementController::class)->group(function () {
             Route::get('/', 'index')->name('index');
@@ -309,9 +257,12 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
             Route::get('{settlement}/export', 'export')->name('export');
             Route::get('{settlement}/source', 'source')->name('source');
             Route::put('{settlement}/signatory', 'signatory')->name('signatory');
+            Route::post('{settlement}/post', 'post')->name('post');
+            Route::delete('{settlement}/post', 'unpost')->name('unpost');
             Route::delete('{settlement}', 'destroy')->name('destroy');
         });
 
+    // বেতন শিট
     Route::get('salaries', [SalaryController::class, 'index'])
         ->name('salaries.index')->middleware('can:access-accounts-salaries');
     Route::post('salaries', [SalaryController::class, 'save'])
@@ -323,26 +274,6 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
         ->name('bandwidth-types.store')->middleware('can:access-accounts-customers');
     Route::delete('bandwidth-types/{bandwidthType}', [BandwidthTypeController::class, 'destroy'])
         ->name('bandwidth-types.destroy')->middleware('can:access-accounts-customers');
-
-    Route::get('invoices', [InvoiceController::class, 'index'])
-        ->name('invoices.index')->middleware('can:access-accounts-invoices');
-    Route::post('invoices/generate', [InvoiceController::class, 'generate'])
-        ->name('invoices.generate')->middleware('can:access-accounts-invoices');
-    Route::get('invoices/print-batch', [InvoiceController::class, 'printBatch'])
-        ->name('invoices.print-batch')->middleware('can:access-accounts-invoices');
-    Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])
-        ->name('invoices.print')->middleware('can:access-accounts-invoices');
-    Route::post('invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
-        ->name('invoices.mark-paid')->middleware('can:access-accounts-invoices');
-    Route::post('invoices/{invoice}/adjustments', [InvoiceController::class, 'storeAdjustment'])
-        ->name('invoices.adjustments.store')->middleware('can:access-accounts-invoices');
-    Route::delete('invoices/{invoice}/adjustments/{item}', [InvoiceController::class, 'destroyAdjustment'])
-        ->name('invoices.adjustments.destroy')->middleware('can:access-accounts-invoices');
-
-    Route::put('invoices/{invoice}/payments/{payment}', [InvoiceController::class, 'updatePayment'])
-        ->name('invoices.payments.update')->middleware('can:access-accounts-payments-edit');
-    Route::delete('invoices/{invoice}/payments/{payment}', [InvoiceController::class, 'destroyPayment'])
-        ->name('invoices.payments.destroy')->middleware('can:access-accounts-payments-edit');
 
 });
 

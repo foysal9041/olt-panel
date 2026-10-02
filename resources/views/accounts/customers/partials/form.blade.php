@@ -28,28 +28,29 @@
         </div>
     </div>
 
-    <div class="form-group">
-        <label>Phone</label>
-        <input type="text" name="phone" class="form-control"
-               value="{{ old('phone', $customer->phone ?? '') }}">
+    <div class="form-row">
+        <div class="col-md-5 form-group">
+            <label>Phone</label>
+            <input type="text" name="phone" class="form-control"
+                   value="{{ old('phone', $customer->phone ?? '') }}" placeholder="01XXXXXXXXX">
+        </div>
+        <div class="col-md-7 form-group">
+            <label>Zone</label>
+            <select name="zone" class="form-control select2-zone">
+                <option value="">Unassigned</option>
+                @foreach($zones as $zone)
+                    <option value="{{ $zone }}" {{ old('zone', $customer->zone ?? '') == $zone ? 'selected' : '' }}>
+                        {{ $zone }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
     </div>
 
     <div class="form-group">
         <label>Address</label>
         <input type="text" name="address" class="form-control"
                value="{{ old('address', $customer->address ?? '') }}">
-    </div>
-
-    <div class="form-group">
-        <label>Zone</label>
-        <select name="zone" class="form-control select2-zone">
-            <option value="">Unassigned</option>
-            @foreach($zones as $zone)
-                <option value="{{ $zone }}" {{ old('zone', $customer->zone ?? '') == $zone ? 'selected' : '' }}>
-                    {{ $zone }}
-                </option>
-            @endforeach
-        </select>
     </div>
 
     <div class="form-group">
@@ -62,16 +63,10 @@
     </div>
 
     <div id="mac-client-fields">
-
-        <div class="alert alert-light border small">
+        <div class="alert alert-light border small mb-3">
             <i class="fas fa-info-circle text-primary mr-1"></i>
-            Allowed packages (fixed rate or commission %), users per package and products given
-            are set on the customer page{{ isset($customer) && $customer->exists ? '' : ' after you save' }}.
-            @if(isset($customer) && $customer->exists)
-                <a href="{{ route('accounts.customers.show', $customer) }}#monthly-invoice">Open customer page</a>
-            @endif
+            MAC clients are billed through <strong>Zone Settlement</strong> — the monthly Excel is matched to them by username.
         </div>
-
     </div>
 
     <div id="bandwidth-client-fields" class="d-none">
@@ -146,7 +141,7 @@
     <div class="form-group form-check">
         <input type="checkbox" name="status" id="status" class="form-check-input" value="1"
                {{ old('status', $customer->status ?? true) ? 'checked' : '' }}>
-        <label class="form-check-label" for="status">Active (included when generating invoices)</label>
+        <label class="form-check-label" for="status">Active customer</label>
     </div>
 
 </div>

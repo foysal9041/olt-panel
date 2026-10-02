@@ -85,7 +85,7 @@ class TransactionController extends Controller
     {
         abort_unless($transaction->category->type === 'income', 404);
 
-        $transaction->load(['category', 'recordedBy', 'invoice.customer']);
+        $transaction->load(['category', 'recordedBy']);
 
         return view('accounts.transactions.print', compact('transaction'));
     }
@@ -123,10 +123,6 @@ class TransactionController extends Controller
     {
         if (strtolower(auth()->user()->role) !== 'admin') {
             abort(403);
-        }
-
-        if ($transaction->invoice()->exists()) {
-            return back()->with('error', 'This transaction came from an invoice payment and cannot be deleted directly — void the invoice instead.');
         }
 
         $transaction->delete();

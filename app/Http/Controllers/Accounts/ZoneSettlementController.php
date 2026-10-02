@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Accounts;
 
 use App\Http\Controllers\Controller;
+use App\Models\Transaction;
+use App\Models\TransactionCategory;
 use App\Models\ZoneSettlement;
 use App\Models\ZoneSettlementRow;
 use App\Services\SettlementExport;
@@ -160,7 +162,7 @@ class ZoneSettlementController extends Controller
 
     public function show(ZoneSettlement $settlement)
     {
-        $settlement->load('rows.customer:id,name', 'creator:id,name');
+        $settlement->load('rows.customer:id,name', 'rows.transaction:id,amount,transaction_category_id', 'creator:id,name', 'poster:id,name');
 
         return view('accounts.settlements.show', [
             'settlement' => $settlement,
@@ -212,8 +214,91 @@ class ZoneSettlementController extends Controller
         return back()->with('success', 'Invoices will be signed by ' . $settlement->prepared_by . '.');
     }
 
+    /**
+     * Post the Net Bill (company income) to Accounts: one income entry per
+     * counted zone under "Zone Settlement", dated as chosen (the invoice date
+     * by default). Past days follow the cash book rule — admin only.
+     */
+    public function post(Request $request, ZoneSettlement $settlement)
+    {
+        $date = $request->validate(['income_date' => 'required|date'])['income_date'];
+
+        if (! Transaction::dayIsOpenFor($date, $request->user())) {
+            return back()->with('error', 'Only an admin can post income to a past day (' . Carbon::parse($date)->format('d M Y') . '). Pick today or ask an admin.');
+        }
+
+        $result = DB::transaction(function () use ($settlement, $date) {
+            // Re-read under a lock so a double click can't post twice.
+            $settlement = ZoneSettlement::whereKey($settlement->getKey())->lockForUpdate()->first();
+            if ($settlement->isPosted()) {
+                return null;
+            }
+
+            $category = TransactionCategory::firstOrCreate(['name' => 'Zone Settlement', 'type' => 'income']);
+            $month = $settlement->month->format('M Y');
+            $count = 0;
+            $total = '0';
+
+            foreach ($settlement->rows()->where('included', true)->with('customer')->get() as $row) {
+                $amount = Dec::round($row->calc($settlement->bkash_percent)['income'], 2);
+                if (Dec::toFloat($amount) <= 0) {
+                    continue;
+                }
+
+                $transaction = Transaction::create([
+                    'transaction_category_id' => $category->id,
+                    'amount' => $amount,
+                    'description' => Str::limit("Zone Settlement {$month} — {$row->displayName()} ({$row->invoice_no})", 255, ''),
+                    'transaction_date' => $date,
+                    'recorded_by' => auth()->id(),
+                    'zone' => $row->customer?->zone ?? auth()->user()?->zone,
+                ]);
+                $row->update(['transaction_id' => $transaction->id]);
+                $count++;
+                $total = Dec::add($total, $amount);
+            }
+
+            $settlement->update(['posted_at' => now(), 'posted_on' => $date, 'posted_by' => auth()->id()]);
+
+            return [$count, $total];
+        });
+
+        if ($result === null) {
+            return back()->with('error', 'This settlement is already posted to income.');
+        }
+
+        [$count, $total] = $result;
+
+        return back()->with('success', 'Posted ' . Dec::taka($total) . " to income (Zone Settlement) as {$count} " . Str::plural('entry', $count)
+            . ' on ' . Carbon::parse($date)->format('d M Y') . '.');
+    }
+
+    /** Take the posted income entries back out of Accounts. */
+    public function unpost(Request $request, ZoneSettlement $settlement)
+    {
+        if (! $settlement->isPosted()) {
+            return back()->with('error', 'This settlement is not posted.');
+        }
+        if (! Transaction::dayIsOpenFor($settlement->posted_on, $request->user())) {
+            return back()->with('error', 'The income is on a past day (' . $settlement->posted_on->format('d M Y') . ') — only an admin can undo it.');
+        }
+
+        DB::transaction(function () use ($settlement) {
+            $ids = $settlement->rows()->whereNotNull('transaction_id')->pluck('transaction_id');
+            $settlement->rows()->update(['transaction_id' => null]);
+            Transaction::whereIn('id', $ids)->get()->each->delete();
+            $settlement->update(['posted_at' => null, 'posted_on' => null, 'posted_by' => null]);
+        });
+
+        return back()->with('success', 'Posting undone — the Zone Settlement income entries for ' . $settlement->month->format('F Y') . ' were removed.');
+    }
+
     public function destroy(ZoneSettlement $settlement)
     {
+        if ($settlement->isPosted()) {
+            return back()->with('error', 'This settlement is posted to income. Undo the posting first, then delete it.');
+        }
+
         $label = $settlement->month->format('F Y');
         DB::transaction(function () use ($settlement) {
             if ($settlement->source_path) {

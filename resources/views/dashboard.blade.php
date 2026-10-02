@@ -441,9 +441,6 @@
                     <div class="card-header">
                         <h3 class="card-title"><i class="fas fa-book-open mr-1 text-warning"></i> Accounts</h3>
                         <div class="d-flex align-items-center" style="gap:.35rem">
-                            @can('access-accounts-invoices')
-                                <a href="{{ route('accounts.payments.create') }}" class="btn btn-success btn-xs"><i class="fas fa-hand-holding-usd"></i> Receive</a>
-                            @endcan
                             @can('access-accounts-cashbook')
                                 <a href="{{ route('accounts.cashbook.index') }}" class="btn btn-outline-primary btn-xs"><i class="fas fa-book-open"></i> Cash Book</a>
                             @endcan
@@ -477,11 +474,15 @@
                                 <div><span>{{ now()->format('F') }} out</span><b class="text-expense">{{ $tk($cash['month_out']) }}</b></div>
                             </div>
                         </div>
-                        @if ($accounts['dues'] > 0)
-                            <a href="{{ route('accounts.invoices.index') }}" class="dash-due">
-                                <span><i class="fas fa-file-invoice mr-1"></i> Invoice dues</span>
-                                <b class="money">{{ $tk($accounts['dues']) }}</b>
-                                <span class="text-muted small">{{ $accounts['dues_count'] }} {{ Str::plural('invoice', $accounts['dues_count']) }}</span>
+                        @if ($st = $accounts['settlement'])
+                            <a href="{{ Gate::allows('access-accounts-settlements') ? route('accounts.settlements.show', $st['model']) : '#' }}" class="dash-due">
+                                <span><i class="fas fa-file-excel mr-1"></i> Zone Settlement {{ $st['model']->month->format('M Y') }}</span>
+                                <b class="money">{{ $tk($st['income']) }}</b>
+                                @if ($st['model']->isPosted())
+                                    <span class="small text-success"><i class="fas fa-check-circle"></i> posted</span>
+                                @else
+                                    <span class="small" style="color:#b45309"><i class="fas fa-clock"></i> not posted</span>
+                                @endif
                             </a>
                         @endif
                         </div>

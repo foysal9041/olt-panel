@@ -2,15 +2,21 @@
 
 @section('title', 'Daily Cash Book')
 
+@use('App\Support\Bangla')
 @php
     $tk = fn ($v) => '৳' . number_format((float) $v, 2);
     $prev = $date->copy()->subDay()->toDateString();
     $next = $date->copy()->addDay()->toDateString();
+    $bnDate = Bangla::digits($date->day) . ' ' . Bangla::month($date) . ' ' . Bangla::digits($date->year);
+    $sides = [
+        ['income', 'জমা', 'Income', $income, '#15803d', '#dcfce7', 'fas fa-arrow-down', 'আয়ের উৎস'],
+        ['expense', 'খরচ', 'Expense', $expense, '#b91c1c', '#fee2e2', 'fas fa-arrow-up', 'ব্যয়ের খাত'],
+    ];
 @endphp
 
 @section('content_header')
 <x-accounts.header title="প্রতিদিনের হিসাব" icon="fas fa-book-open"
-    subtitle="Daily Cash Book — {{ \App\Support\Bangla::day($date) }}, {{ $date->format('d/m/Y') }}">
+    subtitle="Daily Cash Book — {{ Bangla::day($date) }}, {{ $date->format('d/m/Y') }}">
     @unless ($locked)
         <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#cash-modal">
             <i class="fas fa-wallet"></i> Cash on Hand
@@ -24,23 +30,74 @@
 
 @section('css')
 <style>
-    .cb-nav { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-    .cb-nav input[type=date] { width: auto; }
-    .cb-side .card-header { border-bottom: 3px solid var(--tone); }
-    .cb-side .card-title { font-size: 1.15rem; font-weight: 700; color: var(--tone); }
-    .cb-table td, .cb-table th { vertical-align: middle; }
-    .cb-table td.amt, .cb-table th.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .cb-table tfoot td { font-weight: 700; background: #f8fafc; }
-    .cb-add { background: #f8fafc; }
-    .cb-add .form-control { font-size: .88rem; }
-    .cb-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .75rem; }
-    .cb-sum div { padding: .8rem 1rem; border-radius: .7rem; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .08); }
-    .cb-sum span { display: block; font-size: .8rem; font-weight: 600; color: #64748b; }
-    .cb-sum b { display: block; margin-top: .15rem; font-size: 1.35rem; font-variant-numeric: tabular-nums; color: #0f172a; }
-    .cb-sum .final { background: #1e3a8a; }
-    .cb-sum .final span { color: rgba(255, 255, 255, .75); }
-    .cb-sum .final b { color: #fff; }
-    .cb-empty td { color: #94a3b8; text-align: center; padding: 1.25rem; }
+    /* Day bar */
+    .cb-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; padding: .8rem 1rem; margin-bottom: 1rem; border-radius: .85rem; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .08); }
+    .cb-day { display: flex; align-items: center; gap: .85rem; }
+    .cb-day-icon { display: grid; place-items: center; width: 2.9rem; height: 2.9rem; border-radius: .75rem; background: #eef2ff; color: #4338ca; line-height: 1; text-align: center; }
+    .cb-day-icon b { display: block; font-size: 1.15rem; }
+    .cb-day-icon small { display: block; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .cb-day-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; line-height: 1.2; }
+    .cb-day-sub { font-size: .8rem; color: #64748b; }
+    .cb-nav { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .cb-nav .input-group { width: auto; flex-wrap: nowrap; }
+    .cb-nav input[type=date] { width: 10.5rem; }
+    .cb-chips { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .cb-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .28rem .65rem; border-radius: 999px; font-size: .76rem; font-weight: 600; background: #f1f5f9; color: #475569; white-space: nowrap; }
+    .cb-chip.open { background: #dcfce7; color: #15803d; }
+    .cb-chip.locked { background: #e2e8f0; color: #334155; }
+    .cb-chip.cash { background: #e0f2fe; color: #0369a1; }
+
+    /* Balance flow: জের + আয় = মোট − ব্যয় = অবশিষ্ট */
+    .cb-flow { display: flex; align-items: stretch; gap: .6rem; margin-bottom: 1.25rem; }
+    .cb-flow .acct-stat { flex: 1 1 0; min-width: 0; margin: 0; }
+    .cb-flow .acct-stat-value { font-size: 1.35rem; }
+    .cb-op { flex: none; align-self: center; display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #fff; color: #64748b; font-weight: 700; box-shadow: 0 1px 3px rgba(15, 23, 42, .1); }
+    .cb-flow .acct-stat-hero.neg { background: linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%); }
+    @media (max-width: 1199.98px) {
+        .cb-flow { flex-wrap: wrap; }
+        .cb-flow .acct-stat { flex: 1 1 calc(50% - .6rem); }
+        .cb-flow .final { flex-basis: 100%; }
+        .cb-op { display: none; }
+    }
+    @media (max-width: 575.98px) { .cb-flow .acct-stat { flex-basis: 100%; } }
+
+    /* Ledger panels */
+    .cb-side { --tone: #15803d; --tint: #dcfce7; overflow: hidden; }
+    .cb-side .card-header { gap: .75rem; }
+    .cb-head { display: flex; align-items: center; gap: .65rem; }
+    .cb-head-icon { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: .65rem; background: var(--tint); color: var(--tone); }
+    .cb-head-title { font-size: 1.15rem; font-weight: 700; color: var(--tone); line-height: 1.1; }
+    .cb-head-title small { font-size: .78rem; font-weight: 600; color: #94a3b8; }
+    .cb-head-total { text-align: right; line-height: 1.15; }
+    .cb-head-total b { display: block; font-size: 1.2rem; color: var(--tone); font-variant-numeric: tabular-nums; }
+    .cb-head-total span { font-size: .75rem; color: #94a3b8; }
+    .cb-scroll { max-height: 27rem; overflow-y: auto; }
+    .cb-table { margin: 0; }
+    .cb-table thead th { position: sticky; top: 0; z-index: 1; background: #f8fafc; border-top: 0; border-bottom: 1px solid #e2e8f0; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #64748b; }
+    .cb-table td { vertical-align: middle; border-top: 1px solid #f1f5f9; padding-top: .55rem; padding-bottom: .55rem; }
+    .cb-table tbody tr:hover { background: #fafafa; }
+    .cb-table .amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cb-no { width: 2.6rem; color: #94a3b8; font-size: .8rem; }
+    .cb-desc { font-weight: 600; color: #0f172a; }
+    .cb-meta { margin-top: .1rem; font-size: .75rem; color: #94a3b8; }
+    .cb-khat { display: inline-block; padding: .05rem .45rem; margin-right: .25rem; border-radius: .35rem; background: var(--tint); color: var(--tone); font-weight: 600; }
+    .cb-del { opacity: .35; transition: opacity .15s; }
+    .cb-table tr:hover .cb-del { opacity: 1; }
+    .cb-total td { background: #f8fafc; font-weight: 700; border-top: 2px solid #e2e8f0; }
+    .cb-total .amt { color: var(--tone); }
+    .cb-add { background: #fbfcfe; border-top: 1px solid #eef2f7; }
+    .cb-add .form-control, .cb-add .input-group-text { font-size: .86rem; }
+    .cb-add label { margin-bottom: .15rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #64748b; }
+    .cb-add .btn-add { background: var(--tone); border-color: var(--tone); color: #fff; }
+    .cb-add .btn-add:hover { filter: brightness(.95); color: #fff; }
+
+    /* খাত-wise summary */
+    .cb-heads { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; }
+    .cb-heads > div { padding: .9rem 1.15rem; }
+    .cb-heads > div + div { border-left: 1px solid #eef2f7; }
+    .cb-heads h6 { margin-bottom: .7rem; font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .cb-heads .acct-progress { margin-top: .3rem; height: .3rem; }
+    @media (max-width: 767.98px) { .cb-heads > div + div { border-left: 0; border-top: 1px solid #eef2f7; } }
 </style>
 @stop
 
@@ -52,127 +109,241 @@
     <div class="alert alert-danger">@foreach ($errors->all() as $e)<div>{{ $e }}</div>@endforeach</div>
 @endif
 
-<form method="GET" class="cb-nav">
-    <a href="{{ route('accounts.cashbook.index', ['date' => $prev]) }}" class="btn btn-light"><i class="fas fa-chevron-left"></i> Previous day</a>
-    <input type="date" name="date" value="{{ $date->toDateString() }}" class="form-control" onchange="this.form.submit()">
-    <a href="{{ route('accounts.cashbook.index', ['date' => $next]) }}" class="btn btn-light">Next day <i class="fas fa-chevron-right"></i></a>
-    @unless ($date->isToday())
-        <a href="{{ route('accounts.cashbook.index') }}" class="btn btn-link">Today</a>
-    @endunless
-</form>
+{{-- ============ Day bar ============ --}}
+<div class="cb-bar">
+    <div class="cb-day">
+        <div class="cb-day-icon"><div><b>{{ $date->format('d') }}</b><small>{{ $date->format('M') }}</small></div></div>
+        <div>
+            <div class="cb-day-title">{{ Bangla::day($date) }}, {{ $bnDate }}</div>
+            <div class="cb-day-sub">{{ $date->format('l, d F Y') }}@if ($date->isToday()) · <strong class="text-primary">Today</strong>@endif</div>
+        </div>
+    </div>
+
+    <form method="GET" class="cb-nav">
+        <div class="input-group input-group-sm">
+            <div class="input-group-prepend">
+                <a href="{{ route('accounts.cashbook.index', ['date' => $prev]) }}" class="btn btn-light border" title="Previous day"><i class="fas fa-chevron-left"></i></a>
+            </div>
+            <input type="date" name="date" value="{{ $date->toDateString() }}" class="form-control" onchange="this.form.submit()" aria-label="Date">
+            <div class="input-group-append">
+                <a href="{{ route('accounts.cashbook.index', ['date' => $next]) }}" class="btn btn-light border" title="Next day"><i class="fas fa-chevron-right"></i></a>
+            </div>
+        </div>
+        @unless ($date->isToday())
+            <a href="{{ route('accounts.cashbook.index') }}" class="btn btn-sm btn-outline-primary">Today</a>
+        @endunless
+    </form>
+
+    <div class="cb-chips">
+        @if ($locked)
+            <span class="cb-chip locked" title="Entries for past days can only be added, changed or removed by an admin"><i class="fas fa-lock"></i> Locked day</span>
+        @else
+            <span class="cb-chip open"><i class="fas fa-lock-open"></i> Open for entries</span>
+        @endif
+        @if ($countToday)
+            <span class="cb-chip cash"><i class="fas fa-wallet"></i> Cash counted</span>
+        @endif
+        <span class="cb-chip"><i class="fas fa-list-ul"></i> {{ $income->count() + $expense->count() }} entries</span>
+    </div>
+</div>
 
 @if ($locked)
-    <div class="alert alert-secondary d-flex align-items-center" style="gap:.6rem">
-        <i class="fas fa-lock fa-lg"></i>
+    <div class="alert alert-light border d-flex align-items-center small" style="gap:.6rem">
+        <i class="fas fa-lock text-muted"></i>
         <div><strong>Locked day.</strong> Entries for past days can only be added, changed or removed by an admin. You can still view and print this day.</div>
     </div>
 @endif
 
+{{-- ============ Balance flow ============ --}}
+<div class="cb-flow">
+    <div class="acct-stat" style="--accent:#64748b">
+        <div class="acct-stat-label">জের · Brought forward <i class="fas fa-history"></i></div>
+        <div class="acct-stat-value {{ $totals['opening'] < 0 ? 'text-danger' : '' }}">{{ $tk($totals['opening']) }}</div>
+        <div class="acct-stat-foot">
+            @if ($countToday)
+                <span class="text-success"><i class="fas fa-wallet"></i> Cash counted today</span>
+            @elseif ($base)
+                From cash count on {{ $base->date->format('d/m/Y') }}
+            @elseif (! $locked)
+                <a href="#" data-toggle="modal" data-target="#cash-modal">Set cash on hand</a>
+            @else
+                Before this day
+            @endif
+        </div>
+    </div>
+    <span class="cb-op">+</span>
+    <div class="acct-stat" style="--accent:#16a34a">
+        <div class="acct-stat-label">দিনের আয় · Income <i class="fas fa-arrow-down"></i></div>
+        <div class="acct-stat-value text-income">{{ $tk($totals['day_income']) }}</div>
+        <div class="acct-stat-foot">{{ $income->count() }} {{ Str::plural('entry', $income->count()) }}</div>
+    </div>
+    <span class="cb-op">=</span>
+    <div class="acct-stat" style="--accent:#4f46e5">
+        <div class="acct-stat-label">মোট আয় · Total <i class="fas fa-layer-group"></i></div>
+        <div class="acct-stat-value">{{ $tk($totals['total_income']) }}</div>
+        <div class="acct-stat-foot">জের + দিনের আয়</div>
+    </div>
+    <span class="cb-op">−</span>
+    <div class="acct-stat" style="--accent:#e11d48">
+        <div class="acct-stat-label">মোট ব্যয় · Expense <i class="fas fa-arrow-up"></i></div>
+        <div class="acct-stat-value text-expense">{{ $tk($totals['total_expense']) }}</div>
+        <div class="acct-stat-foot">{{ $expense->count() }} {{ Str::plural('entry', $expense->count()) }}</div>
+    </div>
+    <span class="cb-op">=</span>
+    <div @class(['acct-stat', 'acct-stat-hero', 'final', 'neg' => $totals['closing'] < 0])>
+        <div class="acct-stat-label">অবশিষ্ট টাকা · Balance <i class="fas fa-wallet"></i></div>
+        <div class="acct-stat-value">{{ $tk($totals['closing']) }}</div>
+        <div class="acct-stat-foot">Cash in hand at day end</div>
+    </div>
+</div>
+
+{{-- ============ জমা / খরচ ============ --}}
 <div class="row">
-    @foreach ([
-        ['income', 'জমা', 'Income', $income, '#15803d', 'আয়ের উৎস', 'আয়ের পরিমান'],
-        ['expense', 'খরচ', 'Expense', $expense, '#b91c1c', 'ব্যায়ের খাত', 'ব্যায়ের পরিমান'],
-    ] as [$type, $bn, $en, $list, $tone, $colLabel, $amtLabel])
-        <div class="col-lg-6">
-            <div class="card cb-side" style="--tone: {{ $tone }}">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title">{{ $bn }} <small class="text-muted font-weight-normal">{{ $en }}</small></h3>
-                    <strong style="color: {{ $tone }}">{{ $tk($list->sum('amount')) }}</strong>
+    @foreach ($sides as [$type, $bn, $en, $list, $tone, $tint, $icon, $colLabel])
+        <div class="col-xl-6">
+            <div class="card acct-panel cb-side" style="--tone: {{ $tone }}; --tint: {{ $tint }}">
+                <div class="card-header">
+                    <div class="cb-head">
+                        <span class="cb-head-icon"><i class="{{ $icon }}"></i></span>
+                        <div class="cb-head-title">{{ $bn }} <small>{{ $en }}</small></div>
+                    </div>
+                    <div class="cb-head-total">
+                        <b>{{ $tk($list->sum('amount')) }}</b>
+                        <span>{{ $list->count() }} {{ Str::plural('entry', $list->count()) }}</span>
+                    </div>
                 </div>
-                <div class="card-body p-0 table-responsive">
-                    <table class="table table-sm cb-table mb-0">
-                        <thead>
-                            <tr>
-                                <th class="pl-3" style="width:2.5rem">নং</th>
-                                <th>{{ $colLabel }}</th>
-                                <th class="amt">{{ $amtLabel }}</th>
-                                <th style="width:2.5rem"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($list as $t)
+                <div class="card-body p-0">
+                    <div class="cb-scroll">
+                        <table class="table table-sm cb-table">
+                            <thead>
                                 <tr>
-                                    <td class="pl-3 text-muted">{{ $loop->iteration }}</td>
-                                    <td>
-                                        <span class="badge badge-light border">{{ $t->category->name }}</span>
-                                        {{ $t->description }}
-                                    </td>
-                                    <td class="amt font-weight-bold">{{ $tk($t->amount) }}</td>
-                                    <td class="text-right pr-2">
-                                        @if (! $t->invoice_id && ! $locked)
-                                            <form method="POST" action="{{ route('accounts.cashbook.destroy', $t) }}" class="d-inline js-confirm-delete"
-                                                  data-confirm-message="Remove {{ $t->category->name }} {{ $tk($t->amount) }}?">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="btn btn-link btn-sm text-danger p-0" title="Remove"><i class="fas fa-times"></i></button>
-                                            </form>
-                                        @endif
-                                    </td>
+                                    <th class="pl-3">নং</th>
+                                    <th>{{ $colLabel }} / বিবরণ</th>
+                                    <th class="amt">পরিমাণ</th>
+                                    <th style="width:2.2rem"></th>
                                 </tr>
-                            @empty
-                                <tr class="cb-empty"><td colspan="4">No {{ strtolower($en) }} entries on this day</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @forelse ($list as $t)
+                                    <tr>
+                                        <td class="pl-3 cb-no">{{ $loop->iteration }}</td>
+                                        <td>
+                                            <div class="cb-desc">{{ $t->description ?: $t->category->name }}</div>
+                                            <div class="cb-meta">
+                                                <span class="cb-khat">{{ $t->category->name }}</span>
+                                                {{ $t->recordedBy?->name ?? '—' }} · {{ $t->created_at?->format('h:i A') }}
+                                            </div>
+                                        </td>
+                                        <td class="amt font-weight-bold">{{ $tk($t->amount) }}</td>
+                                        <td class="text-right pr-3">
+                                            @unless ($locked)
+                                                <form method="POST" action="{{ route('accounts.cashbook.destroy', $t) }}" class="d-inline js-confirm-delete"
+                                                      data-confirm-message="Remove {{ $t->category->name }} {{ $tk($t->amount) }}?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="btn btn-link btn-sm text-danger p-0 cb-del" title="Remove"><i class="fas fa-trash-alt"></i></button>
+                                                </form>
+                                            @endunless
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="4" class="border-0"><div class="acct-empty"><i class="{{ $icon }}"></i>No {{ strtolower($en) }} entries on this day</div></td></tr>
+                                @endforelse
+                            </tbody>
+                            @if ($list->isNotEmpty())
+                                <tfoot>
+                                    <tr class="cb-total">
+                                        <td class="pl-3" colspan="2">মোট {{ $type === 'income' ? 'আয়' : 'ব্যয়' }}</td>
+                                        <td class="amt">{{ $tk($list->sum('amount')) }}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            @endif
+                        </table>
+                    </div>
                 </div>
                 @unless ($locked)
-                <div class="card-footer cb-add">
-                    <form method="POST" action="{{ route('accounts.cashbook.store') }}" class="form-row align-items-end">
-                        @csrf
-                        <input type="hidden" name="transaction_date" value="{{ $date->toDateString() }}">
-                        <div class="col-sm-4 mb-2 d-flex" style="gap:.25rem">
-                            <select name="transaction_category_id" class="form-control form-control-sm" required>
-                                <option value="">খাত…</option>
-                                @foreach ($categories[$type] ?? [] as $c)
-                                    <option value="{{ $c->id }}" @selected(old('transaction_category_id') == $c->id && old('_type') === $type)>{{ $c->name }}</option>
-                                @endforeach
-                            </select>
-                            <button type="button" class="btn btn-sm btn-light border text-nowrap" data-toggle="modal" data-target="#khat-{{ $type }}" title="Add or remove {{ $bn }} খাত">
-                                <i class="fas fa-plus"></i> খাত
-                            </button>
-                        </div>
-                        <div class="col-sm-5 mb-2">
-                            <input type="text" name="description" class="form-control form-control-sm" placeholder="বিবরণ (description)" maxlength="255">
-                        </div>
-                        <div class="col-sm-3 mb-2">
-                            <input type="number" name="amount" step="0.01" min="0.01" class="form-control form-control-sm" placeholder="৳" required>
-                        </div>
-                        <input type="hidden" name="_type" value="{{ $type }}">
-                        <div class="col-12">
-                            <button class="btn btn-sm btn-block" style="background: {{ $tone }}; color: #fff">
-                                <i class="fas fa-plus"></i> Add {{ $bn }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    <div class="card-footer cb-add">
+                        <form method="POST" action="{{ route('accounts.cashbook.store') }}" class="form-row align-items-end">
+                            @csrf
+                            <input type="hidden" name="transaction_date" value="{{ $date->toDateString() }}">
+                            <input type="hidden" name="_type" value="{{ $type }}">
+                            <div class="col-md-4 mb-2">
+                                <label>খাত</label>
+                                <div class="input-group input-group-sm">
+                                    <select name="transaction_category_id" class="form-control" required>
+                                        <option value="">Select…</option>
+                                        @foreach ($categories[$type] ?? [] as $c)
+                                            <option value="{{ $c->id }}" @selected(old('transaction_category_id') == $c->id && old('_type') === $type)>{{ $c->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-light border" data-toggle="modal" data-target="#khat-{{ $type }}" title="Add or remove {{ $bn }} খাত"><i class="fas fa-cog"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label>বিবরণ</label>
+                                <input type="text" name="description" class="form-control form-control-sm" placeholder="Description" maxlength="255"
+                                       value="{{ old('_type') === $type ? old('description') : '' }}">
+                            </div>
+                            <div class="col-md-2 col-7 mb-2">
+                                <label>পরিমাণ</label>
+                                <div class="input-group input-group-sm">
+                                    <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
+                                    <input type="number" name="amount" step="0.01" min="0.01" class="form-control" placeholder="0.00" required
+                                           value="{{ old('_type') === $type ? old('amount') : '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-5 mb-2">
+                                <button class="btn btn-sm btn-block btn-add"><i class="fas fa-plus"></i> {{ $bn }}</button>
+                            </div>
+                        </form>
+                    </div>
                 @endunless
             </div>
         </div>
     @endforeach
 </div>
 
-<div class="cb-sum mb-4">
-    <div>
-        <span>জের (Brought forward)</span><b class="{{ $totals['opening'] < 0 ? 'text-danger' : '' }}">{{ $tk($totals['opening']) }}</b>
-        @if ($countToday)
-            <small class="text-success"><i class="fas fa-wallet"></i> cash counted today</small>
-        @elseif ($base)
-            <small class="text-muted">from cash count on {{ $base->date->format('d/m/Y') }}</small>
-        @elseif (! $locked)
-            <small class="text-muted"><a href="#" data-toggle="modal" data-target="#cash-modal">set cash on hand</a></small>
-        @endif
+{{-- ============ খাত অনুযায়ী ============ --}}
+@if ($income->isNotEmpty() || $expense->isNotEmpty())
+    <div class="card acct-panel">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-tags mr-1 text-primary"></i> খাত অনুযায়ী <small class="text-muted">By head</small></h3>
+        </div>
+        <div class="cb-heads">
+            @foreach ($sides as [$type, $bn, $en, $list, $tone])
+                @php
+                    $dayTotal = (float) $list->sum('amount');
+                    $heads = $list->groupBy(fn ($t) => $t->category->name)
+                        ->map(fn ($g, $name) => ['name' => $name, 'sum' => (float) $g->sum('amount'), 'count' => $g->count()])
+                        ->sortByDesc('sum');
+                @endphp
+                <div>
+                    <h6 style="color: {{ $tone }}">{{ $bn }} · {{ $en }}</h6>
+                    @forelse ($heads as $h)
+                        <div class="acct-bar-row">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ $h['name'] }} <span class="text-muted small">× {{ $h['count'] }}</span></span>
+                                <strong class="money">{{ $tk($h['sum']) }}</strong>
+                            </div>
+                            <div class="acct-progress"><span style="width: {{ $dayTotal > 0 ? round($h['sum'] / $dayTotal * 100, 1) : 0 }}%; background: {{ $tone }}"></span></div>
+                        </div>
+                    @empty
+                        <div class="text-muted small">No {{ strtolower($en) }} on this day.</div>
+                    @endforelse
+                </div>
+            @endforeach
+        </div>
     </div>
-    <div><span>দিনের আয় (Today's income)</span><b class="text-success">{{ $tk($totals['day_income']) }}</b></div>
-    <div><span>মোট আয় (Total)</span><b>{{ $tk($totals['total_income']) }}</b></div>
-    <div><span>মোট ব্যয় (Today's expense)</span><b class="text-danger">{{ $tk($totals['total_expense']) }}</b></div>
-    <div class="final"><span>অবশিষ্ট টাকা (Balance)</span><b>{{ $tk($totals['closing']) }}</b></div>
-</div>
+@endif
 
 <p class="small text-muted">
     <i class="fas fa-info-circle"></i>
     জের = everything received minus everything spent before this day. Entries here are the same as in
     @can('access-accounts-transactions') <a href="{{ route('accounts.transactions.index') }}">Income &amp; Expenses</a> @else Income &amp; Expenses @endcan
-    and the monthly sheets, so each expense is entered once.
+    and the monthly sheets, so each entry is made once.
 </p>
 
 {{-- ============ Cash on hand ============ --}}

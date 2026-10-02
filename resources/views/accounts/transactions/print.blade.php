@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Receipt RCPT-{{ str_pad($transaction->id, 6, '0', STR_PAD_LEFT) }} — Sunlit Network</title>
 
-    @include('accounts.invoices.partials.print-styles')
+    @include('accounts.partials.print-styles')
 
     <style>
         .receipt-sheet { max-width: 520px; }
@@ -64,22 +64,12 @@
         <table class="receipt-table">
             <tr>
                 <td class="label">Received From</td>
-                <td class="value">{{ $transaction->invoice->customer->name ?? '—' }}</td>
+                <td class="value">{{ $transaction->description ?: '—' }}</td>
             </tr>
             <tr>
                 <td class="label">Category</td>
                 <td class="value">{{ $transaction->category->name }}</td>
             </tr>
-            <tr>
-                <td class="label">Reference</td>
-                <td class="value">{{ $transaction->invoice->invoice_number ?? $transaction->description ?? '—' }}</td>
-            </tr>
-            @if($transaction->description)
-                <tr>
-                    <td class="label">Description</td>
-                    <td class="value">{{ $transaction->description }}</td>
-                </tr>
-            @endif
             <tr>
                 <td class="label">Received By</td>
                 <td class="value">{{ $transaction->recordedBy->name ?? '—' }}</td>
@@ -95,18 +85,7 @@
 
         <div class="footer-note">
             This is a computer-generated receipt from Sunlit Network ERP.
-            @php($kamCustomer = $transaction->invoice?->customer)
-            @if($kamCustomer && ($kamCustomer->kam_name || $kamCustomer->kam_phone))
-                For any billing queries, please contact with your KAM
-                @if($kamCustomer->kam_name)
-                    <strong>{{ $kamCustomer->kam_name }}</strong>
-                @endif
-                @if($kamCustomer->kam_phone)
-                    ({{ $kamCustomer->kam_phone }})
-                @endif.
-            @else
-                For any billing queries, please contact with your KAM.
-            @endif
+            For any billing queries, please call 09614-552233.
         </div>
 
     </div>

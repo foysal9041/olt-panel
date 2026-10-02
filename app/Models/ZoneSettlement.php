@@ -16,6 +16,7 @@ class ZoneSettlement extends Model
     protected $fillable = [
         'month', 'invoice_date', 'bkash_percent', 'source_name', 'source_path', 'sheet_name',
         'mapping', 'original', 'blank_deduction_as_zero', 'notes', 'created_by', 'prepared_by', 'prepared_title',
+        'posted_at', 'posted_on', 'posted_by',
     ];
 
     protected $casts = [
@@ -25,6 +26,8 @@ class ZoneSettlement extends Model
         'mapping' => 'array',
         'original' => 'array',
         'blank_deduction_as_zero' => 'boolean',
+        'posted_at' => 'datetime',
+        'posted_on' => 'date',
     ];
 
     protected $hidden = ['original'];
@@ -37,6 +40,17 @@ class ZoneSettlement extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function poster()
+    {
+        return $this->belongsTo(User::class, 'posted_by');
+    }
+
+    /** Net Bill has been posted to Accounts as income. */
+    public function isPosted(): bool
+    {
+        return $this->posted_at !== null;
     }
 
     /**

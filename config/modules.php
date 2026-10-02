@@ -62,13 +62,9 @@ return [
         'icon' => 'fas fa-file-invoice-dollar',
         'submodules' => [
             'dashboard'     => 'Dashboard',
-            'invoices'      => 'Invoices',
             'transactions'  => 'Income & Expenses',
             'customers'     => 'Customers',
-            'products'      => 'Products',
-            'payments-edit' => 'Edit/Delete Payment Entries',
             'cashbook'      => 'Daily Cash Book (প্রতিদিনের হিসাব)',
-            'reports'       => 'Monthly Ledgers & Summary',
             'salaries'      => 'Salary Sheet (বেতন)',
             'settlements'   => 'Zone Settlement (Excel · bKash)',
         ],

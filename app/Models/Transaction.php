@@ -10,7 +10,6 @@ class Transaction extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'invoice_id',
         'transaction_category_id',
         'amount',
         'description',
@@ -35,15 +34,6 @@ class Transaction extends Model
     public function recordedBy()
     {
         return $this->belongsTo(User::class, 'recorded_by');
-    }
-
-    /**
-     * The invoice this payment was recorded against, if any — an invoice
-     * can have several of these when it's paid off in installments.
-     */
-    public function invoice()
-    {
-        return $this->belongsTo(Invoice::class);
     }
 
     public function scopeIncome($query)
