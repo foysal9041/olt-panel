@@ -280,6 +280,9 @@ class TransceiverReader
         // ifIndex => entPhysicalIndex of that port's Rx power sensor.
         $rxSensors = [];
 
+        // First pass: the transceiver sensors and the port each belongs to.
+        $sensors = [];
+
         foreach ($values as $entIndex => $raw) {
             $name = $names[$entIndex] ?? '';
             $type = (int) ($types[$entIndex] ?? 0);
@@ -301,14 +304,15 @@ class TransceiverReader
             }
 
             // Not tied to a port: chassis/PSU/fan sensor.
-            if ($ifIndex === null) {
-                continue;
+            if ($ifIndex !== null) {
+                $sensors[$entIndex] = [$raw, $type, $field, $ifIndex];
             }
+        }
 
-            // Scale: 9 = units, each step is x1000 (yocto=1 ... yotta=17).
-            $scale = (int) ($scales[$entIndex] ?? 9);
-            $precision = (int) ($precisions[$entIndex] ?? 0);
-            $value = $raw * (10 ** (($scale - 9) * 3)) / (10 ** $precision);
+        $wholeUnits = $this->reportsWholeUnits($sensors, $scales, $precisions);
+
+        foreach ($sensors as $entIndex => [$raw, $type, $field, $ifIndex]) {
+            $value = $this->sensorValue($raw, $type, $scales[$entIndex] ?? 9, $precisions[$entIndex] ?? 0, $wholeUnits);
 
             if ($field === 'power') {
                 $powerSlots[$ifIndex][] = (int) $entIndex;
@@ -362,12 +366,70 @@ class TransceiverReader
         }
 
         if ($base === self::CISCO_SENSOR && $rxSensors) {
-            foreach ($this->readCiscoRxThresholds($snmp, $rxSensors, $types, $scales, $precisions) as $ifIndex => $limits) {
+            foreach ($this->readCiscoRxThresholds($snmp, $rxSensors, $types, $scales, $precisions, $wholeUnits) as $ifIndex => $limits) {
                 $out[$ifIndex] = ($out[$ifIndex] ?? []) + $limits;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Scale: 9 = units, each step is x1000 (yocto=1 ... yotta=17), then
+     * divided by 10^precision.
+     */
+    protected function sensorValue($raw, int $type, $scale, $precision, bool $wholeUnits): float
+    {
+        // See reportsWholeUnits(): power, temperature and voltage are
+        // already in dBm / °C / V there. Bias stays scaled (it comes out
+        // in mA either way).
+        if ($wholeUnits && in_array($type, [3, 4, 8, 14], true)) {
+            return (float) $raw;
+        }
+
+        return $raw * (10 ** (((int) $scale - 9) * 3)) / (10 ** (int) $precision);
+    }
+
+    /**
+     * Older NX-OS (7.0(3)I2 and around) says "milli" for every transceiver
+     * sensor but reports whole dBm, °C and volts (-1, 31, 3), so taking the
+     * scale at its word turns 31 °C into 0.031 and -1 dBm into -0.001.
+     * A module's supply voltage (~3.3 V) and temperature (well above 1 °C)
+     * give it away: if, scaled, they come out implausibly small while the
+     * raw numbers look like volts and degrees, the device reports whole
+     * units.
+     *
+     * @param  array<int|string, array{0:mixed, 1:int, 2:string, 3:int}>  $sensors
+     */
+    protected function reportsWholeUnits(array $sensors, array $scales, array $precisions): bool
+    {
+        $whole = 0;
+        $scaled = 0;
+
+        foreach ($sensors as $entIndex => [$raw, $type]) {
+            $scale = (int) ($scales[$entIndex] ?? 9);
+            if ($scale === 9 || (float) $raw == 0.0) {
+                continue;
+            }
+
+            $value = $this->sensorValue($raw, $type, $scale, $precisions[$entIndex] ?? 0, false);
+
+            if (in_array($type, [3, 4], true)) {
+                if ($value < 0.5 && $raw >= 1 && $raw <= 6) {
+                    $whole++;
+                } elseif ($value >= 1 && $value <= 6) {
+                    $scaled++;
+                }
+            } elseif ($type === 8) {
+                if (abs($value) < 1 && $raw >= 5 && $raw <= 100) {
+                    $whole++;
+                } elseif ($value >= 5 && $value <= 100) {
+                    $scaled++;
+                }
+            }
+        }
+
+        return $whole > $scaled;
     }
 
     /**
@@ -381,7 +443,7 @@ class TransceiverReader
      * @param  array<int, int>  $rxSensors  ifIndex => entPhysicalIndex
      * @return array<int, array<string, float>>
      */
-    protected function readCiscoRxThresholds(SnmpClient $snmp, array $rxSensors, array $types, array $scales, array $precisions): array
+    protected function readCiscoRxThresholds(SnmpClient $snmp, array $rxSensors, array $types, array $scales, array $precisions, bool $wholeUnits = false): array
     {
         $values = $snmp->tryWalk(self::CISCO_THRESHOLD . '.4');
 
@@ -413,12 +475,12 @@ class TransceiverReader
             $precision = (int) ($precisions[$entIndex] ?? 0);
             $type = (int) ($types[$entIndex] ?? 14);
 
-            $toDbm = function ($raw) use ($scale, $precision, $type) {
+            $toDbm = function ($raw) use ($scale, $precision, $type, $wholeUnits) {
                 if (! is_numeric($raw)) {
                     return null;
                 }
 
-                $v = $raw * (10 ** (($scale - 9) * 3)) / (10 ** $precision);
+                $v = $this->sensorValue($raw, $type, $scale, $precision, $wholeUnits);
                 $v = $type === 6 ? $this->uwToDbm($v * 1_000_000) : round($v, 2);
 
                 // Modules without a limit report sentinels like -2147483648;
@@ -442,25 +504,27 @@ class TransceiverReader
                         $limits["rx_{$side}_{$level}"] = $toDbm($t['value']);
                     }
                 }
-            } elseif (count($thresholds) === 4) {
-                [$highAlarm, $highWarn, $lowAlarm, $lowWarn] = array_values($thresholds);
-
-                $limits = [
-                    'rx_high_alarm' => $toDbm($highAlarm['value']),
-                    'rx_high_warn' => $toDbm($highWarn['value']),
-                    'rx_low_alarm' => $toDbm($lowAlarm['value']),
-                    'rx_low_warn' => $toDbm($lowWarn['value']),
-                ];
             }
 
             $limits = array_filter($limits, fn ($v) => $v !== null);
 
+            // Older NX-OS fills in relations that contradict the values
+            // (its "low" limits sit above the "high" ones) but still lists
+            // the four rows in SFF-8472 order, so read them that way.
+            if (count($thresholds) === 4 && (! $informative || $this->limitsInverted($limits))) {
+                [$highAlarm, $highWarn, $lowAlarm, $lowWarn] = array_values($thresholds);
+
+                $limits = array_filter([
+                    'rx_high_alarm' => $toDbm($highAlarm['value']),
+                    'rx_high_warn' => $toDbm($highWarn['value']),
+                    'rx_low_alarm' => $toDbm($lowAlarm['value']),
+                    'rx_low_warn' => $toDbm($lowWarn['value']),
+                ], fn ($v) => $v !== null);
+            }
+
             // Sanity check: the low limits must sit below the high ones,
             // and all-zero rows mean the module didn't report any.
-            $low = $limits['rx_low_warn'] ?? $limits['rx_low_alarm'] ?? null;
-            $high = $limits['rx_high_warn'] ?? $limits['rx_high_alarm'] ?? null;
-
-            if (! $limits || ($low !== null && $high !== null && $low >= $high)) {
+            if (! $limits || $this->limitsInverted($limits)) {
                 continue;
             }
 
@@ -468,6 +532,15 @@ class TransceiverReader
         }
 
         return $out;
+    }
+
+    /** True when a low Rx limit is not below the high one. */
+    protected function limitsInverted(array $limits): bool
+    {
+        $low = $limits['rx_low_warn'] ?? $limits['rx_low_alarm'] ?? null;
+        $high = $limits['rx_high_warn'] ?? $limits['rx_high_alarm'] ?? null;
+
+        return $low !== null && $high !== null && $low >= $high;
     }
 
     /**
