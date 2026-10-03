@@ -32,7 +32,7 @@ class DashboardController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $isPrivileged = in_array(strtolower($user->role), ['admin', 'noc']);
+        $isPrivileged = $user->seesAllZones();
 
         $can = [
             'olt' => Gate::allows('access-olt'),

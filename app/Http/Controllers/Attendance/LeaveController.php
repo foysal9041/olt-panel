@@ -14,7 +14,7 @@ class LeaveController extends Controller
     {
         $query = Leave::with(['employee', 'leaveType', 'approvedBy', 'appliedBy']);
 
-        if (!in_array(strtolower(auth()->user()->role), ['admin', 'noc'])) {
+        if (! auth()->user()->seesAllZones()) {
             $query->whereHas('employee', fn ($q) => $q->where('zone', auth()->user()->zone));
         }
 
@@ -137,7 +137,7 @@ class LeaveController extends Controller
     {
         $query = Employee::query();
 
-        if (!in_array(strtolower(auth()->user()->role), ['admin', 'noc'])) {
+        if (! auth()->user()->seesAllZones()) {
             $query->where('zone', auth()->user()->zone);
         }
 

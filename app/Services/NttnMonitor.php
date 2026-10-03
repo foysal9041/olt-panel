@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\NttnLink;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -31,11 +32,17 @@ class NttnMonitor
         $results = [];
 
         foreach ($links->chunk(25) as $chunk) {
-            $pool = Process::pool(function (Pool $pool) use ($chunk) {
-                foreach ($chunk as $link) {
-                    $pool->as((string) $link->id)->timeout(15)->command($this->command($link->pingTarget()));
-                }
-            })->start()->wait();
+            try {
+                $pool = Process::pool(function (Pool $pool) use ($chunk) {
+                    foreach ($chunk as $link) {
+                        $pool->as((string) $link->id)->timeout(15)->command($this->command($link->pingTarget()));
+                    }
+                })->start()->wait();
+            } catch (ProcessTimedOutException $e) {
+                report($e); // too busy this round — try these links again next time
+
+                continue;
+            }
 
             foreach ($chunk as $link) {
                 $out = $pool[(string) $link->id]->output();

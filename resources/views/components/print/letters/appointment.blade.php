@@ -1,5 +1,9 @@
 {{-- Appointment letter body (English, printed on the pad). --}}
 @php
+    $d = array_merge(['name' => '', 'designation' => '', 'department' => null, 'emp_id' => null, 'address' => null, 'phone' => null,
+        'signatory' => '', 'signatory_title' => ''], $d ?? []);
+    $d += ['joining_date' => null, 'salary_basic' => 0, 'salary_house_rent' => null, 'salary_other' => null, 'probation_months' => 0,
+        'working_hours' => null, 'weekly_off' => null, 'reporting_to' => null, 'workplace' => null, 'notice_days' => 0, 'terms' => ''];
     $tk = fn ($v) => number_format((float) $v, 0);
     $gross = (float) ($d['salary_basic'] ?? 0) + (float) ($d['salary_house_rent'] ?? 0) + (float) ($d['salary_other'] ?? 0);
     $parts = array_filter([
@@ -8,7 +12,7 @@
         'Other Allowance' => $d['salary_other'] ?? null,
     ], fn ($v) => (float) $v > 0);
     $terms = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $d['terms'] ?? ''))));
-    $joining = \Illuminate\Support\Carbon::parse($d['joining_date'])->format('d F Y');
+    $joining = $d['joining_date'] ? \Illuminate\Support\Carbon::parse($d['joining_date'])->format('d F Y') : '—';
     $probation = (int) ($d['probation_months'] ?? 0);
     $notice = (int) ($d['notice_days'] ?? 0);
     $many = count($terms) > 5;

@@ -113,6 +113,15 @@ class User extends Authenticatable
         return strtolower((string) $this->role) === 'admin';
     }
 
+    /**
+     * Sees every zone's employees, leave and attendance: admins, the NOC,
+     * and anyone whose zone is "all". Everyone else sees their own zone.
+     */
+    public function seesAllZones(): bool
+    {
+        return $this->isAdmin() || strtolower((string) $this->role) === 'noc' || strtolower((string) $this->zone) === 'all';
+    }
+
     /** View-only account (viewer, owner): sees what it's allowed to, changes nothing but its own to-dos and leave. */
     public function isViewer(): bool
     {
@@ -139,7 +148,7 @@ class User extends Authenticatable
             return 'all';
         }
 
-        $mode = $type === 'olt' ? $this->olt_access : $this->switch_access;
+        $mode = ($type === 'olt' ? $this->olt_access : $this->switch_access) ?? 'zone';
 
         if ($mode === 'zone' && strtolower((string) $this->zone) === 'all') {
             return 'all';

@@ -117,7 +117,7 @@ class IpInventory
         }
 
         foreach (ZkDevice::get(['id', 'name', 'serial_number', 'ip_address', 'zone']) as $d) {
-            $add($d->ip_address, 'seen', false, 'device', $d->id, $d->name ?: $d->serial_number, 'Attendance device', $d->zone, route('attendance.devices.edit', $d));
+            $add($d->ip_address, 'seen', false, 'device', $d->id, $d->name ?: $d->serial_number, 'Attendance device', $d->zone, \Illuminate\Support\Facades\Gate::allows('access-attendance-devices') ? route('attendance.devices.edit', $d) : null);
         }
 
         return $this->entries = $rows->sortBy([['min', 'asc'], ['max', 'desc']])->values();

@@ -33,7 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Private files (photos, signatures, backups) are never served by URL.
+            'serve' => false,
             'throw' => false,
             'report' => false,
             // Group-writable, so folders made by the web server (www-data) and

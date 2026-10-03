@@ -843,3 +843,60 @@ tr.inv-inactive { opacity: .5; }
     .wk-progress { width: 4.5rem; }
     .wk-quick { flex-wrap: wrap; }
 }
+
+/* ==========================================================================
+   Site-wide tidy-ups
+   ========================================================================== */
+
+/* Flex card headers: AdminLTE's clearfix ::after would be a third flex item
+   and push the header's button into the middle. */
+.card-header.d-flex::after,
+.card-header.justify-content-between::after { display: none; }
+.card-header.d-flex > .card-title { float: none; }
+
+/* Action buttons in tables: one soft style everywhere. */
+.table td .btn-sm, .table td .btn-xs { border-radius: .45rem; font-weight: 600; }
+.table td .btn-sm.btn-warning, .table td .btn-xs.btn-warning { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+.table td .btn-sm.btn-warning:hover, .table td .btn-xs.btn-warning:hover { background: #fde68a; color: #78350f; }
+.table td .btn-sm.btn-danger, .table td .btn-xs.btn-danger { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+.table td .btn-sm.btn-danger:hover, .table td .btn-xs.btn-danger:hover { background: #fecaca; color: #991b1b; }
+.table td .btn-sm.btn-info, .table td .btn-xs.btn-info { background: #e0f2fe; border-color: #bae6fd; color: #075985; }
+.table td .btn-sm.btn-info:hover, .table td .btn-xs.btn-info:hover { background: #bae6fd; color: #0c4a6e; }
+.table td .btn-sm.btn-success, .table td .btn-xs.btn-success { background: #dcfce7; border-color: #bbf7d0; color: #166534; }
+.table td .btn-sm.btn-success:hover, .table td .btn-xs.btn-success:hover { background: #bbf7d0; color: #14532d; }
+.table td .btn-sm[disabled], .table td .btn-sm.disabled { opacity: .55; }
+
+/* A cell that holds buttons keeps them on one line. */
+.table td:has(> .btn, > form > .btn, > a.btn, > .btn-group) { white-space: nowrap; }
+.table td > form.d-inline + form.d-inline,
+.table td > .btn + form.d-inline,
+.table td > form.d-inline + .btn { margin-left: .2rem; }
+
+/* small-boxes become the same clean stat cards (white, coloured accent). */
+.content-wrapper:has(.acct-header) .small-box {
+    --sb: #4f46e5;
+    position: relative;
+    border: 1px solid #eef2f7;
+    border-radius: 1rem;
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 6px 18px -8px rgba(15, 23, 42, .12);
+    overflow: hidden;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.content-wrapper:has(.acct-header) .small-box::before {
+    content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, var(--sb), color-mix(in srgb, var(--sb) 35%, #fff));
+}
+.content-wrapper:has(.acct-header) .small-box:hover { transform: translateY(-2px); text-decoration: none; }
+.content-wrapper:has(.acct-header) .small-box.bg-primary { --sb: #4f46e5; }
+.content-wrapper:has(.acct-header) .small-box.bg-success { --sb: #16a34a; }
+.content-wrapper:has(.acct-header) .small-box.bg-info { --sb: #0284c7; }
+.content-wrapper:has(.acct-header) .small-box.bg-warning { --sb: #d97706; }
+.content-wrapper:has(.acct-header) .small-box.bg-danger { --sb: #dc2626; }
+.content-wrapper:has(.acct-header) .small-box.bg-secondary { --sb: #64748b; }
+.content-wrapper:has(.acct-header) .small-box .inner h3 { font-size: 1.7rem; font-weight: 800; color: #0f172a; }
+.content-wrapper:has(.acct-header) .small-box.bg-danger .inner h3 { color: #dc2626; }
+.content-wrapper:has(.acct-header) .small-box .inner p { color: #64748b; font-weight: 600; font-size: .85rem; }
+.content-wrapper:has(.acct-header) .small-box .icon > i { color: var(--sb); opacity: .16; }
+.content-wrapper:has(.acct-header) .small-box > .small-box-footer { background: #f8fafc; color: #475569 !important; }

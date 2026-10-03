@@ -1,5 +1,9 @@
 {{-- Termination letter body (English, printed on the pad). The reason sets the opening. --}}
 @php
+    $d = array_merge(['name' => '', 'designation' => '', 'department' => null, 'emp_id' => null, 'address' => null, 'phone' => null,
+        'signatory' => '', 'signatory_title' => ''], $d ?? []);
+    $d += ['reason' => 'other', 'reason_details' => null, 'resignation_date' => null, 'effective_date' => null, 'joining_date' => null,
+        'notice_pay' => false, 'settlement' => null, 'property' => null];
     $date = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('d F Y') : null;
     $last = $date($d['effective_date']);
     $role = $d['designation'];

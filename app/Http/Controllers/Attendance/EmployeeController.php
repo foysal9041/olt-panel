@@ -21,7 +21,7 @@ class EmployeeController extends Controller
 
         $query = Employee::with('dutyShift');
 
-        if (!in_array(strtolower($authUser->role), ['admin', 'noc'])) {
+        if (! $authUser->seesAllZones()) {
             $query->where('zone', $authUser->zone);
         }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\LatencyTarget;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
@@ -22,13 +23,19 @@ class LatencyProber
         $results = [];
 
         foreach ($targets->chunk(max(1, config('latency.concurrency'))) as $chunk) {
-            $pool = Process::pool(function (Pool $pool) use ($chunk) {
-                foreach ($chunk as $target) {
-                    $pool->as((string) $target->id)
-                        ->timeout($this->deadline($target->pings) + 5)
-                        ->command($this->command($target));
-                }
-            })->start()->wait();
+            try {
+                $pool = Process::pool(function (Pool $pool) use ($chunk) {
+                    foreach ($chunk as $target) {
+                        $pool->as((string) $target->id)
+                            ->timeout($this->deadline($target->pings) + 5)
+                            ->command($this->command($target));
+                    }
+                })->start()->wait();
+            } catch (ProcessTimedOutException $e) {
+                report($e); // too busy this round — no sample rather than a fake loss
+
+                continue;
+            }
 
             foreach ($chunk as $target) {
                 $rtts = $this->parse($pool[(string) $target->id]->output(), $target->pings);

@@ -23,11 +23,9 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h3 class="card-title">Registered Devices</h3>
 
-                @if(strtolower(auth()->user()->role) == 'admin')
-                    <a href="{{ route('attendance.devices.create') }}" class="btn btn-primary btn-sm">
-                        <i class="fas fa-plus"></i> Add Device
-                    </a>
-                @endif
+                <a href="{{ route('attendance.devices.create') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Add Device
+                </a>
             </div>
 
             <div class="card-body p-0">
@@ -42,9 +40,7 @@
                             <th>Last IP</th>
                             <th>Last Seen</th>
                             <th>Status</th>
-                            @if(strtolower(auth()->user()->role) == 'admin')
-                                <th width="220">Actions</th>
-                            @endif
+                            <th width="220">Actions</th>
                         </tr>
                     </thead>
 
@@ -71,7 +67,6 @@
                                         </span>
                                     @endif
                                 </td>
-                                @if(strtolower(auth()->user()->role) == 'admin')
                                     <td>
                                         <form action="{{ route('attendance.devices.fetch-data', $device->id) }}" method="POST" class="d-inline">
                                             @csrf
@@ -84,6 +79,7 @@
                                             Edit
                                         </a>
 
+                                        @if (auth()->user()->isAdmin())
                                         <form action="{{ route('attendance.devices.destroy', $device->id) }}" method="POST" class="d-inline js-confirm-delete" data-confirm-message="Remove this device?">
                                             @csrf
                                             @method('DELETE')
@@ -91,8 +87,8 @@
                                                 Delete
                                             </button>
                                         </form>
+                                        @endif
                                     </td>
-                                @endif
                             </tr>
 
                         @empty
@@ -113,7 +109,6 @@
 
         </div>
 
-        @if(strtolower(auth()->user()->role) == 'admin')
 
         <div class="card card-outline card-secondary">
 
@@ -152,7 +147,6 @@
 
         </div>
 
-        @endif
 
     </div>
 

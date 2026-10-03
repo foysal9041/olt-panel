@@ -161,10 +161,6 @@ class AttendanceController extends Controller
 
     public function updateSettings(Request $request)
     {
-        if (strtolower(auth()->user()->role) !== 'admin') {
-            abort(403);
-        }
-
         $request->validate([
             'weekly_off_day' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
         ]);
@@ -255,7 +251,7 @@ class AttendanceController extends Controller
 
         $query = Employee::whereNotNull('device_user_id')->with('dutyShift');
 
-        if (!in_array(strtolower($user->role), ['admin', 'noc'])) {
+        if (! $user->seesAllZones()) {
             $query->where('zone', $user->zone);
         }
 

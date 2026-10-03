@@ -30,6 +30,9 @@ class CheckNttnLinks extends Command
         $alerts = [];
 
         foreach ($links as $link) {
+            if (! isset($results[$link->id])) {
+                continue; // not pinged this round
+            }
             $r = $results[$link->id];
 
             if ($block = $monitor->record($link, $r, $now)) {

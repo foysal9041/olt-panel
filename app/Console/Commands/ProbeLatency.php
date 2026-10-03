@@ -30,6 +30,9 @@ class ProbeLatency extends Command
         $alerts = [];
 
         foreach ($targets as $target) {
+            if (! isset($results[$target->id])) {
+                continue; // not probed this round
+            }
             $result = $results[$target->id];
             $rtts = $result['rtts'];
             $median = LatencyProber::median($rtts);

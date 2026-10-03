@@ -19,14 +19,12 @@ class ZkDeviceController extends Controller
 
     public function create()
     {
-        $this->authorizeAdmin();
 
         return view('attendance.devices.create', ['zones' => \App\Models\Zone::names()]);
     }
 
     public function store(Request $request)
     {
-        $this->authorizeAdmin();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -43,14 +41,12 @@ class ZkDeviceController extends Controller
 
     public function edit(ZkDevice $device)
     {
-        $this->authorizeAdmin();
 
         return view('attendance.devices.edit', compact('device') + ['zones' => \App\Models\Zone::names()]);
     }
 
     public function update(Request $request, ZkDevice $device)
     {
-        $this->authorizeAdmin();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -86,7 +82,6 @@ class ZkDeviceController extends Controller
      */
     public function fetchData(ZkDevice $device)
     {
-        $this->authorizeAdmin();
 
         $commandId = (string) now()->timestamp;
 
@@ -105,8 +100,6 @@ class ZkDeviceController extends Controller
 
     private function authorizeAdmin(): void
     {
-        if (strtolower(auth()->user()->role) !== 'admin') {
-            abort(403);
-        }
+        abort_unless(auth()->user()->isAdmin(), 403, 'Only an admin can delete a device.');
     }
 }

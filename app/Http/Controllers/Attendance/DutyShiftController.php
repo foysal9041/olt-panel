@@ -17,15 +17,11 @@ class DutyShiftController extends Controller
 
     public function create()
     {
-        $this->authorizeAdmin();
-
         return view('attendance.shifts.create');
     }
 
     public function store(Request $request)
     {
-        $this->authorizeAdmin();
-
         $validated = $this->validated($request);
 
         DutyShift::create($validated);
@@ -37,15 +33,11 @@ class DutyShiftController extends Controller
 
     public function edit(DutyShift $shift)
     {
-        $this->authorizeAdmin();
-
         return view('attendance.shifts.edit', compact('shift'));
     }
 
     public function update(Request $request, DutyShift $shift)
     {
-        $this->authorizeAdmin();
-
         $shift->update($this->validated($request));
 
         return redirect()
@@ -92,8 +84,6 @@ class DutyShiftController extends Controller
 
     private function authorizeAdmin(): void
     {
-        if (strtolower(auth()->user()->role) !== 'admin') {
-            abort(403);
-        }
+        abort_unless(auth()->user()->isAdmin(), 403, 'Only an admin can delete a shift.');
     }
 }

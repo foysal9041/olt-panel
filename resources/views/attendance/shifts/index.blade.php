@@ -22,11 +22,9 @@
 
         <h3 class="card-title">Shifts</h3>
 
-        @if(strtolower(auth()->user()->role) == 'admin')
-            <a href="{{ route('attendance.shifts.create') }}" class="btn btn-primary btn-sm">
-                <i class="fas fa-plus"></i> Add Shift
-            </a>
-        @endif
+        <a href="{{ route('attendance.shifts.create') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus"></i> Add Shift
+        </a>
 
     </div>
 
@@ -41,9 +39,7 @@
                     <th>Late Grace</th>
                     <th>Employees</th>
                     <th>Default</th>
-                    @if(strtolower(auth()->user()->role) == 'admin')
-                        <th width="160">Actions</th>
-                    @endif
+                    <th width="160">Actions</th>
                 </tr>
             </thead>
 
@@ -61,12 +57,12 @@
                                 <span class="badge badge-primary">DEFAULT</span>
                             @endif
                         </td>
-                        @if(strtolower(auth()->user()->role) == 'admin')
                             <td>
                                 <a href="{{ route('attendance.shifts.edit', $shift->id) }}" class="btn btn-warning btn-sm">
                                     Edit
                                 </a>
 
+                                @if (auth()->user()->isAdmin())
                                 <form action="{{ route('attendance.shifts.destroy', $shift->id) }}"
                                       method="POST"
                                       class="d-inline js-confirm-delete"
@@ -77,8 +73,8 @@
                                         Delete
                                     </button>
                                 </form>
+                                @endif
                             </td>
-                        @endif
                     </tr>
 
                 @empty

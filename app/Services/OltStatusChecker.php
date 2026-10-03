@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Olt;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
@@ -27,13 +28,24 @@ class OltStatusChecker
         $results = [];
 
         foreach ($olts->chunk(25) as $chunk) {
-            $pool = Process::pool(function (Pool $pool) use ($chunk) {
+            try {
+                $pool = Process::pool(function (Pool $pool) use ($chunk) {
+                    foreach ($chunk as $olt) {
+                        $pool->as((string) $olt->id)
+                            ->timeout(10)
+                            ->command(['ping', '-n', '-c', (string) self::PINGS, '-i', '0.2', '-W', '1', '-w', '3', $olt->ip]);
+                    }
+                })->start()->wait();
+            } catch (ProcessTimedOutException $e) {
+                // The server was too busy to finish the pings: keep what we knew
+                // rather than calling the whole batch down.
+                report($e);
                 foreach ($chunk as $olt) {
-                    $pool->as((string) $olt->id)
-                        ->timeout(10)
-                        ->command(['ping', '-n', '-c', (string) self::PINGS, '-i', '0.2', '-W', '1', '-w', '3', $olt->ip]);
+                    $results[$olt->id] = (bool) $olt->status;
                 }
-            })->start()->wait();
+
+                continue;
+            }
 
             foreach ($chunk as $olt) {
                 $results[$olt->id] = $pool[(string) $olt->id]->successful();
