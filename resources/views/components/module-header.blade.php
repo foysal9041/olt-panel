@@ -16,9 +16,9 @@
                 <span class="acct-header-icon"><i class="{{ $icon }}"></i></span>
             @endif
             <div>
-                <h1>{{ $title }} @isset($badge) <span class="acct-header-badge">{{ $badge }}</span> @endisset</h1>
+                <h1>{{ \App\Support\Ui::t($title) }} @isset($badge) <span class="acct-header-badge">{{ $badge }}</span> @endisset</h1>
                 @if ($subtitle)
-                    <p>{{ $subtitle }}</p>
+                    <p>{{ \App\Support\Ui::t($subtitle) }}</p>
                 @endif
             </div>
         </div>
@@ -33,7 +33,7 @@
         @foreach ($tabs as [$route, $pattern, $label, $tabIcon, $ability])
             @if (! $ability || Gate::allows($ability))
                 <a href="{{ route($route) }}" class="{{ request()->routeIs(...(array) $pattern) ? 'active' : '' }}">
-                    <i class="{{ $tabIcon }}"></i> <span>{{ $label }}</span>
+                    <i class="{{ $tabIcon }}"></i> <span>{{ \App\Support\Ui::t($label) }}</span>
                 </a>
             @endif
         @endforeach

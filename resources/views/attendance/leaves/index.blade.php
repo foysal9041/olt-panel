@@ -96,11 +96,16 @@
 
                     <tr>
                         <td>{{ $leave->employee->name }}</td>
-                        <td><span class="badge badge-secondary">{{ $leave->leaveType->name }}</span></td>
+                        <td><span class="badge badge-secondary">{{ \App\Support\Ui::t($leave->leaveType->name) }}</span></td>
                         <td>{{ $leave->start_date->format('d M Y') }}</td>
                         <td>{{ $leave->end_date->format('d M Y') }}</td>
                         <td>{{ $leave->daysCount() }}</td>
-                        <td>{{ $leave->reason ?? '-' }}</td>
+                        <td>
+                            {{ $leave->reason ?? '-' }}
+                            @if ($leave->appliedBy && $leave->appliedBy->employee_id === $leave->employee_id)
+                                <div class="small text-muted"><i class="fas fa-paper-plane"></i> Applied by themselves · {{ $leave->created_at?->format('d M, h:i A') }}</div>
+                            @endif
+                        </td>
                         <td>
                             @if($leave->status == 'approved')
                                 <span class="badge badge-success">APPROVED</span>

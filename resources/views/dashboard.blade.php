@@ -27,7 +27,7 @@
 <div class="dash-hero">
     <div class="row align-items-center">
         <div class="col-sm-8">
-            <h1>{{ $greeting }}, {{ auth()->user()->name }} 👋</h1>
+            <h1>{{ \App\Support\Ui::t($greeting) }}, {{ auth()->user()->name }} 👋</h1>
             <div class="dash-hero-sub">Sunlit Network ERP — here's what's happening across your network today.</div>
 
             <div data-live="hero-status">
@@ -80,25 +80,21 @@
     </div>
 </div>
 
-@unless ($anyModule)
-
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i>
-        No modules have been assigned to your account yet. Contact your administrator to get access.
-    </div>
-
-@else
-
 @if ($actions)
     <div class="qa-grid">
         @foreach ($actions as [$label, $icon, $url, $tone])
             <a href="{{ $url }}" class="qa">
                 <span class="qa-icon tone-{{ $tone }}"><i class="{{ $icon }}"></i></span>
-                <span>{{ $label }}</span>
+                <span>{{ \App\Support\Ui::t($label) }}</span>
             </a>
         @endforeach
     </div>
 @endif
+
+@include('dashboard.my-work')
+
+@if ($anyModule)
+
 
 {{-- ================= Network ================= --}}
 @if ($olt || $switches || $nttn || $latency || $ip)
@@ -450,14 +446,14 @@
                         <div data-live="acct-now">
                         <div class="d-flex align-items-end justify-content-between flex-wrap mb-3" style="gap:.75rem">
                             <div>
-                                <div class="small text-muted text-uppercase font-weight-bold">Cash in hand now</div>
+                                <div class="small text-muted text-uppercase font-weight-bold">Petty cash on hand</div>
                                 @if ($cash['counted_on'])
                                     <div class="big-num money {{ $cash['closing'] < 0 ? 'text-danger' : '' }}">{{ $tk($cash['closing']) }}</div>
-                                    <div class="small text-muted">অবশিষ্ট টাকা · counted {{ $cash['counted_on']->format('d M') }}</div>
+                                    <div class="small text-muted">Balance · counted {{ $cash['counted_on']->format('d M') }}</div>
                                 @else
                                     <div class="big-num" style="font-size:1.15rem; color:#b45309"><i class="fas fa-exclamation-circle"></i> Not counted yet</div>
                                     <div class="small text-muted">
-                                        Set today's হাতে নগদ once in the
+                                        Set today's cash on hand once in the
                                         @can('access-accounts-cashbook')
                                             <a href="{{ route('accounts.cashbook.index') }}">Cash Book</a>
                                         @else
@@ -468,21 +464,33 @@
                                 @endif
                             </div>
                             <div class="acct-mini-grid">
-                                <div><span>Today in</span><b class="text-income">{{ $tk($cash['in']) }}</b></div>
-                                <div><span>Today out</span><b class="text-expense">{{ $tk($cash['out']) }}</b></div>
-                                <div><span>{{ now()->format('F') }} in</span><b class="text-income">{{ $tk($cash['month_in']) }}</b></div>
-                                <div><span>{{ now()->format('F') }} out</span><b class="text-expense">{{ $tk($cash['month_out']) }}</b></div>
+                                <div><span>Petty cash in today</span><b class="text-income">{{ $tk($cash['in']) }}</b></div>
+                                <div><span>Spent today</span><b class="text-expense">{{ $tk($cash['out']) }}</b></div>
+                                <div><span>{{ now()->format('F') }} income</span><b class="text-income">{{ $tk($cash['month_in']) }}</b></div>
+                                <div><span>{{ now()->format('F') }} expense</span><b class="text-expense">{{ $tk($cash['month_out']) }}</b></div>
                             </div>
+                        </div>
+                        <div class="dash-acct-links">
+                            @can('access-accounts-billing')
+                                <a href="{{ route('accounts.billing.index') }}">
+                                    <span><i class="fas fa-tachometer-alt"></i> Bandwidth due</span>
+                                    <b class="money {{ (float) $accounts['bandwidth_due'] > 0 ? 'text-danger' : '' }}">{{ $tk($accounts['bandwidth_due']) }}</b>
+                                </a>
+                            @endcan
+                            @can('access-accounts-profit')
+                                @php $pf = $accounts['profit']; @endphp
+                                <a href="{{ route('accounts.profit.index', $pf ? ['month' => $pf->month->format('Y-m')] : []) }}">
+                                    <span><i class="fas fa-chart-line"></i> Net profit{{ $pf ? ' · ' . $pf->month->format('M') : '' }}</span>
+                                    <b class="money">{{ $pf ? $tk($pf->calc()['net']) : '—' }}</b>
+                                    @if ($pf)<small class="{{ $pf->isFinal() ? 'text-success' : 'text-warning' }}"><i class="fas {{ $pf->isFinal() ? 'fa-lock' : 'fa-pen' }}"></i></small>@endif
+                                </a>
+                            @endcan
                         </div>
                         @if ($st = $accounts['settlement'])
                             <a href="{{ Gate::allows('access-accounts-settlements') ? route('accounts.settlements.show', $st['model']) : '#' }}" class="dash-due">
                                 <span><i class="fas fa-file-excel mr-1"></i> Zone Settlement {{ $st['model']->month->format('M Y') }}</span>
                                 <b class="money">{{ $tk($st['income']) }}</b>
-                                @if ($st['model']->isPosted())
-                                    <span class="small text-success"><i class="fas fa-check-circle"></i> posted</span>
-                                @else
-                                    <span class="small" style="color:#b45309"><i class="fas fa-clock"></i> not posted</span>
-                                @endif
+                                <span class="small text-muted">{{ $st['model']->cycleLabel() }}</span>
                             </a>
                         @endif
                         </div>
@@ -495,7 +503,7 @@
     </div>
 @endif
 
-@endunless
+@endif
 
 @stop
 

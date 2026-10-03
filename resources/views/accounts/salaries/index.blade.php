@@ -3,14 +3,14 @@
 @section('title', 'Salary Sheet')
 
 @php
-    $bnMonth = \App\Support\Bangla::month($month);
+    $monthName = \App\Support\Ui::month($month);
     $posted = (bool) $sheet?->isPosted();
     $printUrl = route('accounts.salaries.index', ['month' => $month->format('Y-m'), 'print' => 1]);
 @endphp
 
 @section('content_header')
-<x-accounts.header title="বেতন শিট" icon="fas fa-money-check-alt"
-    subtitle="{{ $bnMonth }} {{ $month->year }} — Salary, House Rent, Bonus, Advance, Deduction, Net Pay">
+<x-accounts.header title="Salary Sheet" icon="fas fa-money-check-alt"
+    subtitle="{{ $monthName }} {{ $month->year }} — Salary, House Rent, Bonus, Advance, Deduction, Net Pay">
     <a href="{{ $printUrl }}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-print"></i> Print</a>
 </x-accounts.header>
 @stop
@@ -42,11 +42,11 @@
 
     <span class="ml-auto sal-status {{ $sheet?->isPosted() ? 'bg-success text-white' : ($sheet ? 'bg-warning' : 'bg-light') }}">
         @if ($posted)
-            <i class="fas fa-lock"></i> Posted to expenses (বেতন) on {{ $sheet->posted_at->format('d M Y') }} — locked
+            <i class="fas fa-lock"></i> Posted to expenses (Salary) on {{ $sheet->posted_at->format('d M Y') }} — locked
         @elseif ($sheet)
             <i class="fas fa-pen"></i> Saved, not posted to expenses yet
         @else
-            <i class="fas fa-file"></i> New sheet — filled from {{ $rows->isNotEmpty() ? 'last month / employee salaries' : 'nothing yet' }}, not saved
+            <i class="fas fa-file"></i> New sheet — filled from {{ \App\Support\Ui::t($rows->isNotEmpty() ? 'last month / employee salaries' : 'nothing yet') }}, not saved
         @endif
     </span>
 </form>
@@ -60,13 +60,18 @@
     <div class="card acct-panel">
         <div class="card-header">
             <h3 class="card-title">
-                {{ $bnMonth }} মাসের বেতন খরচের হিসাব {{ $month->year }}
-                <small class="text-muted d-block">পরিশোধ: {{ \App\Support\Bangla::month($payMonth) }} {{ $payMonth->year }} — postpaid, the expense goes in {{ $payMonth->format('F') }}'s books</small>
+                Salary expenses for {{ $monthName }} {{ $month->year }}
+                <small class="text-muted d-block">Paid in {{ \App\Support\Ui::month($payMonth) }} {{ $payMonth->year }} — postpaid, the expense goes in {{ \App\Support\Ui::month($payMonth) }}'s books</small>
             </h3>
             <div class="d-flex align-items-center" style="gap:.5rem">
                 <label class="small mb-0 text-muted">Pay date</label>
                 <input type="date" name="pay_date" value="{{ old('pay_date', \Illuminate\Support\Carbon::parse($payDate)->toDateString()) }}"
                        min="{{ $payMonth->copy()->startOfMonth()->toDateString() }}" class="form-control form-control-sm @error('pay_date') is-invalid @enderror" style="width:auto" required>
+                <select name="pay_account" class="form-control form-control-sm ml-1" style="width:auto" title="Paid from">
+                    @foreach (\App\Models\Transaction::ACCOUNTS as $key => $label)
+                        <option value="{{ $key }}" @selected(old('pay_account', 'cash') === $key)>Paid from {{ $label }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
         <div class="card-body p-0 table-responsive">
@@ -137,7 +142,7 @@
 
 @if ($posted)
     <form method="POST" action="{{ route('accounts.salaries.unpost') }}" class="js-confirm-delete mb-4"
-          data-confirm-message="Remove this month's বেতন expenses? The sheet itself is kept.">
+          data-confirm-message="Remove this month's salary expenses? The sheet itself is kept.">
         @csrf
         <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
         <button class="btn btn-link btn-sm text-danger p-0"><i class="fas fa-undo"></i> Undo posting to expenses</button>

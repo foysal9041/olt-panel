@@ -26,7 +26,8 @@ class AccountsDashboardController extends Controller
         $lastStart = $monthStart->copy()->subMonthNoOverflow();
         $lastMonth = [$lastStart->toDateString(), $lastStart->copy()->endOfMonth()->toDateString()];
 
-        $sum = fn (string $type, array $range) => (float) Transaction::{$type}()->whereBetween('transaction_date', $range)->sum('amount');
+        // Real income and costs: petty cash brought from the bank etc. ("Not counted") stays out.
+        $sum = fn (string $type, array $range) => (float) Transaction::{$type}()->counted()->whereBetween('transaction_date', $range)->sum('amount');
 
         $income = $sum('income', $month);
         $expense = $sum('expense', $month);
@@ -35,8 +36,8 @@ class AccountsDashboardController extends Controller
 
         // Cash in hand right now: today's জের plus today's entries.
         ['amount' => $opening, 'base' => $count] = CashBalance::before($today);
-        $dayIn = (float) Transaction::income()->whereDate('transaction_date', $today)->sum('amount');
-        $dayOut = (float) Transaction::expense()->whereDate('transaction_date', $today)->sum('amount');
+        $dayIn = (float) Transaction::income()->cash()->whereDate('transaction_date', $today)->sum('amount');
+        $dayOut = (float) Transaction::expense()->cash()->whereDate('transaction_date', $today)->sum('amount');
         $cash = [
             'now' => $opening + $dayIn - $dayOut,
             'in' => $dayIn,
@@ -48,10 +49,13 @@ class AccountsDashboardController extends Controller
             ->map(fn (ZoneSettlement $s) => ['model' => $s, 'totals' => $s->totals()]);
 
         $salary = SalarySheet::withSum('items as net_total', 'net')->withCount('items')->latest('month')->first();
+        $profit = \App\Models\ProfitSheet::latest('month')->first();
+        $partnersDue = (string) \App\Models\PartnerEntry::sum('amount');
 
         $byCategory = fn (string $type) => Transaction::query()
             ->join('transaction_categories as c', 'c.id', '=', 'transactions.transaction_category_id')
             ->where('c.type', $type)
+            ->where(fn ($q) => $q->whereNull('c.pl_group')->orWhere('c.pl_group', '!=', 'none'))
             ->whereBetween('transaction_date', $month)
             ->groupBy('c.name')
             ->orderByDesc(DB::raw('SUM(transactions.amount)'))
@@ -72,6 +76,8 @@ class AccountsDashboardController extends Controller
             'cash' => $cash,
             'settlements' => $settlements,
             'salary' => $salary,
+            'profit' => $profit,
+            'partnersDue' => $partnersDue,
             'incomeByCategory' => $byCategory('income'),
             'expenseByCategory' => $byCategory('expense'),
             'recent' => $recent,
@@ -91,8 +97,8 @@ class AccountsDashboardController extends Controller
 
             return [
                 'label' => $start->format('M Y'),
-                'income' => (float) Transaction::income()->whereBetween('transaction_date', $range)->sum('amount'),
-                'expense' => (float) Transaction::expense()->whereBetween('transaction_date', $range)->sum('amount'),
+                'income' => (float) Transaction::income()->counted()->whereBetween('transaction_date', $range)->sum('amount'),
+                'expense' => (float) Transaction::expense()->counted()->whereBetween('transaction_date', $range)->sum('amount'),
             ];
         })->all();
     }

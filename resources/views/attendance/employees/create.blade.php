@@ -14,7 +14,7 @@
         <h3 class="card-title">Employee Details</h3>
     </div>
 
-    <form method="POST" action="{{ route('attendance.employees.store') }}">
+    <form method="POST" action="{{ route('attendance.employees.store') }}" enctype="multipart/form-data">
         @csrf
 
         @include('attendance.employees.partials.form')

@@ -23,6 +23,7 @@ class CashBookController extends Controller
         $date = $this->date($request->query('date'));
 
         $entries = Transaction::with('category', 'recordedBy:id,name')
+            ->cash()
             ->whereDate('transaction_date', $date)
             ->orderBy('id')
             ->get();
@@ -43,7 +44,10 @@ class CashBookController extends Controller
             'closing' => $opening + $dayIncome - $dayExpense, // অবশিষ্ট টাকা
         ];
 
-        $categories = TransactionCategory::orderBy('name')->get()->groupBy('type');
+        // জমা: only heads that aren't income (petty cash brought from the bank).
+        $categories = TransactionCategory::orderBy('name')->get()
+            ->reject(fn ($c) => Transaction::isRealIncome($c))
+            ->groupBy('type');
 
         $view = $request->boolean('print') ? 'accounts.cashbook.print' : 'accounts.cashbook.index';
 
@@ -60,12 +64,25 @@ class CashBookController extends Controller
             'description' => 'nullable|string|max:255',
             'amount' => 'required|numeric|min:0.01',
         ], [
-            'transaction_category_id.required' => 'Choose a খাত (category).',
+            'transaction_category_id.required' => 'Choose a head (category).',
         ]);
 
-        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, Transaction::lockReason($validated['transaction_date']));
+
+        // The Cash Book is the petty cash: income belongs in the bank.
+        if (Transaction::isRealIncome(TransactionCategory::find($validated['transaction_category_id']))) {
+            return back()->withInput()->withErrors(['transaction_category_id' => 'Income is deposited in the bank — record it in Income & Expenses as Bank. Cash in here is only petty cash brought into the office.']);
+        }
+
+        $same = Transaction::where('transaction_category_id', $validated['transaction_category_id'])->where('account', 'cash')
+            ->where('amount', $validated['amount'])->whereDate('transaction_date', $validated['transaction_date'])
+            ->where('description', $validated['description'] ?? null);
+        if (\App\Support\DuplicateGuard::recent($same)) {
+            return back()->withInput()->with('error', \App\Support\DuplicateGuard::message());
+        }
 
         Transaction::create($validated + [
+            'account' => 'cash',
             'recorded_by' => auth()->id(),
             'zone' => auth()->user()->zone,
         ]);
@@ -77,7 +94,7 @@ class CashBookController extends Controller
 
     public function destroy(Transaction $transaction)
     {
-        abort_if($transaction->isLockedFor(auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_if($transaction->isLockedFor(auth()->user()), 403, Transaction::lockReason($transaction->transaction_date));
 
         $date = $transaction->transaction_date->toDateString();
         $transaction->delete();
@@ -97,7 +114,7 @@ class CashBookController extends Controller
             'note' => 'nullable|string|max:255',
         ]);
 
-        abort_unless(Transaction::dayIsOpenFor($validated['date'], auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_unless(Transaction::dayIsOpenFor($validated['date'], auth()->user()), 403, Transaction::lockReason($validated['date']));
 
         CashOpening::updateOrCreate(
             ['date' => Carbon::parse($validated['date'])->toDateString()],
@@ -105,18 +122,18 @@ class CashBookController extends Controller
         );
 
         return redirect()->route('accounts.cashbook.index', ['date' => $validated['date']])
-            ->with('success', 'Cash on hand set — জের counts from this amount now.');
+            ->with('success', 'Cash on hand set — the brought-forward balance counts from this amount now.');
     }
 
     public function removeOpening(CashOpening $opening)
     {
-        abort_unless(Transaction::dayIsOpenFor($opening->date, auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_unless(Transaction::dayIsOpenFor($opening->date, auth()->user()), 403, Transaction::lockReason($opening->date));
 
         $date = $opening->date->toDateString();
         $opening->delete();
 
         return redirect()->route('accounts.cashbook.index', ['date' => $date])
-            ->with('success', 'Cash on hand count removed — জের is worked out from earlier entries again.');
+            ->with('success', 'Cash on hand count removed — the brought-forward balance is worked out from earlier entries again.');
     }
 
     /**
@@ -131,9 +148,9 @@ class CashBookController extends Controller
 
         $validated['name'] = trim($validated['name']);
 
-        $category = TransactionCategory::firstOrCreate($validated);
+        $category = TransactionCategory::firstOrCreate($validated, $validated['type'] === 'income' ? ['pl_group' => 'none'] : []);
 
-        return back()->with('success', ($category->wasRecentlyCreated ? 'খাত added: ' : 'খাত already exists: ') . $category->name);
+        return back()->with('success', ($category->wasRecentlyCreated ? 'Head added: ' : 'Head already exists: ') . $category->name);
     }
 
     public function destroyCategory(TransactionCategory $category)
@@ -144,7 +161,7 @@ class CashBookController extends Controller
 
         $category->delete();
 
-        return back()->with('success', "খাত removed: {$category->name}");
+        return back()->with('success', "Head removed: {$category->name}");
     }
 
     protected function date(?string $value): Carbon

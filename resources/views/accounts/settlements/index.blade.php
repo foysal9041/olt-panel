@@ -34,6 +34,17 @@
                         </div>
                         <small class="form-text text-muted">One row per zone with its name, Total Payment and Deduction (negative). Nothing in the file is changed.</small>
                     </div>
+                    <div class="form-group">
+                        <label>Customer group / billing cycle</label>
+                        <select name="cycle" id="settle-cycle" class="form-control">
+                            @foreach (\App\Models\ZoneSettlement::CYCLES as $key => $cy)
+                                <option value="{{ $key }}" @selected(old('cycle', 'fixed') === $key)>
+                                    {{ $cy['label'] }} — {{ $cy['start'] === 1 ? '1st to month end' : $cy['start'] . ' of last month to ' . ($cy['start'] - 1) . ' of this month' }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="form-text text-muted">One Excel per group. Picked from the file name when it says NTTN or Balunda.</small>
+                    </div>
                     <div class="form-row">
                         <div class="col-6 form-group">
                             <label>Billing month</label>
@@ -108,8 +119,9 @@
                                 <tr>
                                     <td class="pl-3">
                                         <a href="{{ route('accounts.settlements.show', $s) }}" class="font-weight-bold">{{ $s->month->format('F Y') }}</a>
-                                        @if ($s->isPosted())<span class="badge badge-success ml-1" title="Net Bill posted to income on {{ $s->posted_on->format('d M Y') }}"><i class="fas fa-check"></i> Posted</span>@endif
-                                        <div class="small text-muted">{{ $s->source_name }} · {{ $s->creator?->name ?? '—' }}, {{ $s->created_at->format('d M') }}</div>
+                                        <span class="badge {{ ['fixed' => 'badge-primary', 'balunda' => 'badge-warning', 'nttn' => 'badge-info'][$s->cycle] ?? 'badge-secondary' }} ml-1" title="{{ $s->periodLabel() }}">{{ $s->cycleLabel() }}</span>
+                                        @if ($s->isClosed())<span class="badge badge-success ml-1" title="The month's Net Profit is finalized"><i class="fas fa-lock"></i> Closed</span>@endif
+                                        <div class="small text-muted">{{ $s->periodLabel('d M') }} · {{ $s->source_name }} · {{ $s->creator?->name ?? '—' }}, {{ $s->created_at->format('d M') }}</div>
                                     </td>
                                     <td class="text-center">{{ $t['count'] }} @if ($flags)<span class="badge badge-warning" title="Rows to check">{{ $flags }}</span>@endif</td>
                                     <td class="text-right money">{{ \App\Support\Dec::taka($t['payment']) }}</td>
@@ -130,7 +142,11 @@
 
 <script>
 document.getElementById('settle-file').addEventListener('change', function () {
-    this.nextElementSibling.textContent = this.files[0] ? this.files[0].name : 'Choose .xlsx, .xls or .csv';
+    var name = this.files[0] ? this.files[0].name : '';
+    this.nextElementSibling.textContent = name || 'Choose .xlsx, .xls or .csv';
+    // NTTN-SEP.xlsx → NTTN Client, "Balunda …" → Balunda
+    var guess = /nttn/i.test(name) ? 'nttn' : (/balun/i.test(name) ? 'balunda' : null);
+    if (guess) document.getElementById('settle-cycle').value = guess;
 });
 </script>
 

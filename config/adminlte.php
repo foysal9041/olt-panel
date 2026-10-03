@@ -306,15 +306,57 @@ return [
 
     'menu' => [
 
+    // Top bar: switch the interface language (label comes from lang/*/menu.php).
+    [
+        'text' => 'lang_switch',
+        'url' => 'locale/toggle',
+        'icon' => 'fas fa-language',
+        'topnav_right' => true,
+    ],
+
+    // Sections show only when the user can open something in them.
+    [
+        'type' => 'sidebar-menu-search',
+        'text' => 'Search menu…',
+    ],
+
+    ['header' => 'OVERVIEW'],
     [
         'text' => 'Dashboard',
         'url'  => '/',
-        'icon' => 'fas fa-tachometer-alt',
+        'icon' => 'fas fa-home',
+        'icon_color' => 'primary',
     ],
 
+    ['header' => 'MY WORK'],
+    [
+        'text' => 'My Tasks & To-do',
+        'url'  => 'my/tasks',
+        'icon' => 'fas fa-check-square',
+        'icon_color' => 'teal',
+        'key'  => 'my-tasks',
+        'active' => ['my/tasks', 'my/tasks/*'],
+    ],
+    [
+        'text' => 'Tickets',
+        'url'  => 'tickets',
+        'icon' => 'fas fa-ticket-alt',
+        'icon_color' => 'danger',
+        'key'  => 'tickets',
+        'active' => ['tickets', 'tickets/*'],
+    ],
+    [
+        'text' => 'My Leave',
+        'url'  => 'my/leave',
+        'icon' => 'fas fa-umbrella-beach',
+        'icon_color' => 'info',
+    ],
+
+    ['header' => 'OPERATIONS', 'can' => ['access-olt', 'access-attendance', 'access-latency']],
     [
         'text' => 'NOC',
         'icon' => 'fas fa-satellite-dish',
+        'icon_color' => 'info',
         'submenu' => [
             [
                 'text' => 'NOC Dashboard',
@@ -406,7 +448,8 @@ return [
     ],
 
     [
-        'text' => 'Attendance',
+        'text' => 'HR & Attendance',
+        'icon_color' => 'success',
         'icon' => 'fas fa-fingerprint',
         'submenu' => [
             [
@@ -438,6 +481,21 @@ return [
                 'url'  => 'attendance/leaves',
                 'icon' => 'fas fa-plane-departure',
                 'can'  => 'access-attendance-leaves',
+                'key'  => 'leave-requests',
+            ],
+            [
+                'text' => 'HR Letters',
+                'url'  => 'attendance/letters',
+                'icon' => 'fas fa-file-signature',
+                'can'  => 'access-attendance-letters',
+                'active' => ['attendance/letters', 'attendance/letters/*'],
+            ],
+            [
+                'text' => 'ID Cards',
+                'url'  => 'attendance/id-cards',
+                'icon' => 'fas fa-id-card',
+                'can'  => 'access-attendance-idcards',
+                'active' => ['attendance/id-cards', 'attendance/id-cards/*'],
             ],
             [
                 'text' => 'Duty Shifts',
@@ -454,8 +512,10 @@ return [
         ],
     ],
 
+    ['header' => 'FINANCE', 'can' => ['access-accounts', 'access-inventory']],
     [
         'text' => 'Accounts',
+        'icon_color' => 'warning',
         'icon' => 'fas fa-file-invoice-dollar',
         'submenu' => [
             [
@@ -483,6 +543,24 @@ return [
                 'can'  => 'access-accounts-settlements',
             ],
             [
+                'text' => 'Bandwidth Billing',
+                'url'  => 'accounts/billing',
+                'icon' => 'fas fa-tachometer-alt',
+                'can'  => 'access-accounts-billing',
+            ],
+            [
+                'text' => 'Net Profit & Shares',
+                'url'  => 'accounts/profit',
+                'icon' => 'fas fa-chart-line',
+                'can'  => 'access-accounts-profit',
+            ],
+            [
+                'text' => 'Partners',
+                'url'  => 'accounts/partners',
+                'icon' => 'fas fa-user-tie',
+                'can'  => 'access-accounts-partners',
+            ],
+            [
                 'text' => 'Salary Sheet',
                 'url'  => 'accounts/salaries',
                 'icon' => 'fas fa-money-check-alt',
@@ -498,8 +576,43 @@ return [
     ],
 
     [
+        'text' => 'Inventory & Assets',
+        'icon_color' => 'teal',
+        'icon' => 'fas fa-boxes',
+        'submenu' => [
+            [
+                'text' => 'Summary',
+                'url'  => 'inventory',
+                'icon' => 'fas fa-chart-pie',
+                'can'  => 'access-inventory-summary',
+            ],
+            [
+                'text' => 'Products & Stock',
+                'url'  => 'inventory/items',
+                'icon' => 'fas fa-box',
+                'can'  => 'access-inventory-stock',
+                'active' => ['inventory/items', 'inventory/items/*'],
+            ],
+            [
+                'text' => 'Stock Entries',
+                'url'  => 'inventory/entries',
+                'icon' => 'fas fa-exchange-alt',
+                'can'  => 'access-inventory-stock',
+                'active' => ['inventory/entries', 'inventory/entries/*'],
+            ],
+            [
+                'text' => 'Company Assets',
+                'url'  => 'inventory/assets',
+                'icon' => 'fas fa-building',
+                'can'  => 'access-inventory-assets',
+            ],
+        ],
+    ],
+    ['header' => 'ADMINISTRATION', 'can' => ['access-settings-general', 'access-settings-users', 'access-settings-telegram']],
+    [
         'text' => 'Settings',
         'icon' => 'fas fa-cog',
+        'icon_color' => 'secondary',
         'submenu' => [
             [
                 'text' => 'General',
@@ -508,15 +621,27 @@ return [
                 'can'  => 'access-settings-general',
             ],
             [
-                'text' => 'Users',
+                'text' => 'Users & Roles',
                 'url'  => 'users',
-                'icon' => 'fas fa-users',
+                'icon' => 'fas fa-user-shield',
+                'can'  => 'access-settings-users',
+            ],
+            [
+                'text' => 'Activity Log',
+                'url'  => 'activity',
+                'icon' => 'fas fa-history',
                 'can'  => 'access-settings-users',
             ],
             [
                 'text' => 'Telegram',
                 'url'  => 'settings/telegram',
                 'icon' => 'fab fa-telegram-plane',
+                'can'  => 'access-settings-telegram',
+            ],
+            [
+                'text' => 'WhatsApp',
+                'url'  => 'settings/whatsapp',
+                'icon' => 'fab fa-whatsapp',
                 'can'  => 'access-settings-telegram',
             ],
         ],
@@ -539,6 +664,7 @@ return [
 
     'filters' => [
         JeroenNoten\LaravelAdminLte\Menu\Filters\GateFilter::class,
+        App\Menu\WorkBadgeFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\HrefFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\SearchFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\ActiveFilter::class,

@@ -19,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
     // "viewer" role: read-only everywhere.
     $middleware->appendToGroup('web', \App\Http\Middleware\ViewerReadOnly::class);
 
+    // English / বাংলা for every page; the choice is kept in a plain cookie too.
+    $middleware->appendToGroup('web', \App\Http\Middleware\SetLocale::class);
+    $middleware->encryptCookies(except: ['locale']);
+
     // The site is served through Cloudflare (noc.sunlitnetwork.com). Trust
     // only Cloudflare's edge ranges, so request()->ip() is the real visitor
     // and HTTPS is detected from X-Forwarded-Proto — a direct hit on the

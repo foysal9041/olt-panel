@@ -20,17 +20,68 @@
                value="{{ old('name', $employee->name ?? '') }}" required autofocus>
     </div>
 
-    <div class="form-group">
-        <label>Phone</label>
-        <input type="text" name="phone" class="form-control"
-               value="{{ old('phone', $employee->phone ?? '') }}">
-    </div>
-
-    <div class="form-group">
-        <label>Designation</label>
-        <input type="text" name="designation" class="form-control"
-               value="{{ old('designation', $employee->designation ?? '') }}"
-               placeholder="e.g. Network Engineer">
+    <div class="form-row">
+        <div class="col-md-6 form-group">
+            <label>Phone</label>
+            <input type="text" name="phone" class="form-control"
+                   value="{{ old('phone', $employee->phone ?? '') }}">
+        </div>
+        <div class="col-md-6 form-group">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ old('email', $employee->email ?? '') }}">
+        </div>
+        <div class="col-md-6 form-group">
+            <label>Designation</label>
+            <input type="text" name="designation" class="form-control"
+                   value="{{ old('designation', $employee->designation ?? '') }}"
+                   placeholder="e.g. Network Engineer">
+        </div>
+        <div class="col-md-6 form-group">
+            <label>Department</label>
+            <input type="text" name="department" class="form-control" list="emp-depts"
+                   value="{{ old('department', $employee->department ?? '') }}" placeholder="e.g. IT & Network">
+            <datalist id="emp-depts">@foreach (\App\Models\Employee::DEPARTMENTS as $dep)<option value="{{ $dep }}">@endforeach</datalist>
+        </div>
+        <div class="col-md-4 form-group">
+            <label>Emp ID</label>
+            <input type="text" name="emp_code" class="form-control"
+                   value="{{ old('emp_code', $employee->emp_code ?? '') }}" placeholder="SNDC-001">
+        </div>
+        <div class="col-md-4 form-group">
+            <label>Joining date</label>
+            <input type="date" name="joining_date" class="form-control"
+                   value="{{ old('joining_date', $employee?->joining_date?->toDateString()) }}">
+        </div>
+        <div class="col-md-4 form-group">
+            <label>Blood group</label>
+            <select name="blood_group" class="form-control">
+                <option value="">—</option>
+                @foreach (\App\Models\Employee::BLOOD_GROUPS as $bg)
+                    <option value="{{ $bg }}" @selected(old('blood_group', $employee->blood_group ?? '') === $bg)>{{ $bg }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-8 form-group">
+            <label>Address</label>
+            <input type="text" name="address" class="form-control"
+                   value="{{ old('address', $employee->address ?? '') }}">
+        </div>
+        <div class="col-md-4 form-group">
+            <label>NID</label>
+            <input type="text" name="nid" class="form-control"
+                   value="{{ old('nid', $employee->nid ?? '') }}">
+        </div>
+        <div class="col-12 form-group">
+            <label>Photo</label>
+            <div class="d-flex align-items-center" style="gap:.75rem">
+                @if ($employee?->photoUrl())
+                    <img src="{{ $employee->photoUrl() }}" alt="" style="width:3.2rem; height:3.2rem; border-radius:50%; object-fit:cover">
+                @endif
+                <input type="file" name="photo_file" accept="image/*" class="form-control-file">
+            </div>
+            <small class="text-muted">For the ID card. You can also add and fit it on the ID card page.</small>
+        </div>
     </div>
 
     <div class="form-group">

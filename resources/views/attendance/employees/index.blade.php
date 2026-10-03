@@ -73,6 +73,12 @@
                             <a href="{{ route('attendance.employees.edit', $employee->id) }}" class="btn btn-warning btn-sm">
                                 Edit
                             </a>
+                            @can('access-attendance-idcards')
+                                <a href="{{ route('attendance.idcards.make', ['employee' => $employee->id]) }}" class="btn btn-outline-primary btn-sm" title="ID card"><i class="fas fa-id-card"></i></a>
+                            @endcan
+                            @can('access-attendance-letters')
+                                <a href="{{ route('attendance.letters.create', ['type' => 'appointment', 'employee' => $employee->id]) }}" class="btn btn-outline-success btn-sm" title="Appointment letter"><i class="fas fa-file-signature"></i></a>
+                            @endcan
 
                             @if(strtolower(auth()->user()->role) == 'admin')
                                 <form action="{{ route('attendance.employees.destroy', $employee->id) }}"

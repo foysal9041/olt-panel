@@ -29,6 +29,7 @@ class User extends Authenticatable
         'olt_access',
         'switch_access',
         'status',
+        'employee_id',
     ];
 
     /** Device access modes for OLTs and switches. */
@@ -61,6 +62,27 @@ class User extends Authenticatable
         ];
     }
 
+    /** The HR employee record this login belongs to (for leave). */
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    /** Tasks given to this user (their own to-dos included). */
+    public function tasks()
+    {
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    /** Short initials for avatars: "Foysal Ahmed" → "FA". */
+    public function initials(): string
+    {
+        $words = preg_split('/\s+/u', trim((string) $this->name)) ?: [];
+        $letters = array_map(fn ($w) => mb_substr($w, 0, 1), array_slice(array_filter($words), 0, 2));
+
+        return mb_strtoupper(implode('', $letters)) ?: '?';
+    }
+
     public function modulePermissions()
     {
         return $this->hasMany(UserModulePermission::class);
@@ -91,10 +113,10 @@ class User extends Authenticatable
         return strtolower((string) $this->role) === 'admin';
     }
 
-    /** View-only account: sees what it's allowed to, changes nothing. */
+    /** View-only account (viewer, owner): sees what it's allowed to, changes nothing but its own to-dos and leave. */
     public function isViewer(): bool
     {
-        return strtolower((string) $this->role) === 'viewer';
+        return in_array(strtolower((string) $this->role), ['viewer', 'owner'], true);
     }
 
     public function allowedOlts()

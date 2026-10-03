@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 class ZoneSettlementRow extends Model
 {
     protected $fillable = [
-        'zone_settlement_id', 'source_row', 'name', 'customer_id', 'total_payment', 'deduction', 'included', 'flags', 'invoice_no', 'transaction_id',
+        'zone_settlement_id', 'source_row', 'name', 'customer_id', 'total_payment', 'deduction', 'included', 'flags', 'invoice_no',
     ];
 
     protected $casts = [
@@ -33,12 +33,6 @@ class ZoneSettlementRow extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
-    }
-
-    /** The income entry this row's Net Bill was posted as. */
-    public function transaction()
-    {
-        return $this->belongsTo(Transaction::class);
     }
 
     /**

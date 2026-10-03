@@ -14,7 +14,7 @@
         <h3 class="card-title">{{ $employee->name }}</h3>
     </div>
 
-    <form method="POST" action="{{ route('attendance.employees.update', $employee->id) }}">
+    <form method="POST" action="{{ route('attendance.employees.update', $employee->id) }}" enctype="multipart/form-data">
         @csrf
         @method('PUT')
 

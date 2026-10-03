@@ -7,7 +7,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Cash in hand at the start of a day (জের).
+ * Petty cash in hand at the start of a day (জের) — only petty cash entries
+ * count; the bank, where all income goes, doesn't.
  *
  * Starts from the latest "cash on hand" count on or before that day (0 if
  * none), then adds income and subtracts expenses from that count's date up
@@ -24,6 +25,7 @@ class CashBalance
 
         $row = DB::table('transactions')
             ->join('transaction_categories as c', 'c.id', '=', 'transactions.transaction_category_id')
+            ->where('transactions.account', 'cash')
             ->where('transactions.transaction_date', '<', $date->toDateString())
             ->when($base, fn ($q) => $q->where('transactions.transaction_date', '>=', $base->date->toDateString()))
             ->selectRaw("COALESCE(SUM(CASE WHEN c.type = 'income' THEN transactions.amount END), 0) AS i,

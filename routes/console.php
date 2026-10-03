@@ -42,6 +42,19 @@ Schedule::call(function () {
     ->name('prune-switch-port-readings')
     ->dailyAt('03:45');
 
+// Employees past their last working day (termination letter): mark them
+// inactive and block their panel login.
+Schedule::call(function () {
+    $left = \App\Models\Employee::where('status', true)->whereNotNull('left_on')->whereDate('left_on', '<', today())->get();
+    foreach ($left as $employee) {
+        $employee->update(['status' => false]);
+        \App\Models\User::where('employee_id', $employee->id)->where('status', 1)->update(['status' => 0]);
+        \App\Models\ActivityLog::record('updated', "{$employee->name} left on {$employee->left_on->format('d M Y')} — marked inactive, login blocked", $employee, null, null, false);
+    }
+})
+    ->name('employees-left')
+    ->dailyAt('00:20');
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

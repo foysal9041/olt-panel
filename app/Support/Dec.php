@@ -73,6 +73,21 @@ class Dec
         return ($neg ? '−' : ($sign ? '+' : '')) . '৳' . $int . '.' . str_pad($frac, 2, '0');
     }
 
+    /** Lakh/crore grouping as in the office's sheets: 31,53,035.24 (negative as −…). */
+    public static function lakh($v): string
+    {
+        $r = self::round($v, 2);
+        $neg = str_starts_with($r, '-');
+        [$int, $frac] = array_pad(explode('.', ltrim($r, '-')), 2, '00');
+
+        if (strlen($int) > 3) {
+            $head = substr($int, 0, -3);
+            $int = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $head) . ',' . substr($int, -3);
+        }
+
+        return ($neg ? '−' : '') . $int . '.' . str_pad($frac, 2, '0');
+    }
+
     /** 81198.02 as a float for spreadsheets (already rounded to 2 places). */
     public static function toFloat($v): float
     {

@@ -1,6 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Inventory\InventoryController;
+use App\Http\Controllers\Inventory\ItemController as InventoryItemController;
+use App\Http\Controllers\Inventory\MovementController as InventoryMovementController;
+use App\Http\Controllers\MyLeaveController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TicketController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\OltController;
 use App\Http\Controllers\DashboardController;
@@ -17,14 +23,19 @@ use App\Http\Controllers\NocAlertSettingController;
 use App\Http\Controllers\Attendance\AttendanceController;
 use App\Http\Controllers\Attendance\DutyShiftController;
 use App\Http\Controllers\Attendance\EmployeeController;
+use App\Http\Controllers\Attendance\HrLetterController;
+use App\Http\Controllers\Attendance\IdCardController;
 use App\Http\Controllers\Attendance\LeaveController;
 use App\Http\Controllers\Attendance\LeaveTypeController;
 use App\Http\Controllers\Attendance\ZkDeviceController;
 use App\Http\Controllers\Attendance\ZkPushController;
 use App\Http\Controllers\Accounts\AccountsDashboardController;
+use App\Http\Controllers\Accounts\BandwidthBillingController;
 use App\Http\Controllers\Accounts\BandwidthTypeController;
 use App\Http\Controllers\Accounts\CustomerController;
 use App\Http\Controllers\Accounts\CashBookController;
+use App\Http\Controllers\Accounts\PartnerController;
+use App\Http\Controllers\Accounts\ProfitSheetController;
 use App\Http\Controllers\Accounts\SalaryController;
 use App\Http\Controllers\Accounts\TransactionCategoryController;
 use App\Http\Controllers\Accounts\TransactionController;
@@ -147,6 +158,9 @@ Route::middleware(['auth', 'can:access-settings-telegram'])->prefix('settings')-
 // Old location of the Telegram page (it used to live under NOC).
 Route::redirect('/noc-alerts', '/settings/telegram');
 
+// English / বাংলা — for signed-in users and the sign-in page alike.
+Route::get('/locale/{locale}', \App\Http\Controllers\LocaleController::class)->whereIn('locale', ['en', 'bn', 'toggle'])->name('locale');
+
 Route::middleware(['auth', 'can:access-settings-general'])->group(function () {
 
     Route::get('/settings', function () {
@@ -198,6 +212,30 @@ Route::middleware(['auth', 'can:access-attendance'])->prefix('attendance')->name
         ->name('leaves.approve')->middleware('can:access-attendance-leaves');
     Route::post('leaves/{leave}/reject', [LeaveController::class, 'reject'])
         ->name('leaves.reject')->middleware('can:access-attendance-leaves');
+
+    // HR documents: appointment / termination letters and office ID cards.
+    Route::middleware('can:access-attendance-letters')->group(function () {
+        Route::get('letters', [HrLetterController::class, 'index'])->name('letters.index');
+        Route::get('letters/create', [HrLetterController::class, 'create'])->name('letters.create');
+        Route::post('letters', [HrLetterController::class, 'store'])->name('letters.store');
+        Route::get('letters/{letter}', [HrLetterController::class, 'show'])->name('letters.show');
+        Route::get('letters/{letter}/edit', [HrLetterController::class, 'edit'])->name('letters.edit');
+        Route::put('letters/{letter}', [HrLetterController::class, 'update'])->name('letters.update');
+        Route::delete('letters/{letter}', [HrLetterController::class, 'destroy'])->name('letters.destroy');
+    });
+    Route::middleware('can:access-attendance-idcards')->group(function () {
+        Route::get('id-cards', [IdCardController::class, 'index'])->name('idcards.index');
+        Route::get('id-cards/make', [IdCardController::class, 'make'])->name('idcards.make');
+        Route::put('id-cards/settings', [IdCardController::class, 'settings'])->name('idcards.settings');
+        Route::put('id-cards/signature', [IdCardController::class, 'signature'])->name('idcards.signature');
+        Route::get('id-cards/sheet', [IdCardController::class, 'sheet'])->name('idcards.sheet');
+        Route::post('id-cards', [IdCardController::class, 'store'])->name('idcards.store');
+        Route::put('id-cards/{card}', [IdCardController::class, 'update'])->name('idcards.update');
+        Route::post('id-cards/{card}/revoke', [IdCardController::class, 'revoke'])->name('idcards.revoke');
+        Route::delete('id-cards/{card}', [IdCardController::class, 'destroy'])->name('idcards.destroy');
+        Route::get('id-cards/{card}/photo', [IdCardController::class, 'cardPhoto'])->name('idcards.photo');
+    });
+    Route::get('employees/{employee}/photo', [IdCardController::class, 'photo'])->name('employees.photo');
 
     Route::post('leave-types', [LeaveTypeController::class, 'store'])
         ->name('leave-types.store')->middleware('can:access-attendance-leaves');
@@ -257,10 +295,44 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
             Route::get('{settlement}/export', 'export')->name('export');
             Route::get('{settlement}/source', 'source')->name('source');
             Route::put('{settlement}/signatory', 'signatory')->name('signatory');
-            Route::post('{settlement}/post', 'post')->name('post');
-            Route::delete('{settlement}/post', 'unpost')->name('unpost');
             Route::delete('{settlement}', 'destroy')->name('destroy');
         });
+
+    // Bandwidth clients: monthly invoices and payments
+    Route::prefix('billing')->name('billing.')->middleware('can:access-accounts-billing')->group(function () {
+        Route::get('/', [BandwidthBillingController::class, 'index'])->name('index');
+        Route::post('generate', [BandwidthBillingController::class, 'generate'])->name('generate');
+        Route::get('print', [BandwidthBillingController::class, 'printMonth'])->name('print-month');
+        Route::get('{invoice}', [BandwidthBillingController::class, 'show'])->name('show');
+        Route::put('{invoice}', [BandwidthBillingController::class, 'update'])->name('update');
+        Route::post('{invoice}/recalculate', [BandwidthBillingController::class, 'recalculate'])->name('recalculate');
+        Route::delete('{invoice}', [BandwidthBillingController::class, 'destroy'])->name('destroy');
+        Route::get('{invoice}/print', [BandwidthBillingController::class, 'print'])->name('print');
+        Route::post('{invoice}/payments', [BandwidthBillingController::class, 'storePayment'])->name('payments.store');
+        Route::get('{invoice}/payments/{payment}/receipt', [BandwidthBillingController::class, 'receipt'])->name('payments.receipt');
+        Route::delete('{invoice}/payments/{payment}', [BandwidthBillingController::class, 'destroyPayment'])->name('payments.destroy');
+    });
+
+    // মাসিক লাভ ও শেয়ার বণ্টন
+    Route::prefix('profit')->name('profit.')->middleware('can:access-accounts-profit')->group(function () {
+        Route::get('/', [ProfitSheetController::class, 'index'])->name('index');
+        Route::post('/', [ProfitSheetController::class, 'save'])->name('save');
+        Route::get('print', [ProfitSheetController::class, 'print'])->name('print');
+        Route::put('heads/{category}', [ProfitSheetController::class, 'head'])->name('heads');
+        Route::post('{profitSheet}/reopen', [ProfitSheetController::class, 'reopen'])->name('reopen');
+        Route::delete('{profitSheet}', [ProfitSheetController::class, 'destroy'])->name('destroy');
+    });
+
+    // Partners: shareholders and commission holders, each with an account
+    Route::prefix('partners')->name('partners.')->middleware('can:access-accounts-partners')->group(function () {
+        Route::get('/', [PartnerController::class, 'index'])->name('index');
+        Route::post('/', [PartnerController::class, 'store'])->name('store');
+        Route::get('{partner}', [PartnerController::class, 'show'])->name('show');
+        Route::put('{partner}', [PartnerController::class, 'update'])->name('update');
+        Route::get('{partner}/print', [PartnerController::class, 'print'])->name('print');
+        Route::post('{partner}/entries', [PartnerController::class, 'storeEntry'])->name('entries.store');
+        Route::delete('{partner}/entries/{entry}', [PartnerController::class, 'destroyEntry'])->name('entries.destroy');
+    });
 
     // বেতন শিট
     Route::get('salaries', [SalaryController::class, 'index'])
@@ -272,6 +344,8 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
 
     Route::post('bandwidth-types', [BandwidthTypeController::class, 'store'])
         ->name('bandwidth-types.store')->middleware('can:access-accounts-customers');
+    Route::put('bandwidth-types/{bandwidthType}', [BandwidthTypeController::class, 'update'])
+        ->name('bandwidth-types.update')->middleware('can:access-accounts-customers');
     Route::delete('bandwidth-types/{bandwidthType}', [BandwidthTypeController::class, 'destroy'])
         ->name('bandwidth-types.destroy')->middleware('can:access-accounts-customers');
 
@@ -292,5 +366,60 @@ Route::middleware(['auth', 'can:access-latency'])->prefix('latency')->name('late
         ->name('data')->whereNumber('target')->middleware('can:access-latency-graphs');
 
 });
+
+// Inventory & company assets.
+Route::middleware(['auth', 'can:access-inventory'])->prefix('inventory')->name('inventory.')->group(function () {
+    Route::get('/', [InventoryController::class, 'summary'])->name('summary')->middleware('can:access-inventory-summary');
+    Route::get('assets', [InventoryController::class, 'assets'])->name('assets')->middleware('can:access-inventory-assets');
+
+    Route::middleware('can:access-inventory-stock')->group(function () {
+        Route::get('items', [InventoryItemController::class, 'index'])->name('items.index');
+        Route::post('items', [InventoryItemController::class, 'store'])->name('items.store');
+        Route::get('items/{item}', [InventoryItemController::class, 'show'])->name('items.show');
+        Route::put('items/{item}', [InventoryItemController::class, 'update'])->name('items.update');
+        Route::delete('items/{item}', [InventoryItemController::class, 'destroy'])->name('items.destroy');
+        Route::post('categories', [InventoryItemController::class, 'storeCategory'])->name('categories.store');
+        Route::delete('categories/{category}', [InventoryItemController::class, 'destroyCategory'])->name('categories.destroy');
+
+        Route::get('entries', [InventoryMovementController::class, 'index'])->name('entries.index');
+        Route::get('entries/create', [InventoryMovementController::class, 'create'])->name('entries.create');
+        Route::post('entries', [InventoryMovementController::class, 'store'])->name('entries.store');
+        Route::delete('entries/{entry}', [InventoryMovementController::class, 'destroy'])->name('entries.destroy');
+    });
+});
+
+// Tickets: everyone works on the ones given to them; the module opens, assigns and closes.
+Route::middleware('auth')->prefix('tickets')->name('tickets.')->controller(TicketController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('create', 'create')->name('create')->middleware('can:access-tickets-manage');
+    Route::post('/', 'store')->name('store')->middleware('can:access-tickets-manage');
+    Route::get('{ticket}', 'show')->name('show')->whereNumber('ticket');
+    Route::get('{ticket}/edit', 'edit')->name('edit')->middleware('can:access-tickets-manage');
+    Route::put('{ticket}', 'update')->name('update')->middleware('can:access-tickets-manage');
+    Route::post('{ticket}/progress', 'progress')->name('progress');
+    Route::post('{ticket}/task', 'makeTask')->name('task');
+    Route::delete('{ticket}', 'destroy')->name('destroy');
+});
+
+// My work: to-do list & tasks, and applying for leave — every signed-in user.
+Route::middleware('auth')->prefix('my')->name('my.')->group(function () {
+    Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+    Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
+    Route::get('tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+    Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+    Route::post('tasks/{task}/progress', [TaskController::class, 'progress'])->name('tasks.progress');
+    Route::post('tasks/{task}/toggle', [TaskController::class, 'toggle'])->name('tasks.toggle');
+    Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+
+    Route::get('leave', [MyLeaveController::class, 'index'])->name('leave.index');
+    Route::post('leave', [MyLeaveController::class, 'store'])->name('leave.store');
+    Route::delete('leave/{leave}', [MyLeaveController::class, 'destroy'])->name('leave.destroy');
+});
+
+// Public: the QR on an office ID card — says whether the card is valid.
+Route::get('verify/card/{card}', [\App\Http\Controllers\Attendance\IdCardController::class, 'verifyCard'])
+    ->name('card.verify')->middleware(['signed:relative', 'throttle:30,1']);
+Route::get('verify/staff/{employee}', [\App\Http\Controllers\Attendance\IdCardController::class, 'verify'])
+    ->name('staff.verify')->middleware(['signed:relative', 'throttle:30,1']);
 
 require __DIR__.'/auth.php';

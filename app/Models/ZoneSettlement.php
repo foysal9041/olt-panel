@@ -14,9 +14,8 @@ class ZoneSettlement extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'month', 'invoice_date', 'bkash_percent', 'source_name', 'source_path', 'sheet_name',
+        'month', 'cycle', 'invoice_date', 'bkash_percent', 'source_name', 'source_path', 'sheet_name',
         'mapping', 'original', 'blank_deduction_as_zero', 'notes', 'created_by', 'prepared_by', 'prepared_title',
-        'posted_at', 'posted_on', 'posted_by',
     ];
 
     protected $casts = [
@@ -26,11 +25,49 @@ class ZoneSettlement extends Model
         'mapping' => 'array',
         'original' => 'array',
         'blank_deduction_as_zero' => 'boolean',
-        'posted_at' => 'datetime',
-        'posted_on' => 'date',
     ];
 
     protected $hidden = ['original'];
+
+    /**
+     * Billing cycles. Each has its own Excel; a month's bill covers from
+     * `start` of the previous month to the day before `start` of this one
+     * (start 1 = the calendar month). `line` is the name on the profit sheet.
+     */
+    public const CYCLES = [
+        'fixed' => ['label' => 'Fixed Date Paid', 'start' => 11, 'line' => 'All Fix Date Paid'],
+        'balunda' => ['label' => 'Balunda', 'start' => 16, 'line' => 'Balunda Tahazzat'],
+        'nttn' => ['label' => 'NTTN Client', 'start' => 1, 'line' => 'NTTN Client Bill'],
+    ];
+
+    public function cycleLabel(): string
+    {
+        return self::CYCLES[$this->cycle]['label'] ?? self::CYCLES['fixed']['label'];
+    }
+
+    /**
+     * First and last day billed, e.g. Sep 2026 fixed → 11 Aug – 10 Sep.
+     *
+     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon}
+     */
+    public function period(): array
+    {
+        $start = self::CYCLES[$this->cycle]['start'] ?? 11;
+        $month = $this->month->copy()->startOfMonth();
+
+        if ($start === 1) {
+            return [$month, $month->copy()->endOfMonth()];
+        }
+
+        return [$month->copy()->subMonthNoOverflow()->day($start), $month->copy()->day($start - 1)];
+    }
+
+    public function periodLabel(string $format = 'd M Y'): string
+    {
+        [$from, $to] = $this->period();
+
+        return $from->format($format) . ' – ' . $to->format($format);
+    }
 
     public function rows()
     {
@@ -42,15 +79,10 @@ class ZoneSettlement extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function poster()
+    /** Its month's Net Profit sheet is finalized: the settlement is part of closed books. */
+    public function isClosed(): bool
     {
-        return $this->belongsTo(User::class, 'posted_by');
-    }
-
-    /** Net Bill has been posted to Accounts as income. */
-    public function isPosted(): bool
-    {
-        return $this->posted_at !== null;
+        return ProfitSheet::isMonthClosed($this->month);
     }
 
     /**
@@ -80,7 +112,7 @@ class ZoneSettlement extends Model
 
     protected function activityLogTitle(): string
     {
-        return ($this->month?->format('M Y') ?? '') . ' · ' . $this->source_name;
+        return ($this->month?->format('M Y') ?? '') . ' · ' . $this->cycleLabel() . ' · ' . $this->source_name;
     }
 
     protected function activityLogExcept(): array

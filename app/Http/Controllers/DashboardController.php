@@ -7,6 +7,11 @@ use App\Models\Employee;
 use App\Models\IpBlock;
 use App\Models\NttnLink;
 use App\Models\LatencyTarget;
+use App\Models\Leave;
+use App\Models\LeaveType;
+use App\Models\Task;
+use App\Models\Ticket;
+use App\Services\InventoryStock;
 use App\Models\NetworkSwitch;
 use App\Models\Olt;
 use App\Models\SwitchEvent;
@@ -103,11 +108,16 @@ class DashboardController extends Controller
                 'income' => $settlement->totals()['income'],
             ] : null];
 
+            // What bandwidth clients still owe, and the latest month's net profit.
+            $accounts['bandwidth_due'] = \App\Models\Customer::where('customer_type', 'bandwidth_client')->get()
+                ->reduce(fn ($t, $c) => \App\Support\Dec::add($t, $c->bandwidthBalance()), '0');
+            $accounts['profit'] = \App\Models\ProfitSheet::latest('month')->first();
+
             // The office's books: today's cash book and this month's totals.
             $today = Carbon::today();
             ['amount' => $opening, 'base' => $count] = CashBalance::before($today);
-            $dayIn = (float) Transaction::income()->whereDate('transaction_date', $today)->sum('amount');
-            $dayOut = (float) Transaction::expense()->whereDate('transaction_date', $today)->sum('amount');
+            $dayIn = (float) Transaction::income()->cash()->whereDate('transaction_date', $today)->sum('amount');
+            $dayOut = (float) Transaction::expense()->cash()->whereDate('transaction_date', $today)->sum('amount');
             $monthRange = [$today->copy()->startOfMonth()->toDateString(), $today->toDateString()];
 
             $accounts['cash'] = [
@@ -118,8 +128,8 @@ class DashboardController extends Controller
                 // Without a cash-on-hand count the balance is just income
                 // minus expenses since the first entry — not real cash.
                 'counted_on' => $count?->date,
-                'month_in' => (float) Transaction::income()->whereBetween('transaction_date', $monthRange)->sum('amount'),
-                'month_out' => (float) Transaction::expense()->whereBetween('transaction_date', $monthRange)->sum('amount'),
+                'month_in' => (float) Transaction::income()->counted()->whereBetween('transaction_date', $monthRange)->sum('amount'),
+                'month_out' => (float) Transaction::expense()->counted()->whereBetween('transaction_date', $monthRange)->sum('amount'),
             ];
 
             // Income vs expense, last 6 months, for the mini chart.
@@ -129,8 +139,8 @@ class DashboardController extends Controller
 
                 return [
                     'label' => $start->format('M'),
-                    'income' => (float) Transaction::income()->whereBetween('transaction_date', $range)->sum('amount'),
-                    'expense' => (float) Transaction::expense()->whereBetween('transaction_date', $range)->sum('amount'),
+                    'income' => (float) Transaction::income()->counted()->whereBetween('transaction_date', $range)->sum('amount'),
+                    'expense' => (float) Transaction::expense()->counted()->whereBetween('transaction_date', $range)->sum('amount'),
                 ];
             })->all();
         }
@@ -163,6 +173,8 @@ class DashboardController extends Controller
             ];
         }
 
+        $work = $this->work($user);
+
         // One-click shortcuts, only for what this user may do.
         $actions = array_values(array_filter([
             Gate::allows('access-olt-manage') ? ['Add OLTs', 'fas fa-network-wired', route('olt.create'), 'indigo'] : null,
@@ -174,6 +186,8 @@ class DashboardController extends Controller
             Gate::allows('access-accounts-settlements') ? ['Zone Settlement', 'fas fa-file-excel', route('accounts.settlements.index'), 'green'] : null,
             Gate::allows('access-accounts-salaries') ? ['Salary Sheet', 'fas fa-money-check-alt', route('accounts.salaries.index'), 'amber'] : null,
             Gate::allows('access-attendance-leaves') ? ['Add Leave', 'fas fa-plane-departure', route('attendance.leaves.create'), 'rose'] : null,
+            Gate::allows('access-tickets-manage') ? ['New Ticket', 'fas fa-ticket-alt', route('tickets.create'), 'rose'] : null,
+            Gate::allows('access-inventory-stock') ? ['Stock Entry', 'fas fa-boxes', route('inventory.entries.create', ['type' => 'use']), 'sky'] : null,
         ]));
 
         // What the team has been doing (for those who manage users).
@@ -181,6 +195,47 @@ class DashboardController extends Controller
             ? \App\Models\ActivityLog::with('user:id,name')->latest('id')->limit(25)->get()
             : null;
 
-        return view('dashboard', compact('can', 'olt', 'switches', 'events', 'team', 'latency', 'attendance', 'accounts', 'issues', 'nttn', 'ip', 'actions'));
+        return view('dashboard', compact('can', 'olt', 'switches', 'events', 'team', 'latency', 'attendance', 'accounts', 'issues', 'nttn', 'ip', 'actions', 'work'));
+    }
+
+    /**
+     * Everyone's own work: their to-do list, tasks they gave, tickets given
+     * to them, their leave — plus tickets / assets numbers for those who
+     * look after them.
+     */
+    protected function work(\App\Models\User $user): array
+    {
+        $mine = Task::where('assigned_to', $user->id);
+        $employee = $user->employee;
+
+        $leave = null;
+        if ($employee) {
+            $types = LeaveType::whereNotNull('default_days_per_year')->orderBy('name')->get();
+            $leave = [
+                'balances' => $types->map(fn ($t) => ['name' => $t->name, 'left' => $employee->remainingLeaveDays($t), 'allocated' => $employee->allocatedLeaveDays($t)]),
+                'latest' => $employee->leaves()->with('leaveType')->latest('id')->first(),
+                'today' => $employee->leaves()->approved()->overlapping(today()->toDateString(), today()->toDateString())->exists(),
+            ];
+        }
+
+        return [
+            'tasks' => (clone $mine)->with(['creator', 'ticket'])->where(fn ($q) => $q->open()->orWhere('completed_at', '>=', now()->subHours(12)))
+                ->workOrder()->limit(8)->get(),
+            'open' => (clone $mine)->open()->count(),
+            'overdue' => (clone $mine)->open()->whereDate('due_date', '<', today())->count(),
+            'given' => Task::with('assignee')->where('created_by', $user->id)->where('assigned_to', '!=', $user->id)
+                ->where(fn ($q) => $q->open()->orWhere('completed_at', '>=', now()->subDays(2)))->workOrder()->limit(6)->get(),
+            'tickets' => Ticket::with('customer')->where('assigned_to', $user->id)->active()
+                ->orderByRaw("FIELD(priority, 'urgent', 'high', 'normal', 'low')")->orderBy('due_at')->limit(5)->get(),
+            'leave' => $leave,
+            'leave_pending' => Gate::allows('access-attendance-leaves') ? Leave::where('status', 'pending')->count() : null,
+            'ticket_stats' => Gate::allows('access-tickets-manage') ? [
+                'open' => Ticket::active()->count(),
+                'overdue' => Ticket::overdue()->count(),
+                'unassigned' => Ticket::active()->whereNull('assigned_to')->count(),
+            ] : null,
+            'assets' => Gate::allows('access-inventory-summary') ? app(InventoryStock::class)->summary() : null,
+            'can_assign' => Gate::allows('access-tasks-assign'),
+        ];
     }
 }

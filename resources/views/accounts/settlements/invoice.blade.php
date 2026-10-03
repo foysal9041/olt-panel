@@ -15,6 +15,10 @@
 @php
     $plain = request()->boolean('plain');
     $n = fn ($v) => number_format((float) Dec::round($v, 2), 2);
+    $pdfName = $rows->count() === 1
+        ? str_replace('/', '-', $rows->first()->invoice_no) . ' ' . $rows->first()->displayName()
+        : 'Sunlit DC Invoices ' . $settlement->month->format('M Y');
+    $pdfName = trim(preg_replace('/[^\w\s.()-]+/u', ' ', $pdfName)) . '.pdf';
 @endphp
 
 @section('title', $rows->count() === 1 ? $rows->first()->invoice_no : 'Invoices ' . $settlement->month->format('F Y'))
@@ -22,7 +26,8 @@
 @section('bare', '1')
 
 @section('actions')
-    <a href="{{ request()->fullUrlWithQuery(['plain' => $plain ? null : 1]) }}">
+    <button type="button" id="pdf-btn" style="background:#15803d; border-color:#15803d">⬇ Download PDF</button>
+    <a href="{{ request()->fullUrlWithQuery(['plain' => $plain ? null : 1, 'download' => null]) }}">
         {{ $plain ? 'Show pad design' : 'Pre-printed pad (blank)' }}
     </a>
 @endsection
@@ -38,6 +43,7 @@
     .inv-meta { line-height: 1.6; }
     .inv-meta b { font-weight: 700; }
     .inv-tag { font-size: 20pt; font-weight: 700; letter-spacing: .12em; color: var(--blue); line-height: 1; }
+    .bill-period { margin: -2.5mm 0 4mm; text-align: center; font-size: 10.5pt; color: #334155; }
     .bill-for { margin: 0 0 4mm; text-align: center; font-size: 15pt; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
     table.bill { width: 100%; border-collapse: collapse; }
     table.bill th, table.bill td { border: 1px solid #000; padding: 1.6mm 3mm; text-align: center; background: transparent; color: #000; font-size: 11.5pt; }
@@ -71,6 +77,7 @@
                 </div>
 
                 <h3 class="bill-for">Bill for {{ $settlement->month->format('M Y') }}</h3>
+                <p class="bill-period">Billing period: {{ $settlement->periodLabel('d/m/Y') }}</p>
 
                 <table class="bill">
                     <thead>
@@ -102,4 +109,8 @@
             </div>
         </x-print.pad>
     @endforeach
+@endsection
+
+@section('scripts')
+    @include('accounts.partials.pdf-download')
 @endsection

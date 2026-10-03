@@ -47,6 +47,7 @@ class EmployeeController extends Controller
 
         $employee = Employee::create($validated);
 
+        $this->savePhoto($employee, $request);
         $this->backfillPunches($employee);
         $this->syncLeaveBalances($employee, $request);
 
@@ -75,6 +76,7 @@ class EmployeeController extends Controller
 
         $employee->update($validated);
 
+        $this->savePhoto($employee, $request);
         $this->backfillPunches($employee);
         $this->syncLeaveBalances($employee, $request);
 
@@ -111,7 +113,23 @@ class EmployeeController extends Controller
             'duty_shift_id' => 'nullable|exists:duty_shifts,id',
             'weekly_off_day' => 'nullable|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'status' => 'nullable|boolean',
-        ]);
+            'emp_code' => 'nullable|string|max:30|unique:employees,emp_code,' . ($employee->id ?? 'NULL'),
+            'department' => 'nullable|string|max:255',
+            'joining_date' => 'nullable|date',
+            'blood_group' => 'nullable|in:' . implode(',', Employee::BLOOD_GROUPS),
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string|max:500',
+            'nid' => 'nullable|string|max:30',
+        ], ['emp_code.unique' => 'Another employee already has this ID.']);
+    }
+
+    /** A photo chosen on the form: square-cropped and kept privately. */
+    private function savePhoto(Employee $employee, Request $request): void
+    {
+        if ($request->hasFile('photo_file')) {
+            $request->validate(['photo_file' => 'image|max:8192']);
+            app(\App\Services\HrDocs::class)->storePhoto($employee, $request->file('photo_file'));
+        }
     }
 
     /**

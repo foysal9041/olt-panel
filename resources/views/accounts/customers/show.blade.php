@@ -115,6 +115,148 @@
             </div>
         @endif
 
+        @if ($isBw)
+            @php $bal = (float) $customer->bandwidthBalance(); @endphp
+            <div class="card acct-panel">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-book mr-1 text-primary"></i> Account statement</h3>
+                    <span class="d-flex align-items-center" style="gap:.6rem">
+                        <span class="font-weight-bold {{ $bal > 0 ? 'text-danger' : 'text-success' }}">{{ $bal > 0 ? 'Due' : ($bal < 0 ? 'Advance' : 'Settled') }} ৳{{ number_format(abs($bal), 2) }}</span>
+                        @can('access-accounts-billing')
+                            <form method="POST" action="{{ route('accounts.billing.generate') }}" class="form-inline" style="gap:.3rem">
+                                @csrf
+                                <input type="hidden" name="customer_id" value="{{ $customer->id }}">
+                                <input type="month" name="month" value="{{ now()->format('Y-m') }}" class="form-control form-control-sm" style="width:9.5rem" required>
+                                <button class="btn btn-sm btn-primary text-nowrap"><i class="fas fa-file-invoice"></i> Make invoice</button>
+                            </form>
+                        @endcan
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    @if ($statement->isEmpty())
+                        <div class="acct-empty"><i class="fas fa-file-invoice"></i>No bill yet — invoices are made on the 1st of every month.</div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm cp-table mb-0">
+                                <thead><tr><th class="pl-3">Date</th><th>Entry</th><th class="num">Bill</th><th class="num">Paid</th><th class="num pr-3">Balance</th></tr></thead>
+                                <tbody>
+                                    @foreach ($statement as $e)
+                                        <tr>
+                                            <td class="pl-3 text-nowrap">{{ $e['date']?->format('d M Y') ?? '—' }}</td>
+                                            <td>
+                                                @if ($e['invoice'] && $e['bill'] !== null)
+                                                    @can('access-accounts-billing')<a href="{{ route('accounts.billing.show', $e['invoice']) }}">{{ $e['text'] }}</a>@else {{ $e['text'] }} @endcan
+                                                @else
+                                                    {{ $e['text'] }}
+                                                @endif
+                                            </td>
+                                            <td class="num">{{ $e['bill'] !== null ? number_format((float) $e['bill'], 2) : '' }}</td>
+                                            <td class="num text-income">{{ $e['paid'] !== null ? number_format((float) $e['paid'], 2) : '' }}</td>
+                                            <td class="num pr-3 font-weight-bold {{ (float) $e['balance'] > 0 ? 'text-danger' : '' }}">{{ number_format((float) $e['balance'], 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            @if ($monthly)
+                @php
+                    $used = collect($monthly)->flatMap(fn ($m) => array_keys($m['types']))->unique();
+                    $cols = $typeOrder->filter(fn ($t) => $used->contains($t))->merge($used->diff($typeOrder))->values();
+                    $n = fn ($v) => $v === null ? '' : (rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.') ?: '0');
+                @endphp
+                <div class="card acct-panel">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-calendar-alt mr-1 text-primary"></i> Month by month</h3>
+                        <span class="small text-muted">Mbps × rate each month · Bill = what the rates give · Invoice = what was billed</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm cp-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="pl-3">Month</th>
+                                        @foreach ($cols as $c)<th class="num">{{ $c }}</th>@endforeach
+                                        <th class="num">Bill</th>
+                                        <th class="num pr-3">Invoice</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($monthly as $row)
+                                        <tr>
+                                            <td class="pl-3 font-weight-bold text-nowrap">{{ $row['month']->format('M Y') }}</td>
+                                            @foreach ($cols as $c)
+                                                <td class="num" style="line-height:1.25">
+                                                    @foreach ($row['types'][$c] ?? [] as $seg)
+                                                        <div @if (count($row['types'][$c]) > 1) title="{{ $seg['from']->format('j M') }} – {{ $seg['to']->format('j M') }}" @endif>
+                                                            @if ($seg['mbps'] !== null)
+                                                                <b>{{ $n($seg['mbps']) }}</b> <span class="text-muted">× {{ $n($seg['rate']) }}</span>
+                                                            @else
+                                                                <b>{{ $n($seg['rate']) }}</b>
+                                                            @endif
+                                                            @if (count($row['types'][$c]) > 1)<span class="text-muted small">({{ $seg['from']->format('j') }}–{{ $seg['to']->format('j') }})</span>@endif
+                                                        </div>
+                                                    @endforeach
+                                                    @if (empty($row['types'][$c]))<span class="text-muted">—</span>@endif
+                                                </td>
+                                            @endforeach
+                                            <td class="num">{{ number_format((float) $row['total'], 2) }}</td>
+                                            <td class="num pr-3">
+                                                @if ($row['invoice'])
+                                                    @php $billed = $row['invoice']->totalBill(); @endphp
+                                                    @can('access-accounts-billing')
+                                                        <a href="{{ route('accounts.billing.show', $row['invoice']) }}" class="font-weight-bold">{{ number_format((float) $billed, 2) }}</a>
+                                                    @else
+                                                        <b>{{ number_format((float) $billed, 2) }}</b>
+                                                    @endcan
+                                                    @if (abs((float) $billed - (float) $row['total']) >= 0.01)
+                                                        <i class="fas fa-info-circle text-muted" title="The invoice differs from the rates (edited lines, or billed another way then)"></i>
+                                                    @endif
+                                                @else
+                                                    <span class="text-muted small">not made</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <div class="card acct-panel">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-history mr-1" style="color:#7c3aed"></i> Rate &amp; Mbps history</h3>
+                    <a href="{{ route('accounts.customers.edit', $customer) }}" class="small">Change rates <i class="fas fa-arrow-right"></i></a>
+                </div>
+                <div class="card-body p-0">
+                    @if ($customer->serviceChanges->isEmpty())
+                        <div class="acct-empty"><i class="fas fa-history"></i>No rates yet.</div>
+                    @else
+                        <table class="table table-sm cp-table mb-0">
+                            <thead><tr><th class="pl-3">From</th><th>Type</th><th class="num">Rate</th><th class="num">Mbps</th><th class="num">Monthly</th><th class="pr-3">Note</th></tr></thead>
+                            <tbody>
+                                @foreach ($customer->serviceChanges->sortByDesc(fn ($c) => $c->effective_from->toDateString() . sprintf('%08d', $c->id)) as $c)
+                                    <tr>
+                                        <td class="pl-3 text-nowrap">{{ $c->effective_from->format('d M Y') }}</td>
+                                        <td>{{ $c->type?->name }}</td>
+                                        <td class="num">{{ (float) $c->rate > 0 ? rtrim(rtrim($c->rate, '0'), '.') : 'stopped' }}</td>
+                                        <td class="num">{{ $c->mbps !== null && (float) $c->rate > 0 ? rtrim(rtrim($c->mbps, '0'), '.') : '' }}</td>
+                                        <td class="num">{{ (float) $c->rate > 0 ? number_format((float) $c->rate * (float) ($c->mbps ?: 1), 2) : '' }}</td>
+                                        <td class="pr-3 small text-muted">{{ $c->note }}{{ $c->recorder ? ($c->note ? ' · ' : '') . $c->recorder->name : '' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         {{-- ============ Zone settlement history ============ --}}
         @if (! $isBw || $rows->isNotEmpty())
             @if ($rows->isNotEmpty())
@@ -157,7 +299,7 @@
                                         <th class="num">Total Payment</th>
                                         <th class="num">Total Payable</th>
                                         <th class="num">Net Bill</th>
-                                        <th class="text-center pr-3">Income</th>
+                                        <th class="text-center pr-3">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -174,6 +316,7 @@
                                             <td class="text-nowrap">
                                                 @can('access-accounts-settlements')
                                                     <a href="{{ route('accounts.settlements.invoice', [$s, $row]) }}" target="_blank" title="Print invoice"><i class="fas fa-print small"></i> {{ $row->invoice_no }}</a>
+                                                    <a href="{{ route('accounts.settlements.invoice', [$s, $row, 'download' => 1]) }}" target="_blank" class="ml-1 text-success" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
                                                 @else
                                                     {{ $row->invoice_no }}
                                                 @endcan
@@ -182,12 +325,10 @@
                                             <td class="num">{{ Dec::taka($c['invoice']) }}</td>
                                             <td class="num font-weight-bold text-income">{{ Dec::taka($c['income']) }}</td>
                                             <td class="text-center pr-3">
-                                                @if ($row->transaction)
-                                                    <i class="fas fa-check-circle text-success" title="Posted to income"></i>
-                                                @elseif ($s->isPosted())
-                                                    <i class="fas fa-minus-circle text-muted" title="No income entry"></i>
+                                                @if ($s->isClosed())
+                                                    <i class="fas fa-lock text-success" title="Month closed in Net Profit"></i>
                                                 @else
-                                                    <i class="fas fa-clock text-warning" title="Settlement not posted yet"></i>
+                                                    <i class="fas fa-pen text-muted" title="Month still open"></i>
                                                 @endif
                                             </td>
                                         </tr>

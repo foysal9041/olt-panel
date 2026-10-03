@@ -68,7 +68,7 @@
             </tr>
             <tr>
                 <td class="label">Category</td>
-                <td class="value">{{ $transaction->category->name }}</td>
+                <td class="value">{{ \App\Support\Ui::english($transaction->category->name) }}</td>
             </tr>
             <tr>
                 <td class="label">Received By</td>

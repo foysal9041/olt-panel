@@ -23,7 +23,7 @@
     }
     .pad:last-child { page-break-after: auto; break-after: auto; }
     .pad-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
-    .pad-mark { position: absolute; left: 50%; top: 144mm; width: 136mm; transform: translate(-50%, -50%); filter: grayscale(1); opacity: .2; }
+    .pad-mark { position: absolute; left: 50%; top: 144mm; width: 136mm; transform: translate(-50%, -50%); opacity: .2; }
 
     .pad-logo { position: absolute; left: 18mm; top: 9mm; height: 21mm; width: auto; }
     .pad-contact { position: absolute; right: 17.5mm; top: 12.5mm; font-size: 8.5pt; line-height: 5.6mm; color: #333; text-align: right; }
@@ -71,7 +71,7 @@
         <polygon points="0,800 165,690 280,800" fill="#f4f4f4"/>
         <polygon points="280,800 613,800 613,720" fill="#f8f8f8"/>
     </svg>
-    <img class="pad-mark" src="{{ $img('logo-icon.png') }}" alt="">
+    <img class="pad-mark" src="{{ $img('logo-icon-gray.png') }}" alt="">
 
     <img class="pad-logo" src="{{ $img('logo.png') }}" alt="Sunlit Network DC">
     <div class="pad-contact">

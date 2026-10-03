@@ -5,7 +5,8 @@
 @php
     $editing = $user->exists;
     $err = fn ($f) => $errors->has($f) ? ' is-invalid' : '';
-    $roles = ['admin' => 'Admin — everything', 'noc' => 'NOC', 'operator' => 'Operator', 'viewer' => 'Viewer — read only'];
+    $roles = config('roles');
+    $currentRole = strtolower(old('role', $user->role ?: 'viewer'));
     $zoneValue = old('zone', $user->zone ?: 'all');
 @endphp
 
@@ -55,11 +56,15 @@
             <div class="card-body">
                 <div class="form-group">
                     <label>Role</label>
-                    <select name="role" class="form-control{{ $err('role') }}">
-                        @foreach ($roles as $value => $label)
-                            <option value="{{ $value }}" @selected(strtolower(old('role', $user->role ?: 'viewer')) === $value)>{{ $label }}</option>
+                    <div class="role-pick{{ $err('role') }}">
+                        @foreach ($roles as $value => $r)
+                            <label class="role-opt" style="--rc: {{ $r['color'] }}">
+                                <input type="radio" name="role" value="{{ $value }}" @checked($currentRole === $value)>
+                                <span class="role-ic"><i class="{{ $r['icon'] }}"></i></span>
+                                <span class="role-tx"><b>{{ \App\Support\Ui::t($r['label']) }}</b><small>{{ \App\Support\Ui::t($r['description']) }}</small></span>
+                            </label>
                         @endforeach
-                    </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Zone</label>
@@ -72,6 +77,22 @@
                     @error('zone') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                     <small class="form-text text-muted">Users limited to one zone only see that zone's OLTs and switches, unless device access below says otherwise.</small>
                 </div>
+                @isset($employees)
+                    <div class="form-group">
+                        <label>Employee record <small class="text-muted">(HR)</small></label>
+                        <select name="employee_id" class="form-control{{ $err('employee_id') }}">
+                            <option value="">— not linked —</option>
+                            @foreach ($employees as $emp)
+                                @php $takenBy = $emp->user && $emp->user->id !== $user->id ? $emp->user->name : null; @endphp
+                                <option value="{{ $emp->id }}" @selected((int) old('employee_id', $user->employee_id) === $emp->id) @disabled($takenBy)>
+                                    {{ $emp->name }}{{ $emp->designation ? ' — ' . $emp->designation : '' }}{{ $takenBy ? ' (' . $takenBy . ')' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('employee_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                        <small class="form-text text-muted">Lets them apply for leave and see their balance from the dashboard.</small>
+                    </div>
+                @endisset
                 <div class="form-group mb-0">
                     <label>Status</label>
                     <div class="custom-control custom-switch">

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+
 /* ==========================================================================
    Modern theme layer on top of stock AdminLTE 3 / Bootstrap 4.
    Presentation only — no markup/behaviour depends on these rules existing.
@@ -174,57 +176,96 @@ a:hover {
     color: var(--brand);
 }
 
-/* ---- Sidebar ----------------------------------------------------------- */
+/* ---- Sidebar ------------------------------------------------------------
+   Deep navy with section headers, a search box, rounded items and an
+   indigo pill for the current page. Submenus hang off a faint guide line. */
 
 .main-sidebar,
 .main-sidebar.sidebar-dark-primary {
-    background-color: var(--ink);
+    background: linear-gradient(180deg, #0b1220 0%, #0f172a 55%, #111827 100%);
 }
+
+.main-sidebar .brand-link {
+    display: flex;
+    align-items: center;
+    height: 3.65rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    background: rgba(255, 255, 255, .02);
+    border-bottom: 1px solid rgba(255, 255, 255, .06) !important;
+}
+
+.main-sidebar .sidebar { padding: 0 .35rem .75rem; scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, .25) transparent; }
+
+/* search */
+.main-sidebar .sidebar .form-inline { margin: .85rem .25rem .25rem; }
+.main-sidebar .sidebar .form-inline .form-control-sidebar,
+.main-sidebar .sidebar .form-inline .btn-sidebar {
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .06);
+    color: #e2e8f0;
+}
+.main-sidebar .sidebar .form-inline .form-control-sidebar { border-radius: .65rem 0 0 .65rem; }
+.main-sidebar .sidebar .form-inline .btn-sidebar { border-radius: 0 .65rem .65rem 0; }
+.main-sidebar .sidebar .form-inline .form-control-sidebar::placeholder { color: #64748b; }
+.main-sidebar .sidebar .form-inline .form-control-sidebar:focus { background: rgba(255, 255, 255, .1); }
+
+/* section headers */
+.nav-sidebar .nav-header {
+    padding: 1.05rem .9rem .35rem !important;
+    font-size: .64rem !important;
+    font-weight: 800;
+    letter-spacing: .16em;
+    color: #64748b !important;
+    background: none !important;
+}
+
+/* items */
+.nav-sidebar > .nav-item { margin: 1px .25rem; }
+.nav-sidebar .nav-link {
+    border-radius: .65rem;
+    color: #cbd5e1 !important;
+    transition: background-color .15s ease, color .15s ease;
+}
+.nav-sidebar .nav-link p { font-weight: 500; }
+.nav-sidebar .nav-link .nav-icon { width: 1.6rem; font-size: .95rem; text-align: center; }
+.sidebar-dark-primary .nav-sidebar .nav-link:hover { background: rgba(255, 255, 255, .06); color: #fff !important; }
 
 .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active,
 .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-treeview > .nav-item > .nav-link.active {
-    background-color: var(--brand);
-    box-shadow: inset 3px 0 0 #ffffff;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    color: #fff !important;
+    box-shadow: 0 8px 18px -8px rgba(79, 70, 229, .85);
 }
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active .nav-icon { color: #fff !important; }
 
-.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link:hover {
-    background-color: rgba(79, 70, 229, 0.25);
-}
-
-.brand-link {
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Submenu items sit indented under their parent, slightly smaller, so it's
-   clear which section they belong to. Only while the sidebar is expanded —
-   the collapsed (icon-only) sidebar keeps AdminLTE's own spacing. */
-body:not(.sidebar-collapse) .nav-sidebar .nav-treeview > .nav-item > .nav-link,
-.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-treeview > .nav-item > .nav-link {
-    padding-left: 1.6rem;
-    font-size: 0.92rem;
-}
-
-.nav-sidebar .nav-treeview > .nav-item > .nav-link > .nav-icon {
-    font-size: 0.85rem;
-}
-
-/* Open section: a faint band behind its children */
-.sidebar-dark-primary .nav-sidebar > .nav-item.menu-open > .nav-treeview {
-    background-color: rgba(255, 255, 255, 0.03);
-    border-radius: 0.4rem;
-}
-
-/* Parent of the current page stays readable even when its section is closed */
+/* parent of the current page */
 .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active:not(:only-child) {
-    background-color: rgba(79, 70, 229, 0.35);
+    background: rgba(99, 102, 241, .16);
     box-shadow: none;
 }
+.sidebar-dark-primary .nav-sidebar > .nav-item.menu-open > .nav-link { color: #fff !important; }
 
-.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link {
-    border-radius: 0.4rem;
+/* submenus: a guide line with the children hanging off it */
+body:not(.sidebar-collapse) .nav-sidebar .nav-treeview,
+.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-treeview {
+    margin: .15rem 0 .4rem 1.15rem;
+    padding-left: .4rem;
+    border-left: 1px solid rgba(148, 163, 184, .14);
+    background: none !important;
 }
+.nav-sidebar .nav-treeview > .nav-item > .nav-link { padding: .4rem .7rem; font-size: .88rem; color: #94a3b8 !important; }
+.nav-sidebar .nav-treeview > .nav-item > .nav-link > .nav-icon { font-size: .8rem; opacity: .85; }
+.sidebar-dark-primary .nav-sidebar .nav-treeview > .nav-item > .nav-link.active {
+    background: rgba(99, 102, 241, .2) !important;
+    color: #fff !important;
+    box-shadow: inset 2px 0 0 #818cf8;
+}
+.sidebar-dark-primary .nav-sidebar .nav-treeview .nav-treeview { margin-left: .9rem; }
+
+/* collapsed (icon-only) sidebar keeps AdminLTE's own spacing */
+.sidebar-collapse .main-sidebar:not(:hover) .nav-sidebar > .nav-item { margin: 1px 0; }
+.sidebar-collapse .main-sidebar:not(:hover) .nav-sidebar .nav-header { display: none; }
 
 /* ---- Top navbar -------------------------------------------------------- */
 
@@ -271,28 +312,6 @@ div.dataTables_wrapper div.dataTables_length select {
     border-radius: 0.3rem;
 }
 
-/* Third-level menus (e.g. NOC → Switches → Port Events) step in further */
-body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link,
-.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link {
-    padding-left: 2.6rem;
-    font-size: 0.88rem;
-}
-
-.sidebar-dark-primary .nav-treeview .nav-treeview {
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    margin-left: 1.35rem;
-}
-
-body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item > .nav-link {
-    padding-left: 1.1rem;
-}
-
-.sidebar-dark-primary .nav-treeview > .nav-item > .nav-link.active {
-    background-color: var(--brand);
-    color: #fff;
-}
-
-
 /* ---- View-only accounts (role "viewer") ------------------------------
    Hide every add / edit / delete / poll / mute control. The server also
    refuses these requests (ViewerReadOnly middleware); this just keeps the
@@ -302,8 +321,8 @@ body:not(.sidebar-collapse) .nav-sidebar .nav-treeview .nav-treeview > .nav-item
 .role-viewer a[href*="/create?"],
 .role-viewer a[href$="/edit"],
 .role-viewer a[href*="/payments/receive"],
-.role-viewer form[method="POST"]:not(#logout-form),
-.role-viewer form[method="post"]:not(#logout-form),
+.role-viewer form[method="POST"]:not(#logout-form):not(.viewer-ok),
+.role-viewer form[method="post"]:not(#logout-form):not(.viewer-ok),
 .role-viewer button[form],
 .role-viewer .viewer-hide,
 .role-viewer .qa-grid {
@@ -598,3 +617,29 @@ table.dataTable td.dataTables_empty { padding: 2rem 1rem; color: #94a3b8; text-a
 .content-wrapper ::-webkit-scrollbar { width: 8px; height: 8px; }
 .content-wrapper ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
 .content-wrapper ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Role picker (Users → account fields) -------------------------- */
+.role-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .5rem; }
+.role-pick.is-invalid { outline: 2px solid #fecaca; border-radius: .7rem; }
+.role-opt { position: relative; display: flex; gap: .6rem; align-items: flex-start; margin: 0; padding: .6rem .7rem; border: 1px solid #e2e8f0; border-radius: .75rem; cursor: pointer; font-weight: 400; transition: border-color .15s, background .15s; }
+.role-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.role-opt:hover { border-color: #cbd5e1; background: #f8fafc; }
+.role-opt:has(input:checked) { border-color: var(--rc); background: color-mix(in srgb, var(--rc) 7%, #fff); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rc) 14%, transparent); }
+.role-ic { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .6rem; background: color-mix(in srgb, var(--rc) 14%, #fff); color: var(--rc); }
+.role-tx { line-height: 1.25; min-width: 0; }
+.role-tx b { display: block; font-size: .9rem; color: #0f172a; }
+.role-tx small { color: #64748b; font-size: .74rem; }
+
+.role-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .55rem; border-radius: 999px; font-size: .76rem; font-weight: 700;
+    background: color-mix(in srgb, var(--rc) 12%, #fff); color: var(--rc); white-space: nowrap; }
+
+/* ---- বাংলা: a Bangla face, a touch more line height ------------------ */
+html[lang="bn"] body,
+html[lang="bn"] .btn,
+html[lang="bn"] .form-control,
+html[lang="bn"] .nav-sidebar .nav-link p { font-family: 'Hind Siliguri', 'Source Sans Pro', system-ui, sans-serif; }
+html[lang="bn"] body { line-height: 1.55; }
+html[lang="bn"] .nav-sidebar .nav-header { letter-spacing: .04em; font-size: .72rem !important; }
+
+/* top-bar language switch */
+.main-header .nav-link[href$="locale/toggle"] { font-weight: 700; color: #4f46e5; }

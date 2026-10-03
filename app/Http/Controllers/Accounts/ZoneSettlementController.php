@@ -3,8 +3,7 @@
 namespace App\Http\Controllers\Accounts;
 
 use App\Http\Controllers\Controller;
-use App\Models\Transaction;
-use App\Models\TransactionCategory;
+use App\Models\ProfitSheet;
 use App\Models\ZoneSettlement;
 use App\Models\ZoneSettlementRow;
 use App\Services\SettlementExport;
@@ -48,6 +47,7 @@ class ZoneSettlementController extends Controller
         $validated = $request->validate([
             'file' => 'required|file|max:20480|extensions:xlsx,xls,csv',
             'month' => 'nullable|date_format:Y-m',
+            'cycle' => 'nullable|in:' . implode(',', array_keys(ZoneSettlement::CYCLES)),
             'invoice_date' => 'nullable|date',
             'bkash_percent' => 'required|numeric|min:0|max:10',
             'blank_as_zero' => 'nullable|boolean',
@@ -75,6 +75,7 @@ class ZoneSettlementController extends Controller
             'path' => $path,
             'name' => $file->getClientOriginalName(),
             'month' => $validated['month'] ?? null,
+            'cycle' => $validated['cycle'] ?? $this->guessCycle($file->getClientOriginalName()),
             'invoice_date' => $validated['invoice_date'] ?? now()->toDateString(),
             'bkash_percent' => (string) $validated['bkash_percent'],
             'blank_as_zero' => $request->boolean('blank_as_zero'),
@@ -92,7 +93,7 @@ class ZoneSettlementController extends Controller
         [$token, $upload] = $this->upload_($request);
         $state = $this->state($request, $upload);
 
-        return view('accounts.settlements.preview', $state + ['token' => $token, 'upload' => $upload]);
+        return view('accounts.settlements.preview', $state + ['token' => $token, 'upload' => $upload] + $this->duplicates($state, $upload));
     }
 
     public function store(Request $request)
@@ -102,9 +103,15 @@ class ZoneSettlementController extends Controller
 
         $request->validate([
             'month' => 'required|date_format:Y-m',
+            'cycle' => 'required|in:' . implode(',', array_keys(ZoneSettlement::CYCLES)),
             'invoice_date' => 'required|date',
             'notes' => 'nullable|string|max:500',
         ]);
+
+        $month = Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth();
+        if (ProfitSheet::isMonthClosed($month)) {
+            return back()->with('error', "{$month->format('F Y')} is closed (Net Profit finalized). An admin has to reopen that month before adding a settlement to it.");
+        }
 
         if (! $state['map']['name'] || ! $state['map']['payment'] || ! $state['map']['deduction']) {
             return back()->with('error', 'Choose the name, Total Payment and Deduction columns first.');
@@ -113,9 +120,20 @@ class ZoneSettlementController extends Controller
             return back()->with('error', 'No row can be counted — check the columns and the flags below.');
         }
 
+        // The same file, or a zone already settled for this month and group, would count twice.
+        $dupes = $this->duplicates(['month' => $month->format('Y-m'), 'cycle' => $request->input('cycle')] + $state, $upload);
+        if ($dupes['sameFile']) {
+            return back()->with('error', "This exact file is already saved as the {$dupes['sameFile']->month->format('F Y')} {$dupes['sameFile']->cycleLabel()} settlement ({$dupes['sameFile']->source_name}). Not saved again.");
+        }
+        if ($dupes['overlap']) {
+            return back()->with('error', 'Not saved — these zones are already in a ' . $month->format('F Y') . ' ' . (ZoneSettlement::CYCLES[$request->input('cycle')]['label'] ?? '') . ' settlement: '
+                . collect($dupes['overlap'])->map(fn ($o) => "{$o['name']} ({$o['in']})")->implode(', ') . '. Take them out of the Excel, or delete that settlement first.');
+        }
+
         $settlement = DB::transaction(function () use ($state, $upload, $request) {
             $settlement = ZoneSettlement::create([
                 'month' => Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth(),
+                'cycle' => $request->input('cycle'),
                 'invoice_date' => $request->input('invoice_date'),
                 'bkash_percent' => $state['bkash_percent'],
                 'source_name' => $upload['name'],
@@ -147,7 +165,7 @@ class ZoneSettlementController extends Controller
             $ext = pathinfo($upload['path'], PATHINFO_EXTENSION);
             $final = "settlements/{$settlement->id}/source.{$ext}";
             Storage::move($upload['path'], $final);
-            $settlement->update(['source_path' => $final]);
+            $settlement->update(['source_path' => $final, 'file_hash' => hash_file('sha256', Storage::path($final))]);
 
             return $settlement;
         });
@@ -157,12 +175,12 @@ class ZoneSettlementController extends Controller
         $count = $settlement->rows()->where('included', true)->count();
 
         return redirect()->route('accounts.settlements.show', $settlement)
-            ->with('success', "Saved {$settlement->month->format('F Y')}: {$count} " . Str::plural('zone', $count) . ' invoiced.');
+            ->with('success', "Saved {$settlement->month->format('F Y')} · {$settlement->cycleLabel()}: {$count} " . Str::plural('zone', $count) . ' invoiced.');
     }
 
     public function show(ZoneSettlement $settlement)
     {
-        $settlement->load('rows.customer:id,name', 'rows.transaction:id,amount,transaction_category_id', 'creator:id,name', 'poster:id,name');
+        $settlement->load('rows.customer:id,name', 'creator:id,name');
 
         return view('accounts.settlements.show', [
             'settlement' => $settlement,
@@ -214,89 +232,10 @@ class ZoneSettlementController extends Controller
         return back()->with('success', 'Invoices will be signed by ' . $settlement->prepared_by . '.');
     }
 
-    /**
-     * Post the Net Bill (company income) to Accounts: one income entry per
-     * counted zone under "Zone Settlement", dated as chosen (the invoice date
-     * by default). Past days follow the cash book rule — admin only.
-     */
-    public function post(Request $request, ZoneSettlement $settlement)
-    {
-        $date = $request->validate(['income_date' => 'required|date'])['income_date'];
-
-        if (! Transaction::dayIsOpenFor($date, $request->user())) {
-            return back()->with('error', 'Only an admin can post income to a past day (' . Carbon::parse($date)->format('d M Y') . '). Pick today or ask an admin.');
-        }
-
-        $result = DB::transaction(function () use ($settlement, $date) {
-            // Re-read under a lock so a double click can't post twice.
-            $settlement = ZoneSettlement::whereKey($settlement->getKey())->lockForUpdate()->first();
-            if ($settlement->isPosted()) {
-                return null;
-            }
-
-            $category = TransactionCategory::firstOrCreate(['name' => 'Zone Settlement', 'type' => 'income']);
-            $month = $settlement->month->format('M Y');
-            $count = 0;
-            $total = '0';
-
-            foreach ($settlement->rows()->where('included', true)->with('customer')->get() as $row) {
-                $amount = Dec::round($row->calc($settlement->bkash_percent)['income'], 2);
-                if (Dec::toFloat($amount) <= 0) {
-                    continue;
-                }
-
-                $transaction = Transaction::create([
-                    'transaction_category_id' => $category->id,
-                    'amount' => $amount,
-                    'description' => Str::limit("Zone Settlement {$month} — {$row->displayName()} ({$row->invoice_no})", 255, ''),
-                    'transaction_date' => $date,
-                    'recorded_by' => auth()->id(),
-                    'zone' => $row->customer?->zone ?? auth()->user()?->zone,
-                ]);
-                $row->update(['transaction_id' => $transaction->id]);
-                $count++;
-                $total = Dec::add($total, $amount);
-            }
-
-            $settlement->update(['posted_at' => now(), 'posted_on' => $date, 'posted_by' => auth()->id()]);
-
-            return [$count, $total];
-        });
-
-        if ($result === null) {
-            return back()->with('error', 'This settlement is already posted to income.');
-        }
-
-        [$count, $total] = $result;
-
-        return back()->with('success', 'Posted ' . Dec::taka($total) . " to income (Zone Settlement) as {$count} " . Str::plural('entry', $count)
-            . ' on ' . Carbon::parse($date)->format('d M Y') . '.');
-    }
-
-    /** Take the posted income entries back out of Accounts. */
-    public function unpost(Request $request, ZoneSettlement $settlement)
-    {
-        if (! $settlement->isPosted()) {
-            return back()->with('error', 'This settlement is not posted.');
-        }
-        if (! Transaction::dayIsOpenFor($settlement->posted_on, $request->user())) {
-            return back()->with('error', 'The income is on a past day (' . $settlement->posted_on->format('d M Y') . ') — only an admin can undo it.');
-        }
-
-        DB::transaction(function () use ($settlement) {
-            $ids = $settlement->rows()->whereNotNull('transaction_id')->pluck('transaction_id');
-            $settlement->rows()->update(['transaction_id' => null]);
-            Transaction::whereIn('id', $ids)->get()->each->delete();
-            $settlement->update(['posted_at' => null, 'posted_on' => null, 'posted_by' => null]);
-        });
-
-        return back()->with('success', 'Posting undone — the Zone Settlement income entries for ' . $settlement->month->format('F Y') . ' were removed.');
-    }
-
     public function destroy(ZoneSettlement $settlement)
     {
-        if ($settlement->isPosted()) {
-            return back()->with('error', 'This settlement is posted to income. Undo the posting first, then delete it.');
+        if ($settlement->isClosed()) {
+            return back()->with('error', "{$settlement->month->format('F Y')} is closed (Net Profit finalized). An admin has to reopen that month first.");
         }
 
         $label = $settlement->month->format('F Y');
@@ -311,6 +250,52 @@ class ZoneSettlementController extends Controller
     }
 
     // ---- helpers -------------------------------------------------------------
+
+    /**
+     * Would saving this count something twice? The same file saved before,
+     * or zones (by customer, else by name) already in another settlement of
+     * the same month and group.
+     *
+     * @return array{sameFile: ?ZoneSettlement, overlap: list<array{name: string, in: string}>}
+     */
+    private function duplicates(array $state, array $upload): array
+    {
+        $hash = is_file(Storage::path($upload['path'])) ? hash_file('sha256', Storage::path($upload['path'])) : null;
+        $sameFile = $hash ? ZoneSettlement::where('file_hash', $hash)->first() : null;
+
+        $overlap = [];
+        if (! empty($state['month']) && ! empty($state['cycle'])) {
+            $others = ZoneSettlement::with('rows')->whereDate('month', Carbon::createFromFormat('Y-m', $state['month'])->startOfMonth())
+                ->where('cycle', $state['cycle'])->get();
+            $seen = [];
+            foreach ($others as $o) {
+                foreach ($o->rows->where('included', true) as $r) {
+                    $key = $r->customer_id ? 'c' . $r->customer_id : 'n' . $this->importer->norm((string) $r->name);
+                    $seen[$key] = $o->source_name;
+                }
+            }
+            foreach (collect($state['result']['rows'] ?? [])->where('included', true) as $row) {
+                $key = $row['customer_id'] ? 'c' . $row['customer_id'] : 'n' . $this->importer->norm((string) $row['name']);
+                if (isset($seen[$key])) {
+                    $overlap[] = ['name' => (string) $row['name'], 'in' => $seen[$key]];
+                }
+            }
+        }
+
+        return ['sameFile' => $sameFile, 'overlap' => $overlap];
+    }
+
+    /** NTTN-SEP.xlsx → nttn, "Balunda …" → balunda, else the fixed-date cycle. */
+    private function guessCycle(string $fileName): string
+    {
+        $n = strtolower($fileName);
+
+        return match (true) {
+            str_contains($n, 'nttn') => 'nttn',
+            str_contains($n, 'balun') => 'balunda',
+            default => 'fixed',
+        };
+    }
 
     /**
      * @return array{0: string, 1: array}
@@ -370,6 +355,7 @@ class ZoneSettlementController extends Controller
             'bkash_percent' => $bkash,
             'blank_as_zero' => $blankAsZero,
             'month' => $month,
+            'cycle' => $request->input('cycle') ?: ($upload['cycle'] ?? 'fixed'),
             'invoice_date' => $request->input('invoice_date') ?: $upload['invoice_date'],
             'result' => $result,
             'totals' => $totals,

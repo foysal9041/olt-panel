@@ -45,7 +45,7 @@ return [
         ],
     ],
     'attendance' => [
-        'label' => 'Attendance',
+        'label' => 'HR & Attendance',
         'icon' => 'fas fa-fingerprint',
         'submodules' => [
             'dashboard'  => 'Dashboard',
@@ -53,6 +53,8 @@ return [
             'absence'    => 'Absence Report',
             'employees'  => 'Employees',
             'leaves'     => 'Leave Management',
+            'letters'    => 'HR Letters (appointment / termination)',
+            'idcards'    => 'Office ID Cards',
             'shifts'     => 'Duty Shifts',
             'devices'    => 'Devices (F18)',
         ],
@@ -64,9 +66,36 @@ return [
             'dashboard'     => 'Dashboard',
             'transactions'  => 'Income & Expenses',
             'customers'     => 'Customers',
-            'cashbook'      => 'Daily Cash Book (প্রতিদিনের হিসাব)',
-            'salaries'      => 'Salary Sheet (বেতন)',
+            'cashbook'      => 'Daily Cash Book',
+            'salaries'      => 'Salary Sheet',
             'settlements'   => 'Zone Settlement (Excel · bKash)',
+            'billing'       => 'Bandwidth Billing (invoices & payments)',
+            'profit'        => 'Net Profit & Shares',
+            'partners'      => 'Partners (share & commission accounts)',
+        ],
+    ],
+    'inventory' => [
+        'label' => 'Inventory & Assets',
+        'icon' => 'fas fa-boxes',
+        'submodules' => [
+            'summary' => 'Summary for owners (assets, stock, purchases, sales)',
+            'stock'   => 'Products, stock & entries (purchase / use / sale)',
+            'assets'  => 'Company assets — where everything is',
+        ],
+    ],
+    'tickets' => [
+        'label' => 'Tickets',
+        'icon' => 'fas fa-ticket-alt',
+        'submodules' => [
+            'manage' => 'All tickets — open, assign, close',
+        ],
+    ],
+    'tasks' => [
+        'label' => 'Tasks',
+        'icon' => 'fas fa-tasks',
+        'submodules' => [
+            'assign' => 'Give tasks to others',
+            'board'  => 'Team board — everyone\'s tasks',
         ],
     ],
     'settings' => [

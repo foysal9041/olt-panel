@@ -62,14 +62,24 @@
 
             <div class="row">
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label>From</label>
                     <input type="date" name="start" class="form-control" value="{{ $start->toDateString() }}">
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label>To</label>
                     <input type="date" name="end" class="form-control" value="{{ $end->toDateString() }}">
+                </div>
+
+                <div class="col-md-2">
+                    <label>Money</label>
+                    <select name="account" class="form-control">
+                        <option value="">Cash + Bank</option>
+                        @foreach (\App\Models\Transaction::ACCOUNTS as $key => $label)
+                            <option value="{{ $key }}" @selected(request('account') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="col-md-2">
@@ -87,7 +97,7 @@
                         <option value="">All</option>
                         @foreach($categories as $category)
                             <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
-                                {{ $category->name }} ({{ ucfirst($category->type) }})
+                                {{ $category->displayName() }} ({{ \App\Support\Ui::t(ucfirst($category->type)) }})
                             </option>
                         @endforeach
                     </select>
@@ -144,8 +154,9 @@
                             @else
                                 <span class="badge badge-danger">EXPENSE</span>
                             @endif
+                            <div class="small text-muted"><i class="fas {{ $transaction->account === 'bank' ? 'fa-university' : 'fa-wallet' }}"></i> {{ $transaction->accountLabel() }}</div>
                         </td>
-                        <td>{{ $transaction->category->name }}</td>
+                        <td>{{ $transaction->category->displayName() }}</td>
                         <td>{{ $transaction->description ?? '-' }}</td>
                         <td>{{ $transaction->recordedBy->name ?? '-' }}</td>
                         <td>&#2547;{{ number_format($transaction->amount, 2) }}</td>
@@ -206,12 +217,12 @@
         <div class="mb-3">
             @foreach($categories as $category)
                 <span class="badge {{ $category->type == 'income' ? 'badge-success' : 'badge-danger' }} p-2 mr-1 mb-1">
-                    {{ $category->name }}
+                    {{ $category->displayName() }}
 
                     <form action="{{ route('accounts.transaction-categories.destroy', $category->id) }}"
                           method="POST"
                           class="d-inline ml-1 js-confirm-delete"
-                          data-confirm-message="Remove category {{ $category->name }}?">
+                          data-confirm-message="Remove category {{ $category->displayName() }}?">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-link text-white p-0" style="text-decoration:none;">&times;</button>

@@ -15,9 +15,10 @@ class TransactionCategoryController extends Controller
             'type' => 'required|in:income,expense',
         ]);
 
-        TransactionCategory::create($validated);
+        $validated['name'] = trim($validated['name']);
+        $category = TransactionCategory::firstOrCreate($validated);
 
-        return back()->with('success', 'Category Added Successfully');
+        return back()->with('success', $category->wasRecentlyCreated ? 'Category added.' : "“{$category->name}” already exists.");
     }
 
     public function destroy(TransactionCategory $category)

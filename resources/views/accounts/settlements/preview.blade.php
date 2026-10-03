@@ -83,6 +83,7 @@
                 </div>
             </div>
             <input type="hidden" name="month" value="{{ $month }}">
+            <input type="hidden" name="cycle" value="{{ $cycle }}">
             <input type="hidden" name="invoice_date" value="{{ $invoice_date }}">
         </form>
     </div>
@@ -187,6 +188,18 @@
     </div>
 </div>
 
+{{-- Would count twice --}}
+@if ($sameFile)
+    <div class="alert alert-danger"><i class="fas fa-copy"></i> <strong>This exact file is already saved</strong> — as the {{ $sameFile->month->format('F Y') }} {{ $sameFile->cycleLabel() }} settlement ({{ $sameFile->source_name }}). Saving it again would count it twice, so it won't be saved.</div>
+@endif
+@if ($overlap)
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i> <strong>{{ count($overlap) }} {{ Str::plural('zone', count($overlap)) }} already settled for this month and group:</strong>
+        {{ collect($overlap)->map(fn ($o) => $o['name'] . ' (' . $o['in'] . ')')->implode(', ') }}.
+        Take them out of the Excel, or delete that settlement first — otherwise this can't be saved.
+    </div>
+@endif
+
 {{-- Save --}}
 <div class="card acct-panel">
     <form method="POST" action="{{ route('accounts.settlements.store') }}" class="card-body">
@@ -208,9 +221,17 @@
                 <label class="small font-weight-bold">Invoice date</label>
                 <input type="date" name="invoice_date" value="{{ old('invoice_date', $invoice_date) }}" class="form-control" required>
             </div>
-            <div class="col-md-4 form-group">
+            <div class="col-md-2 form-group">
+                <label class="small font-weight-bold">Group / cycle</label>
+                <select name="cycle" class="form-control" required>
+                    @foreach (\App\Models\ZoneSettlement::CYCLES as $key => $cy)
+                        <option value="{{ $key }}" @selected(old('cycle', $cycle) === $key)>{{ $cy['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2 form-group">
                 <label class="small font-weight-bold">Note (optional)</label>
-                <input type="text" name="notes" maxlength="500" class="form-control" placeholder="e.g. August zone payments">
+                <input type="text" name="notes" maxlength="500" class="form-control" placeholder="optional">
             </div>
             <div class="col-md-4 form-group">
                 <button class="btn btn-success btn-block" @disabled(! $totals['count'])

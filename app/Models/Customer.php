@@ -11,6 +11,7 @@ class Customer extends Model
 
     protected $fillable = [
         'name',
+        'contact_person',
         'username',
         'phone',
         'address',
@@ -19,12 +20,14 @@ class Customer extends Model
         'kam_name',
         'kam_phone',
         'status',
+        'opening_due',
     ];
 
     protected function casts(): array
     {
         return [
             'status' => 'boolean',
+            'opening_due' => 'string',
         ];
     }
 
@@ -59,6 +62,30 @@ class Customer extends Model
     public function bandwidthRates()
     {
         return $this->hasMany(CustomerBandwidthRate::class);
+    }
+
+    public function serviceChanges()
+    {
+        return $this->hasMany(BandwidthServiceChange::class)->orderBy('effective_from')->orderBy('id');
+    }
+
+    public function bandwidthInvoices()
+    {
+        return $this->hasMany(BandwidthInvoice::class)->orderByDesc('month');
+    }
+
+    public function bandwidthPayments()
+    {
+        return $this->hasMany(BandwidthPayment::class)->orderBy('paid_on')->orderBy('id');
+    }
+
+    /** Opening due + everything billed − everything paid. */
+    public function bandwidthBalance(): string
+    {
+        $billed = \App\Support\Dec::add('0', ...BandwidthInvoice::where('customer_id', $this->id)->with('lines')->get()->map->totalBill());
+        $paid = (string) BandwidthPayment::where('customer_id', $this->id)->sum('amount');
+
+        return \App\Support\Dec::round(\App\Support\Dec::sub(\App\Support\Dec::add($this->opening_due ?? 0, $billed), $paid), 2);
     }
 
     public function bandwidthRatesTotal(): float

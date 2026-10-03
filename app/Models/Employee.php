@@ -12,8 +12,16 @@ class Employee extends Model
     protected $fillable = [
         'emp_code',
         'name',
+        'photo',
         'phone',
+        'email',
+        'address',
+        'nid',
         'designation',
+        'department',
+        'joining_date',
+        'blood_group',
+        'left_on',
         'basic_salary',
         'house_rent',
         'device_user_id',
@@ -27,7 +35,48 @@ class Employee extends Model
     {
         return [
             'status' => 'boolean',
+            'joining_date' => 'date',
+            'left_on' => 'date',
         ];
+    }
+
+    public const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+    public const DEPARTMENTS = ['IT & Network', 'NOC', 'Support', 'Field Operations', 'Accounts', 'Administration', 'Management', 'Sales & Marketing'];
+
+    /** ID shown on the card and letters: the code if set, else SNDC-0xx. */
+    public function empId(): string
+    {
+        return $this->emp_code ?: 'SNDC-' . str_pad((string) $this->id, 3, '0', STR_PAD_LEFT);
+    }
+
+    /** The photo for signed-in pages (null without one). */
+    public function photoUrl(): ?string
+    {
+        return $this->photo ? route('attendance.employees.photo', [$this, 'v' => substr(md5($this->photo), 0, 8)]) : null;
+    }
+
+    /** Public link printed as the ID card's QR: shows whether the card is valid. */
+    public function verifyUrl(): string
+    {
+        // Signed without the host, so it checks out however the site is reached.
+        return rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\URL::signedRoute('staff.verify', ['employee' => $this->id], absolute: false);
+    }
+
+    public function hasLeft(): bool
+    {
+        return ! $this->status || ($this->left_on && $this->left_on->lt(today()));
+    }
+
+    public function idCards()
+    {
+        return $this->hasMany(IdCard::class);
+    }
+
+    /** The login that belongs to this employee, if any. */
+    public function user()
+    {
+        return $this->hasOne(User::class);
     }
 
     public function dutyShift()

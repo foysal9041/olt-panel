@@ -38,7 +38,22 @@ window.ZoneSelect = {
     },
 };
 
+// English / বাংলা: the page's <html lang> says which.
+var BN = document.documentElement.lang === 'bn';
+window.uiText = function (en, bn) { return BN ? bn : en; };
+if (BN && window.jQuery && jQuery.fn && jQuery.fn.dataTable) {
+    jQuery.extend(true, jQuery.fn.dataTable.defaults, {
+        language: {
+            search: 'খুঁজুন:', lengthMenu: '_MENU_ টি করে দেখান', info: '_TOTAL_ টির মধ্যে _START_–_END_',
+            infoEmpty: 'কিছু নেই', infoFiltered: '(মোট _MAX_ টি থেকে)', zeroRecords: 'কিছু মেলেনি', emptyTable: 'কোনো তথ্য নেই',
+            paginate: { first: 'প্রথম', last: 'শেষ', next: 'পরের', previous: 'আগের' }, loadingRecords: 'লোড হচ্ছে…', processing: 'কাজ চলছে…',
+        },
+    });
+}
+// (set before any page script builds its tables)
+
 document.addEventListener('DOMContentLoaded', function () {
+
     document.querySelectorAll('select.js-zone-select').forEach(function (el) { window.ZoneSelect.init(el); });
 });
 
@@ -71,14 +86,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             e.preventDefault();
 
-            var message = form.dataset.confirmMessage || 'Are you sure?';
+            var message = form.dataset.confirmMessage || uiText('Are you sure?', 'আপনি কি নিশ্চিত?');
 
             if (window.Swal) {
                 Swal.fire({
                     title: message,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'Yes, delete it',
+                    confirmButtonText: uiText('Yes, go ahead', 'হ্যাঁ, করুন'),
+                    cancelButtonText: uiText('Cancel', 'বাতিল'),
                     confirmButtonColor: '#d33',
                 }).then(function (result) {
                     if (result.value) {
@@ -91,6 +107,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 form.submit();
             }
         });
+    });
+
+
+    // No double saves: once a form is sent, its buttons are disabled until
+    // the page changes (or, for forms that open a file, a few seconds).
+    // GET forms (filters, search) and data-allow-resubmit forms are left alone.
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (e.defaultPrevented || !(form instanceof HTMLFormElement)) return;
+        if ((form.getAttribute('method') || 'get').toLowerCase() === 'get' || form.hasAttribute('data-allow-resubmit')) return;
+        if (form.dataset.sending === '1') { e.preventDefault(); return; }
+        form.dataset.sending = '1';
+        var buttons = form.querySelectorAll('button[type=submit], button:not([type]), input[type=submit]');
+        // Wait a tick so the clicked button's name/value still goes with the form.
+        setTimeout(function () { buttons.forEach(function (b) { b.disabled = true; b.classList.add('is-sending'); }); }, 0);
+        setTimeout(function () {
+            form.dataset.sending = '';
+            buttons.forEach(function (b) { b.disabled = false; b.classList.remove('is-sending'); });
+        }, form.target === '_blank' ? 3000 : 15000);
     });
 
 });

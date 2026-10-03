@@ -69,6 +69,14 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        // English / বাংলা: wrap the visible text of the app's own templates
+        // in Ui::t() as they compile (see BladeTextWrapper).
+        \Illuminate\Support\Facades\Blade::precompiler(function (string $value) {
+            return \App\Support\BladeTextWrapper::appliesTo(\Illuminate\Support\Facades\Blade::getPath())
+                ? (new \App\Support\BladeTextWrapper())->wrap($value)
+                : $value;
+        });
+
         // Admins always have full access, regardless of assigned module
         // permissions — every other ability check below is skipped for them.
         Gate::before(function (User $user) {

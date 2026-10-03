@@ -16,6 +16,13 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('css/auth.css') }}?v={{ filemtime(public_path('css/auth.css')) }}">
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html[lang="bn"] body { font-family: 'Hind Siliguri', 'Inter', system-ui, sans-serif; }
+        .auth-lang { position: absolute; top: 1rem; right: 1rem; z-index: 5; display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .8rem;
+            border-radius: 999px; background: rgba(15, 23, 42, .06); color: #0f172a; font-size: .85rem; font-weight: 600; text-decoration: none; }
+        .auth-lang:hover { background: rgba(79, 70, 229, .12); color: #3730a3; }
+    </style>
 </head>
 
 <body class="auth-body">
@@ -103,7 +110,8 @@
     </aside>
 
     {{-- ================= Form ================= --}}
-    <main class="auth-main">
+    <main class="auth-main" style="position: relative">
+        <a href="{{ route('locale', 'toggle') }}" class="auth-lang" title="English / বাংলা">🌐 {{ app()->getLocale() === 'bn' ? 'English' : 'বাংলা' }}</a>
         <div class="auth-panel">
 
             <div class="auth-mobile-brand">

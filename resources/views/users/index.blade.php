@@ -4,13 +4,7 @@
 
 @php
     $isAdmin = strtolower(auth()->user()->role) === 'admin';
-    $roleStyle = [
-        'admin' => ['Admin', 'badge-danger'],
-        'noc' => ['NOC', 'badge-info'],
-        'operator' => ['Operator', 'badge-primary'],
-        'employee' => ['Employee', 'badge-secondary'],
-        'viewer' => ['Viewer', 'badge-warning'],
-    ];
+    $roles = config('roles');
     $initials = fn ($name) => collect(preg_split('/\s+/', trim((string) $name)))->filter()->take(2)->map(fn ($w) => mb_substr($w, 0, 1))->implode('');
 @endphp
 
@@ -56,6 +50,24 @@
 
 <div class="card acct-panel">
     <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-user-shield mr-1 text-primary"></i> Roles</h3>
+        <span class="small text-muted">A role fills in the starting access; each user's modules can then be adjusted</span>
+    </div>
+    <div class="card-body">
+        <div class="role-pick">
+            @foreach ($roles as $key => $r)
+                @php $n = $users->filter(fn ($u) => strtolower($u->role) === $key)->count(); @endphp
+                <div class="role-opt" style="--rc: {{ $r['color'] }}; cursor: default">
+                    <span class="role-ic"><i class="{{ $r['icon'] }}"></i></span>
+                    <span class="role-tx"><b>{{ \App\Support\Ui::t($r['label']) }} <span class="badge badge-light border ml-1">{{ $n }}</span></b><small>{{ \App\Support\Ui::t($r['description']) }}</small></span>
+                </div>
+            @endforeach
+        </div>
+    </div>
+</div>
+
+<div class="card acct-panel">
+    <div class="card-header">
         <h3 class="card-title"><i class="fas fa-id-badge mr-1 text-primary"></i> All users</h3>
     </div>
     <div class="card-body p-0">
@@ -75,7 +87,7 @@
                 </thead>
                 <tbody>
                     @foreach ($users as $user)
-                        @php [$roleLabel, $roleClass] = $roleStyle[strtolower($user->role)] ?? [ucfirst($user->role), 'badge-secondary']; @endphp
+                        @php $r = $roles[strtolower($user->role)] ?? ['label' => ucfirst($user->role), 'icon' => 'fas fa-user', 'color' => '#64748b']; @endphp
                         <tr>
                             <td class="pl-3 text-muted">{{ $loop->iteration }}</td>
                             <td>
@@ -88,7 +100,7 @@
                                     </div>
                                 </div>
                             </td>
-                            <td><span class="badge {{ $roleClass }}">{{ $roleLabel }}</span></td>
+                            <td><span class="role-badge" style="--rc: {{ $r['color'] }}"><i class="{{ $r['icon'] }}"></i> {{ \App\Support\Ui::t($r['label']) }}</span></td>
                             <td class="small">{{ $user->zone && $user->zone !== 'all' ? $user->zone : 'All zones' }}</td>
                             <td style="max-width: 22rem">
                                 @if (strtolower($user->role) === 'admin')
@@ -102,11 +114,11 @@
                                             $isFull = $grants->contains('submodule', '');
                                         @endphp
                                         @if ($isFull)
-                                            <span class="badge badge-info mb-1">{{ $moduleLabel }}</span>
+                                            <span class="badge badge-info mb-1">{{ \App\Support\Ui::t($moduleLabel) }}</span>
                                         @else
                                             <span class="badge badge-secondary mb-1"
                                                   title="{{ $grants->map(fn ($g) => config("modules.{$moduleKey}.submodules.{$g->submodule}", $g->submodule))->implode(', ') }}">
-                                                {{ $moduleLabel }} · {{ $grants->count() }}
+                                                {{ \App\Support\Ui::t($moduleLabel) }} · {{ $grants->count() }}
                                             </span>
                                         @endif
                                     @endforeach

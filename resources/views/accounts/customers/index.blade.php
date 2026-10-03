@@ -116,7 +116,9 @@
                 <div><i class="fas fa-phone"></i> {{ $customer->phone ?: '—' }}</div>
             </div>
             @if ($isBw)
+                @php $bal = (float) $customer->bandwidthBalance(); @endphp
                 <div class="cu-money"><span>Monthly · {{ $customer->bandwidthRates->count() }} {{ Str::plural('type', $customer->bandwidthRates->count()) }}</span><b>{{ $tk($customer->bandwidthRatesTotal()) }}</b></div>
+                <div class="cu-money" style="margin-top:-.4rem"><span>{{ $bal > 0 ? 'Due now' : ($bal < 0 ? 'Advance' : 'Settled') }}</span><b class="{{ $bal > 0 ? 'text-danger' : 'text-income' }}">{{ $tk(abs($bal)) }}</b></div>
             @elseif ($last)
                 <div class="cu-money"><span>Net Bill · {{ $last->settlement?->month?->format('M Y') }}</span><b class="text-income">{{ $tk($lastCalc['income']) }}</b></div>
             @else
@@ -143,13 +145,18 @@
 <div class="card acct-panel">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-tachometer-alt mr-1" style="color:#7c3aed"></i> Bandwidth types</h3>
-        <span class="small text-muted">Rate fields on bandwidth clients</span>
+        <span class="small text-muted">"fixed" = a set monthly amount (VAS, Billing); click to switch</span>
     </div>
     <div class="card-body">
         <div class="mb-2">
             @forelse ($bandwidthTypes as $type)
                 <span class="bw-chip">
                     {{ $type->name }}
+                    <form action="{{ route('accounts.bandwidth-types.update', $type) }}" method="POST" class="d-inline">
+                        @csrf @method('PUT')
+                        <input type="hidden" name="flat" value="{{ $type->flat ? 0 : 1 }}">
+                        <button type="submit" title="Click to switch" style="width:auto; padding:0 .45rem; border-radius:999px; font-size:.7rem">{{ $type->flat ? 'fixed' : 'per Mbps' }}</button>
+                    </form>
                     <form action="{{ route('accounts.bandwidth-types.destroy', $type->id) }}" method="POST" class="d-inline js-confirm-delete"
                           data-confirm-message="Remove bandwidth type {{ $type->name }}?">
                         @csrf @method('DELETE')
@@ -163,6 +170,7 @@
         <form method="POST" action="{{ route('accounts.bandwidth-types.store') }}" class="d-flex" style="gap:.5rem; max-width: 420px">
             @csrf
             <input type="text" name="name" class="form-control form-control-sm" placeholder="New type, e.g. VAS" required>
+            <label class="small text-nowrap mb-0 d-flex align-items-center" style="gap:.3rem"><input type="checkbox" name="flat" value="1"> fixed amount</label>
             <button type="submit" class="btn btn-sm text-nowrap" style="background:#7c3aed; color:#fff"><i class="fas fa-plus"></i> Add</button>
         </form>
     </div>

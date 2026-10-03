@@ -12,7 +12,7 @@ class LeaveController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Leave::with(['employee', 'leaveType', 'approvedBy']);
+        $query = Leave::with(['employee', 'leaveType', 'approvedBy', 'appliedBy']);
 
         if (!in_array(strtolower(auth()->user()->role), ['admin', 'noc'])) {
             $query->whereHas('employee', fn ($q) => $q->where('zone', auth()->user()->zone));

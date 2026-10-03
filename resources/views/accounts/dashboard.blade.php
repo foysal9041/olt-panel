@@ -32,7 +32,7 @@
 <div class="acct-stats">
 
     <div class="acct-stat acct-stat-hero">
-        <div class="acct-stat-label">Cash in hand <i class="fas fa-wallet"></i></div>
+        <div class="acct-stat-label">Petty cash on hand <i class="fas fa-wallet"></i></div>
         <div class="acct-stat-value {{ $cash['now'] < 0 ? 'text-warning' : '' }}">{{ $signed($cash['now']) }}</div>
         <div class="acct-stat-foot">
             Today <span class="hero-in">+{{ $tk($cash['in']) }}</span> · <span class="hero-out">−{{ $tk($cash['out']) }}</span>
@@ -106,15 +106,11 @@
                 <div class="card-body pb-2">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="acct-kicker">{{ $s->month->format('F Y') }} · {{ $t['count'] }} zones</div>
+                            <div class="acct-kicker">{{ $s->month->format('F Y') }} · {{ $t['count'] }} zones · {{ $s->periodLabel('d M') }}</div>
                             <div class="acct-big text-income">{{ $tk($t['income'], 2) }}</div>
                             <div class="small text-muted">Net Bill (company income)</div>
                         </div>
-                        @if ($s->isPosted())
-                            <span class="badge badge-success"><i class="fas fa-check"></i> Posted</span>
-                        @else
-                            <span class="badge badge-warning"><i class="fas fa-clock"></i> Not posted</span>
-                        @endif
+                        <span class="badge badge-primary">{{ $s->cycleLabel() }}</span>
                     </div>
                     <div class="acct-split mt-3">
                         <div><span>Total Payment</span><b>{{ $tk($t['payment']) }}</b></div>
@@ -122,18 +118,15 @@
                         <div><span>bKash</span><b>{{ $tk($t['bkash']) }}</b></div>
                     </div>
                     @can('access-accounts-settlements')
-                        <a href="{{ route('accounts.settlements.show', $s) }}" class="btn btn-sm btn-block mt-3 {{ $s->isPosted() ? 'btn-light border' : 'btn-success' }}">
-                            {!! $s->isPosted() ? '<i class="fas fa-eye"></i> Open settlement' : '<i class="fas fa-check"></i> Review &amp; post income' !!}
-                        </a>
+                        <a href="{{ route('accounts.settlements.show', $s) }}" class="btn btn-sm btn-block mt-3 btn-light border"><i class="fas fa-eye"></i> Open settlement</a>
                     @endcan
                 </div>
                 @if ($settlements->count() > 1)
                     <div class="border-top">
                         @foreach ($settlements->skip(1) as ['model' => $old, 'totals' => $ot])
                             <a href="{{ Gate::allows('access-accounts-settlements') ? route('accounts.settlements.show', $old) : '#' }}" class="acct-list-row py-2">
-                                <span class="acct-list-main small">{{ $old->month->format('F Y') }}</span>
+                                <span class="acct-list-main small">{{ $old->month->format('F Y') }} <span class="text-muted">· {{ $old->cycleLabel() }}</span></span>
                                 <span class="money small font-weight-bold">{{ $tk($ot['income']) }}</span>
-                                <i class="fas {{ $old->isPosted() ? 'fa-check-circle text-success' : 'fa-clock text-warning' }}" title="{{ $old->isPosted() ? 'Posted' : 'Not posted' }}"></i>
                             </a>
                         @endforeach
                     </div>
@@ -148,6 +141,24 @@
             <div class="card-footer small text-muted d-flex justify-content-between">
                 <span><i class="fas fa-users mr-1"></i> Active customers</span>
                 <span>{{ $customers['mac_client'] ?? 0 }} MAC · {{ $customers['bandwidth_client'] ?? 0 }} Bandwidth</span>
+            </div>
+        </div>
+
+        <div class="card acct-panel">
+            <div class="card-body d-flex align-items-center" style="gap:.85rem">
+                <span class="acct-tile" style="--accent:#4f46e5"><i class="fas fa-chart-line"></i></span>
+                <div class="flex-grow-1" style="min-width:0">
+                    <div class="acct-kicker">Net Profit · {{ $profit?->month?->format('F Y') ?? 'no sheet yet' }}</div>
+                    @if ($profit)
+                        <div class="font-weight-bold money" style="font-size:1.15rem">৳{{ \App\Support\Dec::lakh($profit->calc()['net']) }}</div>
+                        <div class="small text-muted">{!! $profit->isFinal() ? '<i class="fas fa-lock text-success"></i> finalized' : '<i class="fas fa-pen text-warning"></i> draft' !!} · partners to pay ৳{{ \App\Support\Dec::lakh($partnersDue) }}</div>
+                    @else
+                        <div class="small text-muted">Make the month's Net Profit sheet</div>
+                    @endif
+                </div>
+                @can('access-accounts-profit')
+                    <a href="{{ route('accounts.profit.index') }}" class="btn btn-sm btn-light border"><i class="fas fa-arrow-right"></i></a>
+                @endcan
             </div>
         </div>
 
@@ -189,7 +200,7 @@
                     @forelse ($rows as $row)
                         <div class="acct-bar-row">
                             <div class="d-flex justify-content-between mb-1">
-                                <span>{{ $row->name }} <span class="text-muted small">× {{ $row->entries }}</span></span>
+                                <span>{{ \App\Support\Ui::t($row->name) }} <span class="text-muted small">× {{ $row->entries }}</span></span>
                                 <strong class="money">{{ $tk($row->total) }}</strong>
                             </div>
                             <div class="acct-progress mt-0" style="--accent: {{ $color }}">
@@ -221,8 +232,8 @@
                             <i class="fas fa-arrow-{{ $isIncome ? 'down' : 'up' }}"></i>
                         </span>
                         <span class="acct-list-main">
-                            <div class="acct-list-title">{{ $tx->description ?: ($tx->category?->name ?? 'Entry') }}</div>
-                            <div class="acct-list-sub">{{ $tx->category?->name }} · {{ $tx->transaction_date?->format('d M Y') }}</div>
+                            <div class="acct-list-title">{{ $tx->description ?: ($tx->category?->displayName() ?? 'Entry') }}</div>
+                            <div class="acct-list-sub">{{ $tx->category?->displayName() }} · {{ $tx->transaction_date?->format('d M Y') }}</div>
                         </span>
                         <span class="acct-list-amount {{ $isIncome ? 'text-income' : 'text-expense' }}">{{ $isIncome ? '+' : '−' }}{{ $tk($tx->amount) }}</span>
                     </div>

@@ -213,7 +213,7 @@
                             <span class="acct-list-main">
                                 <div class="acct-list-title">{{ $leave->employee->name ?? 'Unknown' }}</div>
                                 <div class="acct-list-sub">
-                                    {{ $leave->leaveType->name ?? 'Leave' }} ·
+                                    {{ \App\Support\Ui::t($leave->leaveType->name ?? 'Leave') }} ·
                                     {{ $leave->start_date->format('d M') }}@if (! $leave->start_date->equalTo($leave->end_date)) – {{ $leave->end_date->format('d M') }}@endif
                                 </div>
                             </span>

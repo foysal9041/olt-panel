@@ -2,21 +2,22 @@
 
 @section('title', 'Daily Cash Book')
 
-@use('App\Support\Bangla')
+@use('App\Support\Ui')
 @php
     $tk = fn ($v) => '৳' . number_format((float) $v, 2);
     $prev = $date->copy()->subDay()->toDateString();
     $next = $date->copy()->addDay()->toDateString();
-    $bnDate = Bangla::digits($date->day) . ' ' . Bangla::month($date) . ' ' . Bangla::digits($date->year);
+    // Ledger heads are data (often Bangla); show them in the interface language.
+    $head = fn ($name) => Ui::t($name);
     $sides = [
-        ['income', 'জমা', 'Income', $income, '#15803d', '#dcfce7', 'fas fa-arrow-down', 'আয়ের উৎস'],
-        ['expense', 'খরচ', 'Expense', $expense, '#b91c1c', '#fee2e2', 'fas fa-arrow-up', 'ব্যয়ের খাত'],
+        ['income', 'Cash in', 'Petty cash from the bank', $income, '#15803d', '#dcfce7', 'fas fa-arrow-down', 'Source / description', 'Total cash in'],
+        ['expense', 'Expense', 'Office expenses', $expense, '#b91c1c', '#fee2e2', 'fas fa-arrow-up', 'Expense head / description', 'Total spent'],
     ];
 @endphp
 
 @section('content_header')
-<x-accounts.header title="প্রতিদিনের হিসাব" icon="fas fa-book-open"
-    subtitle="Daily Cash Book — {{ Bangla::day($date) }}, {{ $date->format('d/m/Y') }}">
+<x-accounts.header title="Daily Cash Book" icon="fas fa-book-open"
+    subtitle="Petty cash book — {{ Ui::day($date) }}, {{ $date->format('d/m/Y') }}">
     @unless ($locked)
         <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#cash-modal">
             <i class="fas fa-wallet"></i> Cash on Hand
@@ -47,7 +48,7 @@
     .cb-chip.locked { background: #e2e8f0; color: #334155; }
     .cb-chip.cash { background: #e0f2fe; color: #0369a1; }
 
-    /* Balance flow: জের + আয় = মোট − ব্যয় = অবশিষ্ট */
+    /* Balance flow: brought forward + cash in = available − spent = balance */
     .cb-flow { display: flex; align-items: stretch; gap: .6rem; margin-bottom: 1.25rem; }
     .cb-flow .acct-stat { flex: 1 1 0; min-width: 0; margin: 0; }
     .cb-flow .acct-stat-value { font-size: 1.35rem; }
@@ -91,7 +92,7 @@
     .cb-add .btn-add { background: var(--tone); border-color: var(--tone); color: #fff; }
     .cb-add .btn-add:hover { filter: brightness(.95); color: #fff; }
 
-    /* খাত-wise summary */
+    /* Head-wise summary */
     .cb-heads { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; }
     .cb-heads > div { padding: .9rem 1.15rem; }
     .cb-heads > div + div { border-left: 1px solid #eef2f7; }
@@ -114,8 +115,8 @@
     <div class="cb-day">
         <div class="cb-day-icon"><div><b>{{ $date->format('d') }}</b><small>{{ $date->format('M') }}</small></div></div>
         <div>
-            <div class="cb-day-title">{{ Bangla::day($date) }}, {{ $bnDate }}</div>
-            <div class="cb-day-sub">{{ $date->format('l, d F Y') }}@if ($date->isToday()) · <strong class="text-primary">Today</strong>@endif</div>
+            <div class="cb-day-title">{{ Ui::day($date) }}, {{ Ui::longDate($date) }}</div>
+            <div class="cb-day-sub">{{ $date->format('d/m/Y') }}@if ($date->isToday()) · <strong class="text-primary">Today</strong>@endif</div>
         </div>
     </div>
 
@@ -136,7 +137,7 @@
 
     <div class="cb-chips">
         @if ($locked)
-            <span class="cb-chip locked" title="Entries for past days can only be added, changed or removed by an admin"><i class="fas fa-lock"></i> Locked day</span>
+            <span class="cb-chip locked" title="{{ \App\Models\Transaction::lockReason($date) }}"><i class="fas fa-lock"></i> {{ \App\Models\ProfitSheet::isMonthClosed($date) ? 'Month closed' : 'Locked day' }}</span>
         @else
             <span class="cb-chip open"><i class="fas fa-lock-open"></i> Open for entries</span>
         @endif
@@ -150,14 +151,14 @@
 @if ($locked)
     <div class="alert alert-light border d-flex align-items-center small" style="gap:.6rem">
         <i class="fas fa-lock text-muted"></i>
-        <div><strong>Locked day.</strong> Entries for past days can only be added, changed or removed by an admin. You can still view and print this day.</div>
+        <div><strong>Locked.</strong> {{ \App\Models\Transaction::lockReason($date) }} You can still view and print this day.</div>
     </div>
 @endif
 
 {{-- ============ Balance flow ============ --}}
 <div class="cb-flow">
     <div class="acct-stat" style="--accent:#64748b">
-        <div class="acct-stat-label">জের · Brought forward <i class="fas fa-history"></i></div>
+        <div class="acct-stat-label">Brought forward <i class="fas fa-history"></i></div>
         <div class="acct-stat-value {{ $totals['opening'] < 0 ? 'text-danger' : '' }}">{{ $tk($totals['opening']) }}</div>
         <div class="acct-stat-foot">
             @if ($countToday)
@@ -173,43 +174,43 @@
     </div>
     <span class="cb-op">+</span>
     <div class="acct-stat" style="--accent:#16a34a">
-        <div class="acct-stat-label">দিনের আয় · Income <i class="fas fa-arrow-down"></i></div>
+        <div class="acct-stat-label">Cash in today <i class="fas fa-arrow-down"></i></div>
         <div class="acct-stat-value text-income">{{ $tk($totals['day_income']) }}</div>
-        <div class="acct-stat-foot">{{ $income->count() }} {{ Str::plural('entry', $income->count()) }}</div>
+        <div class="acct-stat-foot">{{ $income->count() }} {{ Ui::t(Str::plural('entry', $income->count())) }}</div>
     </div>
     <span class="cb-op">=</span>
     <div class="acct-stat" style="--accent:#4f46e5">
-        <div class="acct-stat-label">মোট আয় · Total <i class="fas fa-layer-group"></i></div>
+        <div class="acct-stat-label">Available <i class="fas fa-layer-group"></i></div>
         <div class="acct-stat-value">{{ $tk($totals['total_income']) }}</div>
-        <div class="acct-stat-foot">জের + দিনের আয়</div>
+        <div class="acct-stat-foot">Brought forward + cash in</div>
     </div>
     <span class="cb-op">−</span>
     <div class="acct-stat" style="--accent:#e11d48">
-        <div class="acct-stat-label">মোট ব্যয় · Expense <i class="fas fa-arrow-up"></i></div>
+        <div class="acct-stat-label">Spent <i class="fas fa-arrow-up"></i></div>
         <div class="acct-stat-value text-expense">{{ $tk($totals['total_expense']) }}</div>
-        <div class="acct-stat-foot">{{ $expense->count() }} {{ Str::plural('entry', $expense->count()) }}</div>
+        <div class="acct-stat-foot">{{ $expense->count() }} {{ Ui::t(Str::plural('entry', $expense->count())) }}</div>
     </div>
     <span class="cb-op">=</span>
     <div @class(['acct-stat', 'acct-stat-hero', 'final', 'neg' => $totals['closing'] < 0])>
-        <div class="acct-stat-label">অবশিষ্ট টাকা · Balance <i class="fas fa-wallet"></i></div>
+        <div class="acct-stat-label">Balance <i class="fas fa-wallet"></i></div>
         <div class="acct-stat-value">{{ $tk($totals['closing']) }}</div>
-        <div class="acct-stat-foot">Cash in hand at day end</div>
+        <div class="acct-stat-foot">Petty cash in hand at day end</div>
     </div>
 </div>
 
-{{-- ============ জমা / খরচ ============ --}}
+{{-- ============ Cash in / Expense ============ --}}
 <div class="row">
-    @foreach ($sides as [$type, $bn, $en, $list, $tone, $tint, $icon, $colLabel])
+    @foreach ($sides as [$type, $label, $subLabel, $list, $tone, $tint, $icon, $colLabel, $totalLabel])
         <div class="col-xl-6">
             <div class="card acct-panel cb-side" style="--tone: {{ $tone }}; --tint: {{ $tint }}">
                 <div class="card-header">
                     <div class="cb-head">
                         <span class="cb-head-icon"><i class="{{ $icon }}"></i></span>
-                        <div class="cb-head-title">{{ $bn }} <small>{{ $en }}</small></div>
+                        <div class="cb-head-title">{{ $label }} <small>{{ $subLabel }}</small></div>
                     </div>
                     <div class="cb-head-total">
                         <b>{{ $tk($list->sum('amount')) }}</b>
-                        <span>{{ $list->count() }} {{ Str::plural('entry', $list->count()) }}</span>
+                        <span>{{ $list->count() }} {{ Ui::t(Str::plural('entry', $list->count())) }}</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -217,9 +218,9 @@
                         <table class="table table-sm cb-table">
                             <thead>
                                 <tr>
-                                    <th class="pl-3">নং</th>
-                                    <th>{{ $colLabel }} / বিবরণ</th>
-                                    <th class="amt">পরিমাণ</th>
+                                    <th class="pl-3">No.</th>
+                                    <th>{{ $colLabel }}</th>
+                                    <th class="amt">Amount</th>
                                     <th style="width:2.2rem"></th>
                                 </tr>
                             </thead>
@@ -228,9 +229,9 @@
                                     <tr>
                                         <td class="pl-3 cb-no">{{ $loop->iteration }}</td>
                                         <td>
-                                            <div class="cb-desc">{{ $t->description ?: $t->category->name }}</div>
+                                            <div class="cb-desc">{{ $t->description ?: $head($t->category->name) }}</div>
                                             <div class="cb-meta">
-                                                <span class="cb-khat">{{ $t->category->name }}</span>
+                                                <span class="cb-khat">{{ $head($t->category->name) }}</span>
                                                 {{ $t->recordedBy?->name ?? '—' }} · {{ $t->created_at?->format('h:i A') }}
                                             </div>
                                         </td>
@@ -238,7 +239,7 @@
                                         <td class="text-right pr-3">
                                             @unless ($locked)
                                                 <form method="POST" action="{{ route('accounts.cashbook.destroy', $t) }}" class="d-inline js-confirm-delete"
-                                                      data-confirm-message="Remove {{ $t->category->name }} {{ $tk($t->amount) }}?">
+                                                      data-confirm-message="{{ Ui::t('Remove') }} {{ $head($t->category->name) }} {{ $tk($t->amount) }}?">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button class="btn btn-link btn-sm text-danger p-0 cb-del" title="Remove"><i class="fas fa-trash-alt"></i></button>
@@ -247,13 +248,13 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="border-0"><div class="acct-empty"><i class="{{ $icon }}"></i>No {{ strtolower($en) }} entries on this day</div></td></tr>
+                                    <tr><td colspan="4" class="border-0"><div class="acct-empty"><i class="{{ $icon }}"></i>No entries on this day</div></td></tr>
                                 @endforelse
                             </tbody>
                             @if ($list->isNotEmpty())
                                 <tfoot>
                                     <tr class="cb-total">
-                                        <td class="pl-3" colspan="2">মোট {{ $type === 'income' ? 'আয়' : 'ব্যয়' }}</td>
+                                        <td class="pl-3" colspan="2">{{ $totalLabel }}</td>
                                         <td class="amt">{{ $tk($list->sum('amount')) }}</td>
                                         <td></td>
                                     </tr>
@@ -269,26 +270,26 @@
                             <input type="hidden" name="transaction_date" value="{{ $date->toDateString() }}">
                             <input type="hidden" name="_type" value="{{ $type }}">
                             <div class="col-md-4 mb-2">
-                                <label>খাত</label>
+                                <label>Head</label>
                                 <div class="input-group input-group-sm">
                                     <select name="transaction_category_id" class="form-control" required>
                                         <option value="">Select…</option>
                                         @foreach ($categories[$type] ?? [] as $c)
-                                            <option value="{{ $c->id }}" @selected(old('transaction_category_id') == $c->id && old('_type') === $type)>{{ $c->name }}</option>
+                                            <option value="{{ $c->id }}" @selected(old('transaction_category_id') == $c->id && old('_type') === $type)>{{ $head($c->name) }}</option>
                                         @endforeach
                                     </select>
                                     <div class="input-group-append">
-                                        <button type="button" class="btn btn-light border" data-toggle="modal" data-target="#khat-{{ $type }}" title="Add or remove {{ $bn }} খাত"><i class="fas fa-cog"></i></button>
+                                        <button type="button" class="btn btn-light border" data-toggle="modal" data-target="#khat-{{ $type }}" title="{{ Ui::t('Add or remove heads') }}"><i class="fas fa-cog"></i></button>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4 mb-2">
-                                <label>বিবরণ</label>
+                                <label>Description</label>
                                 <input type="text" name="description" class="form-control form-control-sm" placeholder="Description" maxlength="255"
                                        value="{{ old('_type') === $type ? old('description') : '' }}">
                             </div>
                             <div class="col-md-2 col-7 mb-2">
-                                <label>পরিমাণ</label>
+                                <label>Amount</label>
                                 <div class="input-group input-group-sm">
                                     <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
                                     <input type="number" name="amount" step="0.01" min="0.01" class="form-control" placeholder="0.00" required
@@ -296,7 +297,7 @@
                                 </div>
                             </div>
                             <div class="col-md-2 col-5 mb-2">
-                                <button class="btn btn-sm btn-block btn-add"><i class="fas fa-plus"></i> {{ $bn }}</button>
+                                <button class="btn btn-sm btn-block btn-add"><i class="fas fa-plus"></i> {{ $label }}</button>
                             </div>
                         </form>
                     </div>
@@ -306,22 +307,22 @@
     @endforeach
 </div>
 
-{{-- ============ খাত অনুযায়ী ============ --}}
+{{-- ============ By head ============ --}}
 @if ($income->isNotEmpty() || $expense->isNotEmpty())
     <div class="card acct-panel">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-tags mr-1 text-primary"></i> খাত অনুযায়ী <small class="text-muted">By head</small></h3>
+            <h3 class="card-title"><i class="fas fa-tags mr-1 text-primary"></i> By head</h3>
         </div>
         <div class="cb-heads">
-            @foreach ($sides as [$type, $bn, $en, $list, $tone])
+            @foreach ($sides as [$type, $label, $subLabel, $list, $tone])
                 @php
                     $dayTotal = (float) $list->sum('amount');
-                    $heads = $list->groupBy(fn ($t) => $t->category->name)
+                    $heads = $list->groupBy(fn ($t) => $head($t->category->name))
                         ->map(fn ($g, $name) => ['name' => $name, 'sum' => (float) $g->sum('amount'), 'count' => $g->count()])
                         ->sortByDesc('sum');
                 @endphp
                 <div>
-                    <h6 style="color: {{ $tone }}">{{ $bn }} · {{ $en }}</h6>
+                    <h6 style="color: {{ $tone }}">{{ $label }} · {{ $subLabel }}</h6>
                     @forelse ($heads as $h)
                         <div class="acct-bar-row">
                             <div class="d-flex justify-content-between">
@@ -331,7 +332,7 @@
                             <div class="acct-progress"><span style="width: {{ $dayTotal > 0 ? round($h['sum'] / $dayTotal * 100, 1) : 0 }}%; background: {{ $tone }}"></span></div>
                         </div>
                     @empty
-                        <div class="text-muted small">No {{ strtolower($en) }} on this day.</div>
+                        <div class="text-muted small">Nothing on this day.</div>
                     @endforelse
                 </div>
             @endforeach
@@ -341,7 +342,9 @@
 
 <p class="small text-muted">
     <i class="fas fa-info-circle"></i>
-    জের = everything received minus everything spent before this day. Entries here are the same as in
+    This is the <strong>petty cash</strong>: all income is deposited in the bank, the office gets petty cash from the bank (<strong>Cash in</strong>)
+    and pays its expenses out of it (<strong>Expense</strong>). Bills paid straight from the bank go in Income &amp; Expenses as <em>Bank</em>.
+    Brought forward = petty cash received minus spent before this day. Entries here are the same as in
     @can('access-accounts-transactions') <a href="{{ route('accounts.transactions.index') }}">Income &amp; Expenses</a> @else Income &amp; Expenses @endcan
     and the monthly sheets, so each entry is made once.
 </p>
@@ -353,13 +356,13 @@
         <form method="POST" action="{{ route('accounts.cashbook.opening.store') }}" class="modal-content">
             @csrf
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-wallet text-primary"></i> Cash on Hand (হাতে নগদ)</h5>
+                <h5 class="modal-title"><i class="fas fa-wallet text-primary"></i> Cash on Hand</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="small text-muted">
-                    Count the cash at the <strong>start</strong> of this day and enter it here. The জের for this day starts from this amount,
-                    and later days add their আয় and subtract their ব্যয় from it. Set it again any day the count doesn't match.
+                    Count the <strong>petty cash</strong> in the office (not the bank) at the <strong>start</strong> of this day and enter it here. The brought-forward balance for this day starts from this amount,
+                    and later days add their cash in and subtract their expenses from it. Set it again any day the count doesn't match.
                 </p>
                 <div class="form-group">
                     <label>Date</label>
@@ -374,7 +377,7 @@
                                value="{{ $countToday ? $countToday->amount : $totals['opening'] }}">
                     </div>
                     @unless ($countToday)
-                        <small class="form-text text-muted">Filled with the জের worked out now ({{ $tk($totals['opening']) }}) — change it to what you actually counted.</small>
+                        <small class="form-text text-muted">Filled with the brought-forward balance worked out now ({{ $tk($totals['opening']) }}) — change it to what you actually counted.</small>
                     @endunless
                 </div>
                 <div class="form-group mb-0">
@@ -410,8 +413,8 @@
 @endif
 @endunless
 
-{{-- ============ খাত (ledger heads) ============ --}}
-@foreach (['income' => ['আয়ের খাত', '#15803d'], 'expense' => ['ব্যয়ের খাত', '#b91c1c']] as $type => [$label, $tone])
+{{-- ============ Ledger heads ============ --}}
+@foreach (['income' => ['Cash-in heads', '#15803d'], 'expense' => ['Expense heads', '#b91c1c']] as $type => [$label, $tone])
     <div class="modal fade" id="khat-{{ $type }}" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -423,15 +426,15 @@
                     <form method="POST" action="{{ route('accounts.cashbook.categories.store') }}" class="d-flex mb-3" style="gap:.5rem">
                         @csrf
                         <input type="hidden" name="type" value="{{ $type }}">
-                        <input type="text" name="name" class="form-control" placeholder="নতুন খাত, e.g. {{ $type === 'income' ? 'কাস্টমার বিল' : 'বিদ্যুৎ বিল' }}" required maxlength="255">
+                        <input type="text" name="name" class="form-control" placeholder="{{ Ui::t($type === 'income' ? 'New head, e.g. Bank withdrawal' : 'New head, e.g. Electricity bill') }}" required maxlength="255">
                         <button class="btn text-nowrap" style="background: {{ $tone }}; color: #fff"><i class="fas fa-plus"></i> Add</button>
                     </form>
                     <ul class="list-group">
                         @foreach ($categories[$type] ?? [] as $c)
                             <li class="list-group-item d-flex justify-content-between align-items-center py-2">
-                                {{ $c->name }}
+                                {{ $head($c->name) }}
                                 <form method="POST" action="{{ route('accounts.cashbook.categories.destroy', $c) }}" class="js-confirm-delete"
-                                      data-confirm-message="Remove খাত “{{ $c->name }}”?">
+                                      data-confirm-message="{{ Ui::t('Remove head') }} “{{ $head($c->name) }}”?">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-link btn-sm text-danger p-0" title="Remove (only if it has no entries)"><i class="fas fa-times"></i></button>
@@ -439,7 +442,7 @@
                             </li>
                         @endforeach
                     </ul>
-                    <small class="text-muted d-block mt-2">A খাত that already has entries can't be removed.</small>
+                    <small class="text-muted d-block mt-2">A head that already has entries can't be removed.</small>
                 </div>
             </div>
         </div>

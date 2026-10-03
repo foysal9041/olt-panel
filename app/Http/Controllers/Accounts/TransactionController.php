@@ -27,6 +27,10 @@ class TransactionController extends Controller
             $query->whereHas('category', fn ($q) => $q->where('type', $request->type));
         }
 
+        if ($request->filled('account')) {
+            $query->where('account', $request->account);
+        }
+
         if ($request->filled('category_id')) {
             $query->where('transaction_category_id', $request->category_id);
         }
@@ -59,12 +63,23 @@ class TransactionController extends Controller
     {
         $validated = $request->validate([
             'transaction_category_id' => 'required|exists:transaction_categories,id',
+            'account' => 'required|in:' . implode(',', array_keys(Transaction::ACCOUNTS)),
             'amount' => 'required|numeric|min:0.01',
             'description' => 'nullable|string|max:255',
             'transaction_date' => 'required|date',
         ]);
 
-        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, Transaction::lockReason($validated['transaction_date']));
+        if ($error = $this->accountError($validated)) {
+            return back()->withInput()->withErrors(['account' => $error]);
+        }
+
+        $same = Transaction::where('transaction_category_id', $validated['transaction_category_id'])->where('account', $validated['account'])
+            ->where('amount', $validated['amount'])->whereDate('transaction_date', $validated['transaction_date'])
+            ->where('description', $validated['description'] ?? null);
+        if (\App\Support\DuplicateGuard::recent($same)) {
+            return back()->withInput()->with('error', \App\Support\DuplicateGuard::message());
+        }
 
         $validated['recorded_by'] = auth()->id();
         $validated['zone'] = auth()->user()->zone;
@@ -92,7 +107,7 @@ class TransactionController extends Controller
 
     public function edit(Transaction $transaction)
     {
-        abort_if($transaction->isLockedFor(auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_if($transaction->isLockedFor(auth()->user()), 403, Transaction::lockReason($transaction->transaction_date));
 
         $categories = TransactionCategory::orderBy('type')->orderBy('name')->get();
 
@@ -103,14 +118,19 @@ class TransactionController extends Controller
     {
         $validated = $request->validate([
             'transaction_category_id' => 'required|exists:transaction_categories,id',
+            'account' => 'required|in:' . implode(',', array_keys(Transaction::ACCOUNTS)),
             'amount' => 'required|numeric|min:0.01',
             'description' => 'nullable|string|max:255',
             'transaction_date' => 'required|date',
         ]);
 
         // Neither the old nor the new date may be a closed day.
-        abort_if($transaction->isLockedFor(auth()->user()), 403, 'Only an admin can change entries for past days.');
-        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, 'Only an admin can change entries for past days.');
+        abort_if($transaction->isLockedFor(auth()->user()), 403, Transaction::lockReason($transaction->transaction_date));
+        abort_unless(Transaction::dayIsOpenFor($validated['transaction_date'], auth()->user()), 403, Transaction::lockReason($validated['transaction_date']));
+
+        if ($error = $this->accountError($validated)) {
+            return back()->withInput()->withErrors(['account' => $error]);
+        }
 
         $transaction->update($validated);
 
@@ -130,5 +150,15 @@ class TransactionController extends Controller
         return redirect()
             ->route('accounts.transactions.index')
             ->with('success', 'Transaction Deleted Successfully');
+    }
+
+    /** All income is deposited in the bank; petty cash is only for the office's expenses. */
+    protected function accountError(array $validated): ?string
+    {
+        $category = TransactionCategory::find($validated['transaction_category_id']);
+
+        return Transaction::isRealIncome($category) && $validated['account'] === 'cash'
+            ? 'Income is deposited in the bank — choose Bank. Petty cash is only for the office\'s expenses.'
+            : null;
     }
 }

@@ -20,7 +20,12 @@ class ViewerReadOnly
         'profile.update',
         'password.update',
         'password.confirm',
+        'tickets.progress',
+        'tickets.task',
     ];
+
+    /** Their own work: to-do list, tasks given to them, leave requests. */
+    protected const ALLOWED_PREFIX = 'my.';
 
     /** Form pages a viewer may still open (their own profile). */
     protected const ALLOWED_FORMS = [
@@ -41,7 +46,9 @@ class ViewerReadOnly
         $isFormPage = (str_ends_with($route, '.create') || str_ends_with($route, '.edit'))
             && ! in_array($route, self::ALLOWED_FORMS, true);
 
-        if (($isWrite && ! in_array($route, self::ALLOWED_WRITES, true)) || $isFormPage) {
+        $own = str_starts_with($route, self::ALLOWED_PREFIX) || in_array($route, self::ALLOWED_WRITES, true);
+
+        if (($isWrite && ! $own) || $isFormPage) {
             abort(403, 'This is a view-only account.');
         }
 

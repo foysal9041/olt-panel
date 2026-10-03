@@ -60,6 +60,7 @@ class SalaryController extends Controller
         $validated = $request->validate([
             'month' => 'required|date_format:Y-m',
             'pay_date' => 'required|date',
+            'pay_account' => 'nullable|in:' . implode(',', array_keys(\App\Models\Transaction::ACCOUNTS)),
             'post' => 'nullable|boolean',
             'rows' => 'array',
             'rows.*.employee_id' => 'nullable|exists:employees,id',
@@ -83,6 +84,11 @@ class SalaryController extends Controller
                 'pay_date' => 'Salary is paid the following month — the pay date must be on or after '
                     . $month->copy()->addMonthNoOverflow()->startOfMonth()->format('d M Y') . '.',
             ]);
+        }
+
+        // The expenses land on the pay date; a closed month can't take them.
+        if ($request->boolean('post') && \App\Models\ProfitSheet::isMonthClosed($validated['pay_date'])) {
+            return back()->withInput()->withErrors(['pay_date' => \App\Models\Transaction::lockReason($validated['pay_date'])]);
         }
 
         // Salary is posted once a month; a posted sheet is final until an
@@ -117,7 +123,7 @@ class SalaryController extends Controller
             }
 
             if ($post) {
-                $this->createExpenses($sheet->fresh('items'), Carbon::parse($validated['pay_date']));
+                $this->createExpenses($sheet->fresh('items'), Carbon::parse($validated['pay_date']), $validated['pay_account'] ?? 'cash');
                 $sheet->posted_at ??= now();
             } else {
                 $sheet->posted_at = null;
@@ -131,7 +137,7 @@ class SalaryController extends Controller
         return redirect()
             ->route('accounts.salaries.index', ['month' => $month->format('Y-m')])
             ->with('success', $sheet->isPosted()
-                ? 'Salary sheet saved and posted — Net Pay is recorded under বেতন.'
+                ? 'Salary sheet saved and posted — Net Pay is recorded as the Salary expense.'
                 : 'Salary sheet saved (not posted to expenses yet).');
     }
 
@@ -140,15 +146,22 @@ class SalaryController extends Controller
         $month = $this->month($request->input('month'));
         $sheet = SalarySheet::where('month', $month->toDateString())->firstOrFail();
 
+        $closed = $sheet->items()->whereNotNull('transaction_id')->with('transaction:id,transaction_date')->get()
+            ->pluck('transaction.transaction_date')->filter()->first(fn ($d) => \App\Models\ProfitSheet::isMonthClosed($d));
+        if ($closed) {
+            return back()->with('error', \App\Models\Transaction::lockReason($closed));
+        }
+
         DB::transaction(function () use ($sheet) {
             $this->removeExpenses($sheet);
             $sheet->update(['posted_at' => null]);
         });
 
-        return back()->with('success', 'Posting undone — the বেতন expenses for this month were removed.');
+        return back()->with('success', 'Posting undone — the salary expenses for this month were removed.');
     }
 
-    protected function createExpenses(SalarySheet $sheet, Carbon $payDate): void
+    /** One বেতন expense per person, paid from the bank or the petty cash. */
+    protected function createExpenses(SalarySheet $sheet, Carbon $payDate, string $account = 'cash'): void
     {
         $category = TransactionCategory::firstOrCreate(['name' => 'বেতন', 'type' => 'expense']);
 
@@ -159,8 +172,9 @@ class SalaryController extends Controller
 
             $transaction = Transaction::create([
                 'transaction_category_id' => $category->id,
+                'account' => $account,
                 'amount' => $item->net,
-                'description' => "বেতন {$sheet->month->format('M Y')} — {$item->name}",
+                'description' => "Salary {$sheet->month->format('M Y')} — {$item->name}",
                 'transaction_date' => $payDate->toDateString(),
                 'recorded_by' => auth()->id(),
                 'zone' => auth()->user()?->zone,

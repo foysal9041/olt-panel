@@ -61,11 +61,12 @@ class UserController extends Controller
         'email'           => 'required|email|unique:users,email',
         'username'        => 'required|unique:users,username',
         'password'        => 'required|min:6',
-        'role'            => 'required',
+        'role'            => 'required|in:' . implode(',', array_keys(config('roles'))),
         'zone'            => ['required', $this->zoneRule()],
         'status'          => 'required',
         'permissions'     => 'nullable|array',
-    ]);
+        'employee_id'     => 'nullable|exists:employees,id|unique:users,employee_id',
+    ], ['employee_id.unique' => 'That employee is already linked to another login.']);
 
     $user = User::create([
         'name'            => $validated['name'],
@@ -75,6 +76,7 @@ class UserController extends Controller
         'role'            => $validated['role'],
         'zone'            => $validated['zone'],
         'status'          => $validated['status'],
+        'employee_id'     => $validated['employee_id'] ?? null,
     ]);
 
     $before = $this->accessSnapshot($user);
@@ -149,10 +151,11 @@ class UserController extends Controller
             'name'           => 'required',
             'email'          => 'required|email',
             'username'       => 'required',
-            'role'           => 'required',
+            'role'           => 'required|in:' . implode(',', array_keys(config('roles'))),
             'zone'           => ['required', $this->zoneRule()],
             'permissions'    => 'nullable|array',
-        ]);
+            'employee_id'    => 'nullable|exists:employees,id|unique:users,employee_id,' . $user->id,
+        ], ['employee_id.unique' => 'That employee is already linked to another login.']);
 
         if ($authUser->role == 'operator') {
 
@@ -173,6 +176,7 @@ class UserController extends Controller
                 'role'            => $request->role,
                 'zone'            => $request->zone,
                 'status'          => $request->status,
+                'employee_id'     => $request->input('employee_id') ?: null,
             ]);
 
             // Only a full admin can change what modules and devices another user can reach.
@@ -281,6 +285,7 @@ class UserController extends Controller
     private function deviceLists(): array
     {
         return [
+            'employees' => \App\Models\Employee::with('user:id,employee_id,name')->orderBy('name')->get(['id', 'name', 'emp_code', 'designation']),
             'olts' => \App\Models\Olt::orderBy('zone')->orderBy('name')->get(['id', 'name', 'ip', 'zone']),
             'switches' => \App\Models\NetworkSwitch::orderBy('zone')->orderBy('name')->get(['id', 'name', 'ip', 'zone']),
         ];
