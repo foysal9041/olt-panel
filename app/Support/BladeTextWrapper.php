@@ -54,10 +54,11 @@ class BladeTextWrapper
         }
 
         // Printed papers handed to customers and partners (invoices, money
-        // receipts, statements) keep the office's English wording.
+        // receipts, statements), their PDFs and the emails carrying them
+        // keep the office's English wording.
         $rel = substr($path, strlen($views));
 
-        return ! preg_match('#(^|/)(print[\w-]*|invoice|receipt|ledger-print)\.blade\.php$|^components/print/|^layouts/accounts-print|^accounts/partials/(print-styles|pdf-download)#', $rel);
+        return ! preg_match('#(^|/)(print[\w-]*|invoice|receipt|ledger-print)\.blade\.php$|^components/print/|^layouts/accounts-print|^accounts/partials/(print-styles|pdf-download)|^pdf/|^emails/#', $rel);
     }
 
     /**

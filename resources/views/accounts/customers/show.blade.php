@@ -61,6 +61,7 @@
             <ul class="cp-facts">
                 <li><span><i class="fas fa-at mr-1"></i> Username</span><b>{{ $customer->username ?: '—' }}</b></li>
                 <li><span><i class="fas fa-phone mr-1"></i> Phone</span><b>@if ($customer->phone)<a href="tel:{{ $customer->phone }}">{{ $customer->phone }}</a>@else — @endif</b></li>
+                <li><span><i class="fas fa-envelope mr-1"></i> Email</span><b class="text-break">@if ($customer->emails())@foreach ($customer->emails() as $e)<a href="mailto:{{ $e }}">{{ $e }}</a>@if (! $loop->last), @endif @endforeach @else — @endif</b></li>
                 <li><span><i class="fas fa-map-marker-alt mr-1"></i> Zone</span><b>{{ $customer->zone ?: '—' }}</b></li>
                 <li><span><i class="fas fa-home mr-1"></i> Address</span><b>{{ $customer->address ?: '—' }}</b></li>
             </ul>

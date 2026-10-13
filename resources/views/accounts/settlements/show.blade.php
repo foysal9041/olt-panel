@@ -8,6 +8,9 @@
     $counted = $settlement->rows->where('included', true);
     $notCounted = $settlement->rows->where('included', false);
     $flagIcon = ['error' => ['badge-danger', 'fas fa-times-circle'], 'warn' => ['badge-warning', 'fas fa-exclamation-triangle'], 'info' => ['badge-secondary', 'fas fa-info-circle']];
+    // Emailing: invoices whose customer has an address, and those of them not emailed yet.
+    $mailable = $counted->filter(fn ($r) => $r->customer?->emails());
+    $toMail = $mailable->reject(fn ($r) => $r->lastMail?->sent());
 @endphp
 
 @section('content_header')
@@ -16,6 +19,14 @@
     <a href="{{ route('accounts.settlements.invoices', $settlement) }}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-print"></i> Print all invoices</a>
     <a href="{{ route('accounts.settlements.invoices', [$settlement, 'download' => 1]) }}" target="_blank" class="btn btn-outline-primary btn-sm" title="All invoices in one PDF"><i class="fas fa-file-pdf"></i> Download all (PDF)</a>
     <a href="{{ route('accounts.settlements.export', $settlement) }}" class="btn btn-success btn-sm"><i class="fas fa-file-excel"></i> Download Excel</a>
+    <form method="POST" action="{{ route('accounts.settlements.email', $settlement) }}" class="d-inline js-confirm-delete"
+          data-confirm-message="Email {{ $toMail->count() }} {{ \Illuminate\Support\Str::plural('invoice', $toMail->count()) }} to their customers? ({{ $counted->count() - $mailable->count() }} without an email address are left out.)">
+        @csrf
+        <button class="btn btn-outline-primary btn-sm" @disabled(! $mailReady || $toMail->isEmpty())
+                title="{{ ! $mailReady ? 'Email is not set up yet (Settings → Email).' : ($toMail->isEmpty() ? 'Nothing left to email — every customer with an address has theirs.' : 'Email every invoice not emailed yet, as PDFs') }}">
+            <i class="fas fa-envelope"></i> Email invoices <span class="badge badge-light">{{ $toMail->count() }}/{{ $counted->count() }}</span>
+        </button>
+    </form>
 </x-accounts.header>
 @stop
 
@@ -148,6 +159,16 @@
                                     <td class="pl-3 text-nowrap">
                                         <a href="{{ route('accounts.settlements.invoice', [$settlement, $row]) }}" target="_blank" title="Print invoice"><i class="fas fa-print small"></i> {{ $row->invoice_no }}</a>
                                         <a href="{{ route('accounts.settlements.invoice', [$settlement, $row, 'download' => 1]) }}" target="_blank" class="ml-1 text-success" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
+                                        @if ($mailReady && $row->customer?->emails())
+                                            <form method="POST" action="{{ route('accounts.settlements.invoice.email', [$settlement, $row]) }}" class="d-inline js-confirm-delete"
+                                                  data-confirm-message="Email {{ $row->invoice_no }} to {{ implode(', ', $row->customer->emails()) }}?">
+                                                @csrf
+                                                <button class="btn btn-link btn-sm p-0 ml-1 align-baseline" title="Email to {{ implode(', ', $row->customer->emails()) }}"><i class="fas fa-envelope"></i></button>
+                                            </form>
+                                        @endif
+                                        @if ($row->lastMail)
+                                            @include('accounts.partials.mail-status', ['mail' => $row->lastMail])
+                                        @endif
                                     </td>
                                     <td>
                                         @if ($row->customer)

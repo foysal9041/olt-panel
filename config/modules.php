@@ -105,6 +105,7 @@ return [
             'general'  => 'General',
             'users'    => 'User Management',
             'telegram' => 'Telegram Alerts',
+            'mail'     => 'Email (invoices & receipts to clients)',
         ],
     ],
 ];

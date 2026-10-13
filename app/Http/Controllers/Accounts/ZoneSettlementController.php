@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProfitSheet;
 use App\Models\ZoneSettlement;
 use App\Models\ZoneSettlementRow;
+use App\Services\DocumentMailer;
 use App\Services\SettlementExport;
 use App\Services\SettlementImporter;
 use App\Support\Dec;
@@ -96,7 +97,7 @@ class ZoneSettlementController extends Controller
         return view('accounts.settlements.preview', $state + ['token' => $token, 'upload' => $upload] + $this->duplicates($state, $upload));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, DocumentMailer $mailer)
     {
         [$token, $upload] = $this->upload_($request);
         $state = $this->state($request, $upload);
@@ -106,6 +107,7 @@ class ZoneSettlementController extends Controller
             'cycle' => 'required|in:' . implode(',', array_keys(ZoneSettlement::CYCLES)),
             'invoice_date' => 'required|date',
             'notes' => 'nullable|string|max:500',
+            'send_mail' => 'nullable|boolean',
         ]);
 
         $month = Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth();
@@ -173,19 +175,70 @@ class ZoneSettlementController extends Controller
         session()->forget("settlement_upload.{$token}");
 
         $count = $settlement->rows()->where('included', true)->count();
+        $flash = ['success' => "Saved {$settlement->month->format('F Y')} · {$settlement->cycleLabel()}: {$count} " . Str::plural('zone', $count) . ' invoiced.'];
 
-        return redirect()->route('accounts.settlements.show', $settlement)
-            ->with('success', "Saved {$settlement->month->format('F Y')} · {$settlement->cycleLabel()}: {$count} " . Str::plural('zone', $count) . ' invoiced.');
+        if ($request->boolean('send_mail')) {
+            $flash = $this->mailInvoices($mailer, $settlement, $settlement->rows()->where('included', true)->with('customer')->get(), $flash);
+        }
+
+        return redirect()->route('accounts.settlements.show', $settlement)->with($flash);
+    }
+
+    /** Email one customer invoice (again), as it stands now. */
+    public function emailInvoice(Request $request, ZoneSettlement $settlement, ZoneSettlementRow $row, DocumentMailer $mailer)
+    {
+        abort_unless($row->zone_settlement_id === $settlement->id && $row->included, 404);
+        if ($problem = $mailer->problem($row->customer)) {
+            return back()->with('error', "Not emailed: {$problem}");
+        }
+
+        return back()->with($mailer->settlementInvoice($row, $request->user()->id)->flash("Invoice {$row->invoice_no}"));
+    }
+
+    /** Email every invoice of the settlement that hasn't gone out yet. */
+    public function emailAll(Request $request, ZoneSettlement $settlement, DocumentMailer $mailer)
+    {
+        $rows = $settlement->rows()->where('included', true)->with('customer')
+            ->whereDoesntHave('sentMails', fn ($q) => $q->where('status', 'sent'))->get();
+
+        if ($rows->isEmpty()) {
+            return back()->with('success', 'Every invoice of this settlement has already been emailed.');
+        }
+        // A second click while the first batch is still going would mail them twice.
+        if (! \Illuminate\Support\Facades\Cache::add("settlement-mail-{$settlement->id}", true, now()->addMinutes(2))) {
+            return back()->with('error', 'These invoices are already being emailed — refresh in a minute to see each one\'s status.');
+        }
+
+        return back()->with($this->mailInvoices($mailer, $settlement, $rows, ['success' => '']));
+    }
+
+    /**
+     * Email the rows' invoices in the background; $flash gets the note on
+     * what is being sent and which customers have no address.
+     */
+    protected function mailInvoices(DocumentMailer $mailer, ZoneSettlement $settlement, $rows, array $flash): array
+    {
+        $userId = auth()->id();
+        $rows->each(fn ($row) => $row->setRelation('settlement', $settlement));
+        $sending = $mailer->later($rows, fn ($row) => $row->customer, fn ($row) => $mailer->settlementInvoice($row, $userId));
+
+        $flash['success'] = trim($flash['success'] . ' ' . $sending['note']);
+        if ($flash['success'] === '') {
+            unset($flash['success']);
+        }
+
+        return $flash + array_filter(['error' => $sending['error']]);
     }
 
     public function show(ZoneSettlement $settlement)
     {
-        $settlement->load('rows.customer:id,name', 'creator:id,name');
+        $settlement->load('rows.customer:id,name,email', 'rows.lastMail', 'creator:id,name');
 
         return view('accounts.settlements.show', [
             'settlement' => $settlement,
             'totals' => $settlement->totals(),
             'reconcile' => $this->reconcileSaved($settlement),
+            'mailReady' => \App\Models\MailSetting::current()->ready(),
         ]);
     }
 

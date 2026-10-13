@@ -34,6 +34,7 @@ class CustomerController extends Controller
             'name' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('customers')->where('customer_type', $request->input('customer_type'))],
             'username' => 'nullable|string|max:100|unique:customers,username',
             'phone' => 'nullable|string|max:50',
+            'email' => ['nullable', 'string', 'max:500', new \App\Rules\EmailList],
             'address' => 'nullable|string|max:255',
             'zone' => 'nullable|exists:zones,name',
             'customer_type' => 'required|in:mac_client,bandwidth_client',
@@ -50,6 +51,7 @@ class CustomerController extends Controller
 
         $validated['status'] = $request->boolean('status', true);
         $validated['username'] = filled($validated['username'] ?? null) ? trim($validated['username']) : null;
+        $validated['email'] = implode(', ', Customer::parseEmails($validated['email'] ?? null)) ?: null;
         $bandwidthRates = $validated['bandwidth_rates'] ?? [];
         $ratesFrom = $validated['rates_from'] ?? null;
         unset($validated['bandwidth_rates'], $validated['rates_from']);
@@ -112,6 +114,7 @@ class CustomerController extends Controller
             'name' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('customers')->where('customer_type', $request->input('customer_type'))->ignore($customer->id)],
             'username' => 'nullable|string|max:100|unique:customers,username,' . $customer->id,
             'phone' => 'nullable|string|max:50',
+            'email' => ['nullable', 'string', 'max:500', new \App\Rules\EmailList],
             'address' => 'nullable|string|max:255',
             'zone' => 'nullable|exists:zones,name',
             'customer_type' => 'required|in:mac_client,bandwidth_client',
@@ -128,6 +131,7 @@ class CustomerController extends Controller
 
         $validated['status'] = $request->boolean('status');
         $validated['username'] = filled($validated['username'] ?? null) ? trim($validated['username']) : null;
+        $validated['email'] = implode(', ', Customer::parseEmails($validated['email'] ?? null)) ?: null;
         $bandwidthRates = $validated['bandwidth_rates'] ?? [];
         $ratesFrom = $validated['rates_from'] ?? null;
         unset($validated['bandwidth_rates'], $validated['rates_from']);

@@ -7,8 +7,9 @@
     customer's name, when the customer record has one). The bKash
     charge stays internal (settlement page and Excel), not on the invoice.
     ?plain=1 hides the pad artwork (same spacing) for pre-printed pad paper.
-      Net Bill       = Payment Difference − bKash Charge
+      Net Bill       = the Deduction, as a positive amount (Total Payment − Total Payable)
       Total Payable  = Total Payment + Deduction
+    The company's own Net Bill (after bKash) stays on the settlement page.
 --}}
 
 @use('App\Support\Dec')
@@ -85,7 +86,7 @@
                     </thead>
                     <tbody>
                         <tr><td>1</td><td class="part">Total Payment</td><td class="amt">{{ $n($c['payment']) }}</td></tr>
-                        <tr><td>2</td><td class="part">Net Bill</td><td class="amt">{{ $n($c['income']) }}</td></tr>
+                        <tr><td>2</td><td class="part">Net Bill</td><td class="amt">{{ $n($c['difference']) }}</td></tr>
                         <tr class="payable"><td></td><td class="part">Total Payable</td><td class="amt">{{ $n($c['invoice']) }}</td></tr>
                     </tbody>
                 </table>

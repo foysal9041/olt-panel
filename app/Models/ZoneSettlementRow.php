@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSentMails;
 use App\Support\Dec;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ZoneSettlementRow extends Model
 {
+    use HasSentMails;
+
     protected $fillable = [
         'zone_settlement_id', 'source_row', 'name', 'customer_id', 'total_payment', 'deduction', 'included', 'flags', 'invoice_no',
     ];

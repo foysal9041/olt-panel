@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSentMails;
 use App\Models\Concerns\LogsActivity;
 use App\Support\Dec;
 use Illuminate\Database\Eloquent\Model;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class BandwidthInvoice extends Model
 {
-    use LogsActivity;
+    use HasSentMails, LogsActivity;
 
     protected $fillable = ['customer_id', 'month', 'invoice_no', 'invoice_date', 'due_date', 'prepared_by', 'prepared_title', 'notes', 'created_by'];
 
@@ -74,6 +75,20 @@ class BandwidthInvoice extends Model
         $paid = $this->paid();
 
         return ['bill' => $bill, 'previous' => $previous, 'mrc' => Dec::round($mrc, 2), 'paid' => $paid, 'due' => Dec::round(Dec::sub($mrc, $paid), 2)];
+    }
+
+    /** What was still due on this invoice right after $payment (negative = advance). */
+    public function dueAfter(BandwidthPayment $payment): string
+    {
+        $after = $this->figures()['mrc'];
+        foreach ($this->payments as $p) {
+            $after = Dec::sub($after, $p->amount);
+            if ($p->id === $payment->id) {
+                break;
+            }
+        }
+
+        return Dec::round($after, 2);
     }
 
     public function isClosed(): bool

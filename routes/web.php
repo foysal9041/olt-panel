@@ -155,6 +155,13 @@ Route::middleware(['auth', 'can:access-settings-telegram'])->prefix('settings')-
 
 });
 
+// Settings → Email: the office mailbox invoices and money receipts are emailed from.
+Route::middleware(['auth', 'can:access-settings-mail'])->prefix('settings')->name('settings.')->group(function () {
+    Route::get('mail', [\App\Http\Controllers\MailSettingController::class, 'edit'])->name('mail');
+    Route::put('mail', [\App\Http\Controllers\MailSettingController::class, 'update'])->name('mail.update');
+    Route::post('mail/test', [\App\Http\Controllers\MailSettingController::class, 'test'])->name('mail.test');
+});
+
 // Old location of the Telegram page (it used to live under NOC).
 Route::redirect('/noc-alerts', '/settings/telegram');
 
@@ -292,6 +299,8 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
             Route::get('{settlement}', 'show')->name('show');
             Route::get('{settlement}/invoices', 'invoices')->name('invoices');
             Route::get('{settlement}/invoices/{row}', 'invoice')->name('invoice');
+            Route::post('{settlement}/invoices/{row}/email', 'emailInvoice')->name('invoice.email');
+            Route::post('{settlement}/email', 'emailAll')->name('email');
             Route::get('{settlement}/export', 'export')->name('export');
             Route::get('{settlement}/source', 'source')->name('source');
             Route::put('{settlement}/signatory', 'signatory')->name('signatory');
@@ -308,6 +317,8 @@ Route::middleware(['auth', 'can:access-accounts'])->prefix('accounts')->name('ac
         Route::post('{invoice}/recalculate', [BandwidthBillingController::class, 'recalculate'])->name('recalculate');
         Route::delete('{invoice}', [BandwidthBillingController::class, 'destroy'])->name('destroy');
         Route::get('{invoice}/print', [BandwidthBillingController::class, 'print'])->name('print');
+        Route::post('{invoice}/email', [BandwidthBillingController::class, 'email'])->name('email');
+        Route::post('{invoice}/payments/{payment}/email', [BandwidthBillingController::class, 'emailReceipt'])->name('payments.email');
         Route::post('{invoice}/payments', [BandwidthBillingController::class, 'storePayment'])->name('payments.store');
         Route::get('{invoice}/payments/{payment}/receipt', [BandwidthBillingController::class, 'receipt'])->name('payments.receipt');
         Route::delete('{invoice}/payments/{payment}', [BandwidthBillingController::class, 'destroyPayment'])->name('payments.destroy');

@@ -35,6 +35,15 @@
                    value="{{ old('phone', $customer->phone ?? '') }}" placeholder="01XXXXXXXXX">
         </div>
         <div class="col-md-7 form-group">
+            <label>Email <small class="text-muted">(invoices &amp; money receipts are sent here)</small></label>
+            <input type="text" name="email" maxlength="500" class="form-control @error('email') is-invalid @enderror"
+                   value="{{ old('email', $customer->email ?? '') }}" placeholder="billing@client.com — several? separate with commas" autocomplete="off">
+            @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="col-md-12 form-group">
             <label>Zone</label>
             <select name="zone" class="form-control select2-zone">
                 <option value="">Unassigned</option>

@@ -85,12 +85,16 @@
                     <div class="col-md-4 form-group mb-2">
                         <button class="btn btn-primary btn-block"><i class="fas fa-file-invoice"></i> Make {{ $month->format('F') }} invoice</button>
                     </div>
+                    <div class="col-12">
+                        @include('accounts.partials.send-mail-check', ['id' => 'bi-mail-one', 'label' => 'Email the invoice to the client (PDF)'])
+                    </div>
                 </form>
                 @if ($missing->where('status', true)->count() > 1)
-                    <form method="POST" action="{{ route('accounts.billing.generate') }}" class="mt-1">
+                    <form method="POST" action="{{ route('accounts.billing.generate') }}" class="mt-2 d-flex flex-wrap align-items-center" style="gap:.25rem 1rem">
                         @csrf
                         <input type="hidden" name="month" value="{{ $ym }}">
                         <button class="btn btn-link btn-sm p-0"><i class="fas fa-magic"></i> Make for all {{ $missing->where('status', true)->count() }} active clients at once</button>
+                        @include('accounts.partials.send-mail-check', ['id' => 'bi-mail-all', 'label' => 'and email each to its client'])
                     </form>
                 @endif
             @endif

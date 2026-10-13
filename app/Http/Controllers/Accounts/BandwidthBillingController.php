@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\ProfitSheet;
 use App\Models\Transaction;
 use App\Services\BandwidthBilling;
+use App\Services\DocumentMailer;
 use App\Support\Dec;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -48,19 +49,22 @@ class BandwidthBillingController extends Controller
             'collected' => $collected,
             'outstanding' => $outstanding,
             'closed' => ProfitSheet::isMonthClosed($month),
+            'mailReady' => \App\Models\MailSetting::current()->ready(),
         ]);
     }
 
     /**
      * Make invoices by hand: for one client (customer_id), or for every
-     * active bandwidth client that has none for the month yet.
+     * active bandwidth client that has none for the month yet. With
+     * send_mail ticked each is emailed to its client as a PDF too.
      */
-    public function generate(Request $request)
+    public function generate(Request $request, DocumentMailer $mailer)
     {
         $data = $request->validate([
             'month' => 'required|date_format:Y-m',
             'customer_id' => 'nullable|exists:customers,id',
             'invoice_date' => 'nullable|date',
+            'send_mail' => 'nullable|boolean',
         ]);
         $month = $this->month($data['month']);
         if ($error = $this->closedError($month)) {
@@ -82,26 +86,66 @@ class BandwidthBillingController extends Controller
         }
 
         $made = $clients->map(fn (Customer $c) => $this->billing->generate($c, $month, $request->user(), $date));
+        $mail = $request->boolean('send_mail');
 
         if ($made->count() === 1) {
-            return redirect()->route('accounts.billing.show', $made->first())
-                ->with('success', "Invoice {$made->first()->invoice_no} made — check the lines, then print or download.");
+            $invoice = $made->first();
+            $flash = ['success' => "Invoice {$invoice->invoice_no} made — check the lines, then print or download."];
+            if ($mail) {
+                $log = $mailer->bandwidthInvoice($invoice, $request->user()->id);
+                $flash = $log->sent()
+                    ? ['success' => "Invoice {$invoice->invoice_no} made and emailed to {$log->to}."]
+                    : $flash + ['error' => "Invoice {$invoice->invoice_no} was not emailed: {$log->error}"];
+            }
+
+            return redirect()->route('accounts.billing.show', $invoice)->with($flash);
         }
 
-        return back()->with('success', $made->isEmpty()
+        $flash = ['success' => $made->isEmpty()
             ? "Every active client already has a {$month->format('F Y')} invoice."
-            : "Made {$made->count()} " . str('invoice')->plural($made->count()) . " for {$month->format('F Y')}: " . $made->pluck('invoice_no')->implode(', '));
+            : "Made {$made->count()} " . str('invoice')->plural($made->count()) . " for {$month->format('F Y')}: " . $made->pluck('invoice_no')->implode(', ') . '.'];
+
+        if ($mail && $made->isNotEmpty()) {
+            $userId = $request->user()->id;
+            $sending = $mailer->later($made, fn ($i) => $i->customer, fn ($i) => $mailer->bandwidthInvoice($i, $userId));
+            $flash['success'] .= $sending['note'] ? ' ' . $sending['note'] : '';
+            $flash += array_filter(['error' => $sending['error']]);
+        }
+
+        return back()->with($flash);
+    }
+
+    /** Email the invoice (again) to the client, as it stands now. */
+    public function email(Request $request, BandwidthInvoice $invoice, DocumentMailer $mailer)
+    {
+        if ($problem = $mailer->problem($invoice->customer)) {
+            return back()->with('error', "Not emailed: {$problem}");
+        }
+
+        return back()->with($mailer->bandwidthInvoice($invoice, $request->user()->id)->flash("Invoice {$invoice->invoice_no}"));
+    }
+
+    /** Email one payment's money receipt to the client. */
+    public function emailReceipt(Request $request, BandwidthInvoice $invoice, BandwidthPayment $payment, DocumentMailer $mailer)
+    {
+        abort_unless($payment->bandwidth_invoice_id === $invoice->id, 404);
+        if ($problem = $mailer->problem($invoice->customer)) {
+            return back()->with('error', "Not emailed: {$problem}");
+        }
+
+        return back()->with($mailer->receipt($payment, $request->user()->id)->flash("Money receipt {$payment->receiptNo()}"));
     }
 
     public function show(BandwidthInvoice $invoice)
     {
-        $invoice->load(['customer', 'lines', 'payments.recorder:id,name']);
+        $invoice->load(['customer', 'lines', 'payments.recorder:id,name', 'payments.lastMail', 'lastMail']);
 
         return view('accounts.billing.show', [
             'invoice' => $invoice,
             'figures' => $invoice->figures(),
             'closed' => $invoice->isClosed(),
             'types' => \App\Models\BandwidthType::ordered()->get(),
+            'mailReady' => \App\Models\MailSetting::current()->ready(),
         ]);
     }
 
@@ -199,7 +243,7 @@ class BandwidthBillingController extends Controller
      * deposited in the bank — even cash — so it never touches the petty
      * cash (Cash Book); the Net Profit sheet takes it from here.
      */
-    public function storePayment(Request $request, BandwidthInvoice $invoice)
+    public function storePayment(Request $request, BandwidthInvoice $invoice, DocumentMailer $mailer)
     {
         $data = $request->validate([
             'paid_on' => 'required|date|before_or_equal:today',
@@ -208,6 +252,7 @@ class BandwidthBillingController extends Controller
             'received_by' => 'nullable|string|max:100',
             'reference' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('bandwidth_payments', 'reference')->where('customer_id', $invoice->customer_id)],
             'note' => 'nullable|string|max:255',
+            'send_mail' => 'nullable|boolean',
         ], ['reference.unique' => 'A payment with this reference is already recorded for this client.']);
         $data['received_by'] = filled($data['received_by'] ?? null) ? trim($data['received_by']) : $request->user()->name;
 
@@ -236,10 +281,19 @@ class BandwidthBillingController extends Controller
         ]);
 
         $due = $invoice->fresh(['customer', 'lines', 'payments'])->figures()['due'];
+        $flash = [
+            'success' => "Received ৳" . number_format((float) $amount, 2) . " from {$customer->name} — receipt {$payment->receiptNo()}. Due now ৳" . number_format((float) $due, 2) . '.',
+            'receipt' => $payment->id,
+        ];
 
-        return back()
-            ->with('success', "Received ৳" . number_format((float) $amount, 2) . " from {$customer->name} — receipt {$payment->receiptNo()}. Due now ৳" . number_format((float) $due, 2) . '.')
-            ->with('receipt', $payment->id);
+        if ($request->boolean('send_mail')) {
+            $log = $mailer->receipt($payment, $request->user()->id);
+            $log->sent()
+                ? $flash['success'] .= " Money receipt emailed to {$log->to}."
+                : $flash['error'] = "The money receipt was not emailed: {$log->error}";
+        }
+
+        return back()->with($flash);
     }
 
     /** Money receipt for one payment, on the pad. */
@@ -248,16 +302,7 @@ class BandwidthBillingController extends Controller
         abort_unless($payment->bandwidth_invoice_id === $invoice->id, 404);
         $invoice->load(['customer', 'lines', 'payments']);
 
-        // What was still due right after this payment.
-        $after = $invoice->figures()['mrc'];
-        foreach ($invoice->payments as $p) {
-            $after = Dec::sub($after, $p->amount);
-            if ($p->id === $payment->id) {
-                break;
-            }
-        }
-
-        return view('accounts.billing.receipt', ['invoice' => $invoice, 'payment' => $payment, 'dueAfter' => Dec::round($after, 2)]);
+        return view('accounts.billing.receipt', ['invoice' => $invoice, 'payment' => $payment, 'dueAfter' => $invoice->dueAfter($payment)]);
     }
 
     public function destroyPayment(Request $request, BandwidthInvoice $invoice, BandwidthPayment $payment)

@@ -9,6 +9,9 @@
     $errors_ = $rowsOut->filter(fn ($r) => collect($r['flags'])->contains(fn ($f) => $f[0] === 'error'));
     $warns = $rowsOut->filter(fn ($r) => $r['included'] && collect($r['flags'])->contains(fn ($f) => $f[0] === 'warn'));
     $skipped = $rowsOut->filter(fn ($r) => in_array($r['kind'], ['duplicate', 'total'], true));
+    // Invoices that can be emailed: counted rows whose customer has an address.
+    $mailable = \App\Models\Customer::whereIn('id', $counted->pluck('customer_id')->filter())->get()->filter(fn ($c) => $c->emails());
+    $mailCount = $counted->filter(fn ($r) => $mailable->contains('id', $r['customer_id']))->count();
     $colLabel = fn ($c) => $c . (isset($headers[$c]) && is_scalar($headers[$c]) && trim((string) $headers[$c]) !== '' ? ' — ' . \Illuminate\Support\Str::limit(trim((string) $headers[$c]), 28) : '');
     $firstNo = \App\Http\Controllers\Accounts\ZoneSettlementController::INVOICE_PREFIX . str_pad((string) $nextInvoice, 3, '0', STR_PAD_LEFT);
     $lastNo = \App\Http\Controllers\Accounts\ZoneSettlementController::INVOICE_PREFIX . str_pad((string) ($nextInvoice + max($counted->count() - 1, 0)), 3, '0', STR_PAD_LEFT);
@@ -240,6 +243,9 @@
                 </button>
                 <small class="d-block text-muted text-center mt-1">Numbered {{ $firstNo }}{{ $totals['count'] > 1 ? ' – ' . $lastNo : '' }}</small>
             </div>
+        </div>
+        <div class="mb-2">
+            @include('accounts.partials.send-mail-check', ['id' => 'st-mail', 'label' => 'Email each invoice to its customer (PDF)', 'have' => $mailCount, 'of' => $totals['count']])
         </div>
         @if ($errors_->count())
             <p class="small text-danger mb-0"><i class="fas fa-info-circle"></i> {{ $errors_->count() }} {{ \Illuminate\Support\Str::plural('row', $errors_->count()) }} with errors will not be saved as invoices — fix them in the Excel and upload again if they should count.</p>

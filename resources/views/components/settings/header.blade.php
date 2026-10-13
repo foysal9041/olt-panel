@@ -5,6 +5,7 @@
     ['activity.index', 'activity.*', 'Activity Log', 'fas fa-history', 'access-settings-users'],
     ['settings.telegram', 'settings.telegram*', 'Telegram Alerts', 'fab fa-telegram-plane', 'access-settings-telegram'],
     ['settings.whatsapp', 'settings.whatsapp*', 'WhatsApp Alerts', 'fab fa-whatsapp', 'access-settings-telegram'],
+    ['settings.mail', 'settings.mail*', 'Email', 'fas fa-envelope', 'access-settings-mail'],
     ['settings', 'settings', 'General', 'fas fa-sliders-h', 'access-settings-general'],
     ['profile.edit', 'profile.edit', 'My Profile', 'fas fa-user-circle', null],
     ['profile.activity', 'profile.activity', 'My Activity', 'fas fa-user-clock', null],

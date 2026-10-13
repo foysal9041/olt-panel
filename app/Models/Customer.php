@@ -14,6 +14,7 @@ class Customer extends Model
         'contact_person',
         'username',
         'phone',
+        'email',
         'address',
         'zone',
         'customer_type',
@@ -48,6 +49,26 @@ class Customer extends Model
     public function customerTypeLabel(): string
     {
         return self::TYPES[$this->customer_type] ?? self::TYPES['mac_client'];
+    }
+
+    /**
+     * Where invoices and receipts are emailed: every valid address in the
+     * email field (comma, semicolon or space separated).
+     *
+     * @return list<string>
+     */
+    public function emails(): array
+    {
+        return self::parseEmails($this->email);
+    }
+
+    /** @return list<string> */
+    public static function parseEmails(?string $value): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(fn ($e) => strtolower(trim($e)), preg_split('/[\s,;]+/', (string) $value)),
+            fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL) !== false
+        )));
     }
 
     /** This customer's lines in the monthly zone settlements, newest month first. */

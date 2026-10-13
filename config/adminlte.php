@@ -608,7 +608,7 @@ return [
             ],
         ],
     ],
-    ['header' => 'ADMINISTRATION', 'can' => ['access-settings-general', 'access-settings-users', 'access-settings-telegram']],
+    ['header' => 'ADMINISTRATION', 'can' => ['access-settings-general', 'access-settings-users', 'access-settings-telegram', 'access-settings-mail']],
     [
         'text' => 'Settings',
         'icon' => 'fas fa-cog',
@@ -643,6 +643,12 @@ return [
                 'url'  => 'settings/whatsapp',
                 'icon' => 'fab fa-whatsapp',
                 'can'  => 'access-settings-telegram',
+            ],
+            [
+                'text' => 'Email',
+                'url'  => 'settings/mail',
+                'icon' => 'fas fa-envelope',
+                'can'  => 'access-settings-mail',
             ],
         ],
     ],

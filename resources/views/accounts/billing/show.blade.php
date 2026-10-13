@@ -10,6 +10,8 @@
     $isAdmin = auth()->user()->isAdmin();
     $due = (float) $figures['due'];
     $dim = $invoice->month->daysInMonth;
+    $emails = $customer->emails();
+    $mailBlock = ! $mailReady ? 'Email is not set up yet (Settings → Email).' : (! $emails ? 'Add the client\'s email address on the customer page first.' : null);
 @endphp
 
 @section('content_header')
@@ -17,6 +19,11 @@
     :subtitle="'Bill for ' . $invoice->month->format('F Y') . ' · dated ' . $invoice->invoice_date->format('d M Y')" :back="route('accounts.billing.index', ['month' => $invoice->month->format('Y-m')])">
     <a href="{{ route('accounts.billing.print', $invoice) }}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-print"></i> Print</a>
     <a href="{{ route('accounts.billing.print', [$invoice, 'download' => 1]) }}" target="_blank" class="btn btn-success btn-sm"><i class="fas fa-file-pdf"></i> Download PDF</a>
+    <form method="POST" action="{{ route('accounts.billing.email', $invoice) }}" class="d-inline js-confirm-delete"
+          data-confirm-message="Email {{ $invoice->invoice_no }} to {{ implode(', ', $emails) }}?">
+        @csrf
+        <button class="btn btn-outline-primary btn-sm" @disabled($mailBlock) title="{{ $mailBlock ?? 'Email this invoice to ' . implode(', ', $emails) . ' as a PDF' }}"><i class="fas fa-envelope"></i> Email to client</button>
+    </form>
 </x-accounts.header>
 @stop
 
@@ -47,6 +54,9 @@
 @if (session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
 @if ($errors->any())
     <div class="alert alert-danger">@foreach ($errors->all() as $e)<div>{{ $e }}</div>@endforeach</div>
+@endif
+@if ($invoice->lastMail)
+    @include('accounts.partials.mail-status', ['mail' => $invoice->lastMail, 'block' => true])
 @endif
 @if ($closed)
     <div class="alert alert-light border small"><i class="fas fa-lock text-success"></i> <strong>{{ $invoice->month->format('F Y') }} is closed</strong> (Net Profit finalized) — this invoice can't be changed until an admin reopens the month.</div>
@@ -158,6 +168,14 @@
                         </span>
                         <span class="acct-list-amount text-income">{{ $money($p->amount) }}</span>
                         <a href="{{ route('accounts.billing.payments.receipt', [$invoice, $p]) }}" target="_blank" class="btn btn-link btn-sm p-0 ml-1" title="Money receipt"><i class="fas fa-receipt"></i></a>
+                        <form method="POST" action="{{ route('accounts.billing.payments.email', [$invoice, $p]) }}" class="js-confirm-delete ml-1"
+                              data-confirm-message="Email money receipt {{ $p->receiptNo() }} to {{ implode(', ', $emails) }}?">
+                            @csrf
+                            <button class="btn btn-link btn-sm p-0" @disabled($mailBlock) title="{{ $mailBlock ?? 'Email the money receipt to ' . implode(', ', $emails) }}"><i class="fas fa-envelope"></i></button>
+                        </form>
+                        @if ($p->lastMail)
+                            @include('accounts.partials.mail-status', ['mail' => $p->lastMail])
+                        @endif
                         @if ($isAdmin && ! $closed)
                             <form method="POST" action="{{ route('accounts.billing.payments.destroy', [$invoice, $p]) }}" class="js-confirm-delete ml-1" data-confirm-message="Remove this payment{{ $p->transaction_id ? ' (and its Cash Book entry)' : '' }}?">
                                 @csrf @method('DELETE')
@@ -193,6 +211,13 @@
                     </div>
                 </div>
                 <div class="form-group mb-2"><input type="text" name="note" value="{{ old('note') }}" maxlength="255" class="form-control form-control-sm" placeholder="Note, e.g. BK to Bank"></div>
+                <div class="mb-2">
+                    @if ($mailReady && ! $emails)
+                        <div class="small text-muted"><i class="fas fa-envelope"></i> No email address for this client — <a href="{{ route('accounts.customers.edit', $customer) }}">add one</a> to email the money receipt.</div>
+                    @else
+                        @include('accounts.partials.send-mail-check', ['id' => 'pay-mail', 'label' => 'Email the money receipt to the client'])
+                    @endif
+                </div>
                 <button class="btn btn-success btn-sm btn-block"><i class="fas fa-check"></i> Record payment</button>
                 <small class="text-muted d-block mt-1">Paid two ways at once (e.g. Bank 7,500 + Cash 12,000)? Record each separately. All of it is deposited in the bank (it doesn't go into the petty cash). Each payment gets a money receipt.</small>
             </form>

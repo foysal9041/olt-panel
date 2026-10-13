@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSentMails;
 use App\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class BandwidthPayment extends Model
 {
-    use LogsActivity;
+    use HasSentMails, LogsActivity;
 
     public const METHODS = ['Bank', 'bKash', 'Nagad', 'Cash', 'Other'];
 
