@@ -22,7 +22,7 @@ class AttendanceController extends Controller
     public function dashboard()
     {
         $settings = AttendanceSetting::current();
-        $employees = $this->employeesQuery()->orderBy('name')->get();
+        $employees = $this->employeesQuery()->ordered()->get();
 
         $summary = $this->calculator->todaySummary($employees, $settings);
         $trend = $this->calculator->trend($employees, $settings, 7);
@@ -33,27 +33,13 @@ class AttendanceController extends Controller
             ->limit(15)
             ->get();
 
-        $unmappedPunches = AttendanceLog::with('zkDevice')
-            ->whereNull('employee_id')
-            ->selectRaw('zk_device_id, device_user_id, COUNT(*) as punches_count, MAX(punched_at) as last_punched_at')
-            ->groupBy('zk_device_id', 'device_user_id')
-            ->orderByDesc('last_punched_at')
-            ->limit(20)
-            ->get();
-
-        $unmappedCount = $unmappedPunches->count();
-
         // Today's board: one row per employee with status and times.
         $today = Carbon::today();
         $todayReport = $this->calculator->buildReport($employees, $today, $today, $settings);
         $board = $employees->map(fn (Employee $employee) => [
             'employee' => $employee,
         ] + ($todayReport[$employee->id][$today->toDateString()] ?? ['status' => 'absent', 'check_in' => null, 'check_out' => null, 'hours_worked' => null]))
-            ->sortBy(fn ($row) => [
-                ['late' => 0, 'present' => 1, 'leave' => 2, 'absent' => 3][$row['status']] ?? 4,
-                $row['check_in']?->timestamp ?? PHP_INT_MAX,
-            ])
-            ->values();
+            ->values(); // in serial number order, like the employee list
 
         $devices = ZkDevice::orderBy('name')->get();
 
@@ -69,8 +55,6 @@ class AttendanceController extends Controller
             'trend',
             'recentPunches',
             'employees',
-            'unmappedCount',
-            'unmappedPunches',
             'board',
             'devices',
             'pendingLeaves',
@@ -180,7 +164,7 @@ class AttendanceController extends Controller
     private function buildReportData(Request $request): array
     {
         $settings = AttendanceSetting::current();
-        $employees = $this->employeesQuery()->orderBy('name')->get();
+        $employees = $this->employeesQuery()->ordered()->get();
 
         $start = $request->filled('start')
             ? Carbon::parse($request->start)
@@ -217,7 +201,7 @@ class AttendanceController extends Controller
     private function buildAbsenceData(Request $request): array
     {
         $settings = AttendanceSetting::current();
-        $employees = $this->employeesQuery()->orderBy('name')->get();
+        $employees = $this->employeesQuery()->ordered()->get();
 
         $month = $request->filled('month')
             ? Carbon::parse($request->month . '-01')

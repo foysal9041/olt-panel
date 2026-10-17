@@ -30,6 +30,7 @@
 
             <thead>
                 <tr>
+                    <th style="width:3.5rem" title="Serial No. — the order employees are listed in">SL</th>
                     <th>Name</th>
                     <th>Designation</th>
                     <th>Phone</th>
@@ -47,6 +48,7 @@
                 @forelse($employees as $employee)
 
                     <tr>
+                        <td data-order="{{ $employee->serial_no ?? 99999 }}">{{ $employee->serial_no ?? '—' }}</td>
                         <td>{{ $employee->name }}</td>
                         <td>{{ $employee->designation ?? '-' }}</td>
                         <td>{{ $employee->phone ?? '-' }}</td>
@@ -98,7 +100,7 @@
                 @empty
 
                     <tr>
-                        <td colspan="9" class="text-center">No employees yet</td>
+                        <td colspan="10" class="text-center">No employees yet</td>
                     </tr>
 
                 @endforelse

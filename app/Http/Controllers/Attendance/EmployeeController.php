@@ -25,7 +25,7 @@ class EmployeeController extends Controller
             $query->where('zone', $authUser->zone);
         }
 
-        $employees = $query->orderBy('name')->get();
+        $employees = $query->ordered()->get();
 
         return view('attendance.employees.index', compact('employees'));
     }
@@ -33,6 +33,7 @@ class EmployeeController extends Controller
     public function create()
     {
         return view('attendance.employees.create', [
+            'nextSerial' => Employee::nextSerial(),
             'zones' => $this->zones(),
             'shifts' => DutyShift::orderBy('start_time')->get(),
             'leaveTypes' => LeaveType::orderBy('name')->get(),
@@ -113,6 +114,7 @@ class EmployeeController extends Controller
             'duty_shift_id' => 'nullable|exists:duty_shifts,id',
             'weekly_off_day' => 'nullable|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'status' => 'nullable|boolean',
+            'serial_no' => 'nullable|integer|min:1|max:9999',
             'emp_code' => 'nullable|string|max:30|unique:employees,emp_code,' . ($employee->id ?? 'NULL'),
             'department' => 'nullable|string|max:255',
             'joining_date' => 'nullable|date',

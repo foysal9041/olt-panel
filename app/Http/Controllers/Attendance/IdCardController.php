@@ -34,7 +34,7 @@ class IdCardController extends Controller
 
         return view('attendance.idcards.index', [
             'cards' => $cards,
-            'employees' => Employee::with(['idCards' => fn ($q) => $q->latest('id')])->orderByDesc('status')->orderBy('name')->get(),
+            'employees' => Employee::with(['idCards' => fn ($q) => $q->latest('id')])->orderByDesc('status')->ordered()->get(),
             'settings' => $this->hr->settings(),
             'themes' => HrDocs::THEMES,
             'signature' => $this->hr->signatureDataUrl(),
@@ -70,7 +70,7 @@ class IdCardController extends Controller
 
         return view('attendance.idcards.make', [
             'card' => $card,
-            'employees' => Employee::orderByDesc('status')->orderBy('name')->get(['id', 'name', 'designation', 'status']),
+            'employees' => Employee::orderByDesc('status')->ordered()->get(['id', 'name', 'designation', 'status']),
             'settings' => $settings,
             'themes' => HrDocs::THEMES,
             'photo' => $photo,

@@ -10,6 +10,7 @@ class Employee extends Model
     use LogsActivity;
 
     protected $fillable = [
+        'serial_no',
         'emp_code',
         'name',
         'photo',
@@ -35,6 +36,7 @@ class Employee extends Model
     {
         return [
             'status' => 'boolean',
+            'serial_no' => 'integer',
             'joining_date' => 'date',
             'left_on' => 'date',
         ];
@@ -61,6 +63,18 @@ class Employee extends Model
     {
         // Signed without the host, so it checks out however the site is reached.
         return rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\URL::signedRoute('staff.verify', ['employee' => $this->id], absolute: false);
+    }
+
+    /** The order employees are listed in: serial number (blank ones last), then name. */
+    public function scopeOrdered($query)
+    {
+        return $query->orderByRaw('serial_no IS NULL')->orderBy('serial_no')->orderBy('name');
+    }
+
+    /** The serial number a new employee gets: one after the highest. */
+    public static function nextSerial(): int
+    {
+        return (int) static::max('serial_no') + 1;
     }
 
     public function hasLeft(): bool

@@ -4,13 +4,13 @@
 
 @section('content_header')
 <x-noc.header :title="$type === 'router' ? 'Routers' : ($type === 'switch' ? 'Switches' : 'Switches & Routers')" :icon="$type === 'router' ? 'fas fa-route' : 'fas fa-server'"
-    subtitle="SNMP-monitored switches and routers: interfaces, traffic and SFP transceivers">
-    <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm">
-        <i class="fas fa-plus"></i> Add Switch
-    </a>
-    <a href="{{ route('switches.create', ['type' => 'router']) }}" class="btn btn-outline-primary btn-sm">
-        <i class="fas fa-plus"></i> Add Router
-    </a>
+    :subtitle="$type === 'router' ? 'SNMP-monitored routers: interfaces, VLANs, traffic, CPU and memory' : ($type === 'switch' ? 'SNMP-monitored switches: ports, traffic and SFP transceivers' : 'Every SNMP-monitored switch and router')">
+    @if ($type !== 'router')
+        <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Switch</a>
+    @endif
+    @if ($type !== 'switch')
+        <a href="{{ route('routers.create') }}" class="btn {{ $type === 'router' ? 'btn-primary' : 'btn-outline-primary' }} btn-sm"><i class="fas fa-plus"></i> Add Router</a>
+    @endif
 </x-noc.header>
 @stop
 
@@ -28,9 +28,9 @@
 @endif
 
 <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Device type">
-    <a href="{{ route('switches.index') }}" class="btn {{ $type ? 'btn-outline-secondary' : 'btn-primary' }}">All ({{ $counts->sum() }})</a>
-    <a href="{{ route('switches.index', ['type' => 'switch']) }}" class="btn {{ $type === 'switch' ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-server"></i> Switches ({{ $counts['switch'] ?? 0 }})</a>
-    <a href="{{ route('switches.index', ['type' => 'router']) }}" class="btn {{ $type === 'router' ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-route"></i> Routers ({{ $counts['router'] ?? 0 }})</a>
+    <a href="{{ route('switches.index') }}" class="btn {{ $type === 'switch' ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-server"></i> Switches ({{ $counts['switch'] ?? 0 }})</a>
+    <a href="{{ route('routers.index') }}" class="btn {{ $type === 'router' ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-route"></i> Routers ({{ $counts['router'] ?? 0 }})</a>
+    <a href="{{ route('switches.index', ['type' => 'all']) }}" class="btn {{ $type === null ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-list"></i> All devices ({{ $counts->sum() }})</a>
 </div>
 
 <div class="row" data-live="sw-stats">

@@ -33,6 +33,14 @@ class SwitchEvent extends Model
         'occurred_at' => 'datetime',
     ];
 
+    /** The type's label, saying "Router" for a router ("Router Down"). */
+    public function label(): string
+    {
+        $label = self::TYPES[$this->type][0] ?? $this->type;
+
+        return $this->networkSwitch?->isRouter() ? str_replace('Switch', 'Router', $label) : $label;
+    }
+
     public function networkSwitch()
     {
         return $this->belongsTo(NetworkSwitch::class);

@@ -12,6 +12,7 @@
         <tbody>
             @forelse ($events as $event)
                 @php([$label, $color] = \App\Models\SwitchEvent::TYPES[$event->type] ?? [$event->type, 'secondary'])
+                @php($label = $event->label())
                 <tr>
                     <td class="pl-3 text-nowrap">
                         {{ $event->occurred_at->format('d M Y, h:i:s A') }}

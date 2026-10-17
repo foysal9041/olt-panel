@@ -73,6 +73,12 @@ class GraphWidget extends Model
         return $this->deviceId() ? NetworkSwitch::find($this->deviceId()) : null;
     }
 
+    /** Out drawn below the axis (LibreNMS "inverse" style). */
+    public function mirror(): bool
+    {
+        return (bool) ($this->settings['mirror'] ?? false);
+    }
+
     public function limit(): int
     {
         return max(3, min(25, (int) ($this->settings['limit'] ?? 10)));
@@ -99,8 +105,9 @@ class GraphWidget extends Model
         }
         $ports ??= $this->ports();
 
+        // One interface: its description (as LibreNMS shows it), else switch · port.
         return $ports->count() === 1
-            ? $ports->first()->networkSwitch?->name . ' · ' . $ports->first()->label . ($ports->first()->alias ? ' (' . $ports->first()->alias . ')' : '')
+            ? ($ports->first()->alias ?: $ports->first()->networkSwitch?->name . ' · ' . $ports->first()->label)
             : $ports->count() . ' interfaces added up';
     }
 

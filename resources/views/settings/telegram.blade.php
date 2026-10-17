@@ -76,14 +76,14 @@
                         <input type="hidden" name="alert_port_status" value="0">
                         <input type="checkbox" class="custom-control-input" id="alert_port_status" name="alert_port_status" value="1"
                                @checked(old('alert_port_status', $settings->alert_port_status))>
-                        <label class="custom-control-label" for="alert_port_status">A switch port goes UP or DOWN</label>
+                        <label class="custom-control-label" for="alert_port_status">A switch or router port goes UP or DOWN</label>
                     </div>
 
                     <div class="custom-control custom-checkbox">
                         <input type="hidden" name="alert_switch_status" value="0">
                         <input type="checkbox" class="custom-control-input" id="alert_switch_status" name="alert_switch_status" value="1"
                                @checked(old('alert_switch_status', $settings->alert_switch_status))>
-                        <label class="custom-control-label" for="alert_switch_status">A switch stops / starts answering SNMP</label>
+                        <label class="custom-control-label" for="alert_switch_status">A switch or router stops / starts answering SNMP</label>
                     </div>
 
                     <div class="custom-control custom-checkbox">

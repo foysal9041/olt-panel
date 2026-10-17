@@ -124,6 +124,12 @@ class NetworkSwitch extends Model
         return $this->device_type === 'router';
     }
 
+    /** The list this device belongs to: Switches or Routers. */
+    public function listUrl(): string
+    {
+        return $this->isRouter() ? route('routers.index') : route('switches.index');
+    }
+
     public function typeLabel(): string
     {
         return self::TYPES[$this->device_type] ?? self::TYPES['switch'];

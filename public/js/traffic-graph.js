@@ -51,6 +51,16 @@ window.TrafficGraph = (function () {
         }
     }
 
+    /** RRD-style short value, e.g. 4330000000 → "4.33G" (axis: "4.0 G"). */
+    function short(v, unit, axis) {
+        if (v === null || v === undefined || isNaN(v)) return axis ? '' : '—';
+        if (['bps', 'pps'].indexOf(unit) < 0) return fmt(v, unit);
+        var u = ['', 'k', 'M', 'G', 'T'], i = 0, a = Math.abs(v);
+        while (a >= 1000 && i < u.length - 1) { a /= 1000; i++; }
+        a = (v < 0 ? -a : a);
+        return axis ? a.toFixed(1) + (u[i] ? ' ' + u[i] : '') : (i === 0 ? Math.round(a) : a.toFixed(2)) + u[i];
+    }
+
     function total(v, unit) {
         if (v === null || v === undefined) return '—';
         return unit === 'bytes' ? scaled(v, ['B', 'KB', 'MB', 'GB', 'TB', 'PB'], 1000) : scaled(v, ['', 'K', 'M', 'G'], 1000).trim();
@@ -70,6 +80,15 @@ window.TrafficGraph = (function () {
         return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
     }
 
+    /** RRD-style axis label: 24-hour clock up to two days, then dates. */
+    function rrdTick(ts, span) {
+        var d = new Date(ts * 1000);
+        if (span <= 2 * 86400 + 60) return pad(d.getHours()) + ':' + pad(d.getMinutes());
+        if (span <= 8 * 86400) return DAYS[d.getDay()] + ' ' + pad(d.getHours()) + ':00';
+        if (span <= 62 * 86400) return d.getDate() + ' ' + MONTHS[d.getMonth()];
+        return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    }
+
     function full(ts, step) {
         var d = new Date(ts * 1000);
         var date = d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
@@ -78,7 +97,7 @@ window.TrafficGraph = (function () {
 
     function head(el, d) {
         var box = el.querySelector('.tg-head');
-        if (!box || el.hasAttribute('data-compact')) { if (box) box.innerHTML = ''; return; }
+        if (!box || el.hasAttribute('data-compact') || el.getAttribute('data-style') === 'rrd') { if (box) box.innerHTML = ''; return; }
         box.innerHTML = '<span class="tg-title">' + (el.getAttribute('data-title') || tr(d.title)) + ' · ' + t(d.period, TITLES[d.period] || d.period) + '</span>' +
             '<span class="tg-sub">' + (STEP_LABEL[d.step] || '') + ' · ' + full(d.start, d.step) + ' – ' + full(d.end - d.step, d.step) + '</span>';
     }
@@ -87,6 +106,7 @@ window.TrafficGraph = (function () {
         var box = el.querySelector('.tg-legend');
         if (!box) return;
         if (!d.series.length) { box.innerHTML = ''; return; }
+        if (el.getAttribute('data-style') === 'rrd') { box.innerHTML = rrdLegend(d); return; }
         if (el.hasAttribute('data-compact')) {
             box.innerHTML = d.series.slice(0, 3).map(function (s) {
                 return '<span><i class="tg-key" style="background:' + s.color + '"></i>' + tr(s.name) + ' <b>' + fmt(s.legend.current, d.unit) + '</b> · ' +
@@ -106,6 +126,33 @@ window.TrafficGraph = (function () {
             }).join('') + '</tbody></table>';
     }
 
+    /** LibreNMS-style legend: "bps Now Ave Max 95th %", a row per series, Total, Port Speed. */
+    function rrdLegend(d) {
+        var unitName = { bps: 'bps', pps: 'pps', per_s: '/s', percent: '%', celsius: '°C', volts: 'V', amps: 'A', watts: 'W', rpm: 'rpm', ms: 'ms', days: t('days', 'দিন') }[d.unit] || '';
+        var p95 = d.series.some(function (s) { return s.legend.p95 !== null && s.legend.p95 !== undefined; });
+        var rows = '<tr><th>' + unitName + '</th><th>' + t('Now', 'এখন') + '</th><th>' + t('Ave', 'গড়') + '</th><th>' + t('Max', 'সর্বোচ্চ') + '</th>' + (p95 ? '<th>95th %</th>' : '') + '</tr>';
+        d.series.forEach(function (s, i) {
+            var L = s.legend, c = rrdColor(d, s, i);
+            rows += '<tr><td><i class="tg-key" style="background:' + c.fill + ';border:1px solid ' + c.line + '"></i>' + tr(s.name) + '</td><td>' + short(L.current, d.unit) + '</td><td>' + short(L.average, d.unit) + '</td><td>' + short(L.maximum, d.unit) + '</td>' + (p95 ? '<td>' + short(L.p95, d.unit) + '</td>' : '') + '</tr>';
+        });
+        var extra = '';
+        if (d.totalUnit && d.series.length) {
+            var sum = 0, parts = [];
+            d.series.forEach(function (s) { sum += s.legend.total || 0; parts.push(tr(s.name) + ' ' + total(s.legend.total, d.totalUnit).replace(' ', '')); });
+            extra += '<div>' + t('Total', 'মোট') + ' ' + total(sum, d.totalUnit).replace(' ', '') + ' &nbsp;(' + parts.join(' &nbsp;') + ')</div>';
+        }
+        if (d.capacity) extra += '<div><i class="tg-key" style="background:#000"></i>' + t('Port Speed', 'পোর্ট স্পিড') + ' ' + fmt(d.capacity, 'bps') + '</div>';
+        return '<table class="rrd-legend">' + rows + '</table>' + extra;
+    }
+
+    /** RRD colours: In green, Out blue-violet; other series their own colour. */
+    function rrdColor(d, s, i) {
+        var inOut = d.series.length === 2 && (s.name === 'In' || s.name === 'Out');
+        if (inOut && s.name === 'In') return { fill: 'rgba(141,183,47,0.95)', line: '#5f7f1e' };
+        if (inOut && s.name === 'Out') return { fill: 'rgba(112,112,208,0.85)', line: '#3f3f9f' };
+        return { fill: i === 0 && s.fill ? hexA(s.color, 0.55) : s.color, line: s.color };
+    }
+
     function hexA(hex, a) {
         var n = parseInt(hex.slice(1), 16);
         return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
@@ -121,39 +168,64 @@ window.TrafficGraph = (function () {
         empty.hidden = has;
 
         var span = d.end - d.start;
-        var datasets = d.series.map(function (s, i) {
-            return {
-                label: tr(s.name), data: s.values, borderColor: s.color,
+        var rrd = el.getAttribute('data-style') === 'rrd';
+        var mirror = rrd && el.hasAttribute('data-mirror') && d.series.length === 2;
+        // Chart.js 2 draws the first dataset on top: RRD style puts Out (usually smaller) over In.
+        var order = d.series.map(function (s, i) { return i; });
+        if (rrd) order.reverse();
+        var datasets = order.map(function (i) {
+            var s = d.series[i], c = rrd ? rrdColor(d, s, i) : null;
+            var values = mirror && i === 1 ? s.values.map(function (v) { return v === null ? null : -v; }) : s.values;
+            return rrd ? {
+                label: tr(s.name), data: values, borderColor: c.line, backgroundColor: c.fill, borderWidth: 1,
+                pointRadius: 0, pointHoverRadius: 2, lineTension: 0, steppedLine: true,
+                fill: (s.fill || d.series.length === 2) ? 'origin' : false, spanGaps: false,
+            } : {
+                label: tr(s.name), data: values, borderColor: s.color,
                 backgroundColor: s.fill ? hexA(s.color, 0.3) : s.color,
                 borderWidth: s.fill ? 1 : 1.5, pointRadius: 0, pointHoverRadius: 3, lineTension: 0,
                 fill: s.fill && i === 0 ? 'origin' : false, spanGaps: false,
             };
         });
-        if (d.p95 && !compact) {
+        var nSeries = d.series.length;
+        if (rrd) {
+            // 95th percentile in red: one line, or one per side when Out is mirrored.
+            (mirror ? d.series : [{ legend: { p95: d.p95 } }]).forEach(function (s, i) {
+                var v = s.legend.p95;
+                if (v) datasets.push({ label: '95th', data: d.times.map(function () { return mirror && i === 1 ? -v : v; }), borderColor: '#ff0000', borderWidth: 1, pointRadius: 0, pointHoverRadius: 0, fill: false });
+            });
+        } else if (d.p95 && !compact) {
             datasets.push({ label: t('95th percentile', '৯৫তম পার্সেন্টাইল') + ' ' + fmt(d.p95, d.unit), data: d.times.map(function () { return d.p95; }), borderColor: P95, borderDash: [6, 4], borderWidth: 1, pointRadius: 0, pointHoverRadius: 0, fill: false });
         }
-        var nSeries = d.series.length;
+        var mono = { fontFamily: "'DejaVu Sans Mono', Menlo, Consolas, monospace", fontSize: 10, fontColor: '#333' };
+        var grid = { color: 'rgba(255,0,0,0.16)', borderDash: [1, 2], zeroLineColor: '#555', drawBorder: true };
 
         if (el._chart) el._chart.destroy();
         el._chart = new Chart(el.querySelector('canvas').getContext('2d'), {
             type: 'line',
-            data: { labels: d.times.map(function (ts) { return tick(ts, span); }), datasets: datasets },
+            data: { labels: d.times.map(function (ts) { return rrd ? rrdTick(ts, span) : tick(ts, span); }), datasets: datasets },
             options: {
                 maintainAspectRatio: false,
                 animation: { duration: 0 },
-                legend: { display: !compact, position: 'bottom', labels: { boxWidth: 12, fontColor: '#475569' } },
+                legend: { display: !compact && !rrd, position: 'bottom', labels: { boxWidth: 12, fontColor: '#475569' } },
                 tooltips: {
                     mode: 'index', intersect: false,
                     filter: function (item) { return item.datasetIndex < nSeries; },
                     callbacks: {
                         title: function (items) { return items.length ? full(d.times[items[0].index], d.step) : ''; },
                         label: function (item) {
-                            var s = d.series[item.datasetIndex], v = s.values[item.index], peak = s.peaks ? s.peaks[item.index] : null;
+                            var s = d.series[order[item.datasetIndex]], v = s.values[item.index], peak = s.peaks ? s.peaks[item.index] : null;
                             return tr(s.name) + ' ' + fmt(v, d.unit) + (d.step > 60 && peak !== null && peak !== undefined ? '  (' + t('peak', 'সর্বোচ্চ') + ' ' + fmt(peak, d.unit) + ')' : '');
                         },
                     },
                 },
-                scales: {
+                scales: rrd ? {
+                    yAxes: [{
+                        ticks: Object.assign({ beginAtZero: ['celsius', 'volts', 'days'].indexOf(d.unit) < 0, max: d.unit === 'percent' ? 100 : undefined, maxTicksLimit: 7, callback: function (v) { return short(v, d.unit, true); } }, mono),
+                        gridLines: grid,
+                    }],
+                    xAxes: [{ ticks: Object.assign({ autoSkip: true, maxTicksLimit: 7, maxRotation: 0 }, mono), gridLines: grid }],
+                } : {
                     yAxes: [{
                         ticks: { beginAtZero: ['celsius', 'volts', 'days'].indexOf(d.unit) < 0, max: d.unit === 'percent' ? 100 : undefined, fontColor: '#94a3b8', maxTicksLimit: compact ? 4 : 6, callback: function (v) { return fmt(v, d.unit); } },
                         gridLines: { color: '#eef2f7', drawBorder: false },

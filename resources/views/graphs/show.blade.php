@@ -10,19 +10,8 @@
 @endphp
 
 @section('content_header')
-<x-noc.header :title="$dashboard->name" icon="fas fa-chart-area" :back="route('graphs.index')"
-    :subtitle="trim(($dashboard->description ? $dashboard->description . ' · ' : '') . $dashboard->sharingLabel() . ' · by ' . ($dashboard->owner->name ?? '—'))">
-    @if ($canEdit)
-        @if ($editing)
-            <a href="{{ route('graphs.show', $dashboard) }}" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Done editing</a>
-        @else
-            <a href="{{ route('graphs.show', [$dashboard, 'edit' => 1]) }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-pen"></i> Edit graphs</a>
-        @endif
-    @endif
-    @if ($canManage)
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="modal" data-target="#dash-settings"><i class="fas fa-cog"></i> Settings &amp; sharing</button>
-    @endif
-</x-noc.header>
+<x-noc.header title="Graph Dashboards" icon="fas fa-chart-area"
+    :subtitle="trim(($dashboard->description ? $dashboard->description . ' · ' : '') . $dashboard->sharingLabel() . ' · by ' . ($dashboard->owner->name ?? '—'))" />
 @stop
 
 @section('content')
@@ -37,8 +26,37 @@
     <div class="alert alert-danger">@foreach ($errors->all() as $e)<div>{{ $e }}</div>@endforeach</div>
 @endif
 
+{{-- LibreNMS-style bar: pick a dashboard, edit / delete it, make a new one --}}
+<div class="d-flex flex-wrap align-items-center mb-2" style="gap:.5rem 1rem">
+    <div class="input-group input-group-sm lw-bar">
+        <div class="input-group-prepend"><span class="input-group-text">Dashboards</span></div>
+        <select class="form-control" id="dash-pick" aria-label="Dashboard">
+            @foreach ($allDashboards as $d)
+                <option value="{{ route('graphs.show', $d) }}" @selected($d->id === $dashboard->id)>{{ $d->name }}</option>
+            @endforeach
+        </select>
+        <div class="input-group-append">
+            @if ($canEdit)
+                @if ($editing)
+                    <a href="{{ route('graphs.show', $dashboard) }}" class="btn btn-success" title="Done editing"><i class="fas fa-check"></i></a>
+                @else
+                    <a href="{{ route('graphs.show', [$dashboard, 'edit' => 1]) }}" class="btn btn-outline-secondary" title="Edit graphs"><i class="fas fa-edit"></i></a>
+                @endif
+            @endif
+            @if ($canManage)
+                <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#dash-settings" title="Settings &amp; sharing"><i class="fas fa-cog"></i></button>
+                <button type="submit" form="dash-delete" class="btn btn-danger" title="Delete dashboard"><i class="fas fa-trash-alt"></i></button>
+            @endif
+            @unless (auth()->user()->isViewer())
+                <button type="button" class="btn btn-success" data-toggle="modal" data-target="#dash-new" title="New dashboard"><i class="fas fa-plus"></i></button>
+            @endunless
+        </div>
+    </div>
+    <a href="{{ route('graphs.index', ['list' => 1]) }}" class="small text-muted">All dashboards</a>
+</div>
+
 <div class="d-flex flex-wrap align-items-center mb-3" style="gap:.5rem 1rem">
-    <div class="btn-group btn-group-sm" role="group" aria-label="Period">
+    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Period">
         <a href="{{ request()->fullUrlWithQuery(['graph' => null]) }}" class="btn {{ $graph ? 'btn-outline-secondary' : 'btn-success' }}">Each graph's own</a>
         @foreach ($graphs as $key => [$title])
             <a href="{{ request()->fullUrlWithQuery(['graph' => $key]) }}" class="btn {{ $graph === $key ? 'btn-success' : 'btn-outline-secondary' }}">{{ \App\Support\Ui::t($title) }}</a>
@@ -82,18 +100,16 @@
                 $small = $widget->width === 4;
             @endphp
             <div class="{{ $cols[$widget->width] ?? 'col-lg-6' }}">
-                <div class="card">
-                    <div class="card-header py-2 d-flex align-items-center flex-wrap" style="gap:.25rem .5rem">
-                        <h3 class="card-title mr-auto" style="font-size:1rem">
-                            <i class="fas {{ ['top' => 'fa-list-ol', 'cpu' => 'fa-microchip'][$widget->kind] ?? 'fa-chart-area' }} mr-1 text-success"></i>
-                            @if ($widget->kind === 'traffic' && $ports->count() === 1)
-                                <a href="{{ route('switches.ports.show', [$ports->first()->network_switch_id, $ports->first()]) }}#traffic" class="text-reset">{{ $widget->displayTitle($ports) }}</a>
-                            @else
-                                {{ $widget->displayTitle($ports) }}
-                            @endif
-                        </h3>
+                <div class="lw-card">
+                    <div class="lw-head">
+                        @php $one = $widget->kind === 'traffic' && $ports->count() === 1 ? $ports->first() : null; @endphp
+                        @if ($one)
+                            <a href="{{ route('graph.show', ['type' => 'port_bits', 'id' => $one->id]) }}" class="lw-title" title="{{ $one->networkSwitch?->name }} · {{ $one->label }}{{ $one->speed_label ? ' · ' . $one->speed_label : '' }}">{{ $widget->displayTitle($ports) }}</a>
+                        @else
+                            <span class="lw-title">{{ $widget->displayTitle($ports) }}</span>
+                        @endif
                         @if ($editing)
-                            <div class="btn-group btn-group-sm">
+                            <div class="btn-group btn-group-sm lw-tools">
                                 @foreach (['up' => 'fa-arrow-up', 'down' => 'fa-arrow-down'] as $dir => $icon)
                                     <form method="POST" action="{{ route('graphs.widgets.move', [$dashboard, $widget]) }}" class="d-inline">
                                         @csrf
@@ -113,18 +129,18 @@
 
                     @if ($editing)
                         <div class="collapse" id="edit-{{ $widget->id }}">
-                            <div class="card-body border-bottom bg-light">
+                            <div class="p-2 border-bottom bg-light">
                                 @include('graphs._widget-form', ['widget' => $widget])
                             </div>
                         </div>
                     @endif
 
-                    <div class="card-body py-2">
+                    <div class="lw-body">
                         @if ($widget->kind === 'cpu')
                             @if (! $widget->cpuDevice)
                                 <div class="text-muted small py-4 text-center">This device no longer exists.</div>
                             @else
-                                <div class="tg" @if ($small) data-compact @endif data-points="{{ $widget->width === 12 ? 720 : 360 }}"
+                                <div class="tg" data-style="rrd" data-points="{{ $widget->width === 12 ? 720 : 360 }}"
                                      data-url="{{ route('graphs.widgets.data', [$dashboard, $widget]) }}" data-graph="{{ $graph ?? ($widget->graph ?: $dashboard->default_graph) }}">
                                     <div class="tg-head"></div>
                                     <div class="tg-plot"><canvas></canvas></div>
@@ -135,7 +151,7 @@
                             @if ($ports->isEmpty())
                                 <div class="text-muted small py-4 text-center">The interfaces on this graph no longer exist.</div>
                             @else
-                                <div class="tg" @if ($small) data-compact @endif data-points="{{ $widget->width === 12 ? 720 : 360 }}"
+                                <div class="tg" data-style="rrd" @if ($widget->mirror()) data-mirror @endif data-points="{{ $widget->width === 12 ? 720 : 360 }}"
                                      data-url="{{ route('graphs.widgets.data', [$dashboard, $widget]) }}" data-graph="{{ $graph ?? ($widget->graph ?: $dashboard->default_graph) }}">
                                     <div class="tg-head"></div>
                                     <div class="tg-plot"><canvas></canvas></div>
@@ -193,6 +209,52 @@
     @include('graphs._settings')
 @endif
 
+@unless (auth()->user()->isViewer())
+    <div class="modal fade" id="dash-new" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <form method="POST" action="{{ route('graphs.store') }}" class="modal-content">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus-circle mr-1 text-success"></i> New dashboard</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" name="name" maxlength="100" class="form-control" placeholder="e.g. Core uplinks" required>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label>Description <small class="text-muted">(optional)</small></label>
+                        <input type="text" name="description" maxlength="255" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button class="btn btn-success"><i class="fas fa-plus"></i> Make dashboard</button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endunless
+
+@stop
+
+@section('css')
+<style>
+    .lw-bar { width: auto; max-width: 100%; }
+    .lw-bar select { min-width: 12rem; }
+    .lw-card { background: #fff; border: 1px solid #dee2e6; margin-bottom: 1rem; }
+    .lw-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 2.4rem; padding: .35rem 2.5rem; background: #e9ecef; border-bottom: 1px solid #dee2e6; }
+    .lw-title { font-size: .95rem; color: #222; text-align: center; }
+    a.lw-title:hover { color: #0d6efd; text-decoration: none; }
+    .lw-tools { position: absolute; right: .35rem; }
+    .lw-body { padding: .5rem .6rem .6rem; }
+    .lw-body .tg[data-style="rrd"] .tg-plot { height: 170px; }
+    .rrd-legend { border-collapse: collapse; margin-top: .3rem; }
+    .rrd-legend th, .rrd-legend td { padding: 0 .9rem 0 0; font-weight: normal; text-align: left; white-space: nowrap; }
+    .tg[data-style="rrd"] .tg-legend { font-family: 'DejaVu Sans Mono', Menlo, Consolas, monospace; font-size: 11px; color: #222; line-height: 1.35; overflow-x: auto; }
+    .tg[data-style="rrd"] .tg-key { border-radius: 0; width: .65rem; height: .65rem; }
+</style>
 @stop
 
 @section('js')
@@ -208,6 +270,10 @@
         if (document.hidden) return;
         graphs.forEach(function (el) { if (el._data) TrafficGraph.load(el); });
     }, {{ max(30, $dashboard->refresh_seconds) * 1000 }});
+
+    // Dashboard picker.
+    var pick = document.getElementById('dash-pick');
+    if (pick) pick.addEventListener('change', function () { window.location = pick.value; });
 
     // Add / edit form: interface picker and the fields each type uses.
     $('.js-select2').select2({ theme: 'bootstrap4', width: '100%' });

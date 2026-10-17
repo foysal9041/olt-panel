@@ -40,7 +40,7 @@ class HrLetterController extends Controller
 
         return view('attendance.letters.index', [
             'letters' => $letters,
-            'employees' => Employee::orderBy('name')->get(['id', 'name']),
+            'employees' => Employee::ordered()->get(['id', 'name']),
             'counts' => HrLetter::selectRaw('type, COUNT(*) as n')->groupBy('type')->pluck('n', 'type'),
         ]);
     }
@@ -232,7 +232,7 @@ class HrLetterController extends Controller
     protected function formData(): array
     {
         return [
-            'employees' => Employee::orderByDesc('status')->orderBy('name')->get(),
+            'employees' => Employee::orderByDesc('status')->ordered()->get(),
             'reasons' => HrLetter::REASONS,
         ];
     }

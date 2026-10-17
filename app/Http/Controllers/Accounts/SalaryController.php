@@ -35,7 +35,7 @@ class SalaryController extends Controller
 
             $rows = $previous
                 ? $previous->items->map(fn ($i) => new SalarySheetItem($i->only(['employee_id', 'emp_code', 'name', 'designation', 'salary', 'house_rent'])))
-                : Employee::where('status', true)->orderBy('emp_code')->orderBy('name')->get()
+                : Employee::where('status', true)->ordered()->get()
                     ->map(fn (Employee $e) => new SalarySheetItem([
                         'employee_id' => $e->id,
                         'emp_code' => $e->emp_code,
@@ -46,7 +46,7 @@ class SalaryController extends Controller
                     ]));
         }
 
-        $employees = Employee::orderBy('name')->get(['id', 'emp_code', 'name', 'designation', 'basic_salary', 'house_rent']);
+        $employees = Employee::ordered()->get(['id', 'emp_code', 'name', 'designation', 'basic_salary', 'house_rent']);
         $payDate = $sheet?->items->first()?->transaction?->transaction_date ?? $this->defaultPayDate($month);
         $payMonth = $month->copy()->addMonthNoOverflow();
 

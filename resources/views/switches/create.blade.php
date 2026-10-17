@@ -3,7 +3,7 @@
 @section('title', $switch->isRouter() ? 'Add Router' : 'Add Switch')
 
 @section('content_header')
-<x-noc.header :title="$switch->isRouter() ? 'Add Router' : 'Add Switch'" :subtitle="$switch->isRouter() ? 'Monitor a router over SNMP' : 'Monitor a switch over SNMP'" :back="route('switches.index')" />
+<x-noc.header :title="$switch->isRouter() ? 'Add Router' : 'Add Switch'" :subtitle="$switch->isRouter() ? 'Monitor a router over SNMP' : 'Monitor a switch over SNMP'" :back="$switch->isRouter() ? route('routers.index') : route('switches.index')" />
 @stop
 
 @section('content')

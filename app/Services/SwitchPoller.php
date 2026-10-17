@@ -145,7 +145,7 @@ class SwitchPoller
         if ($switch->fail_count >= self::FAILS_BEFORE_DOWN && $switch->status !== 0) {
             // Only alert on a real transition, not a switch that has never answered.
             if ($switch->status === 1) {
-                $this->event($switch, null, 'switch_down', "Switch {$switch->name} ({$switch->ip}) is not responding to SNMP", $now, $settings->alert_switch_status);
+                $this->event($switch, null, 'switch_down', "{$switch->typeLabel()} {$switch->name} ({$switch->ip}) is not responding to SNMP", $now, $settings->alert_switch_status);
             }
 
             $switch->status = 0;
@@ -158,7 +158,7 @@ class SwitchPoller
     {
         // A switch that has never answered before isn't "back" — it's new.
         if ($switch->status === 0 && $switch->ports()->exists()) {
-            $this->event($switch, null, 'switch_up', "Switch {$switch->name} ({$switch->ip}) is reachable again", $now, $settings->alert_switch_status);
+            $this->event($switch, null, 'switch_up', "{$switch->typeLabel()} {$switch->name} ({$switch->ip}) is reachable again", $now, $settings->alert_switch_status);
         }
 
         $switch->status = 1;
@@ -180,7 +180,7 @@ class SwitchPoller
         $names = $snmp->walk(self::IF_NAME);
 
         if (! $descr && ! $names) {
-            throw new \RuntimeException('Switch answered but returned no interfaces (check SNMP view / community permissions).');
+            throw new \RuntimeException("{$switch->typeLabel()} answered but returned no interfaces (check SNMP view / community permissions).");
         }
 
         $types = $snmp->walk(self::IF_TYPE);
@@ -471,7 +471,8 @@ class SwitchPoller
 
         foreach ($toSend as $event) {
             $port = $event->port;
-            $title = SwitchEvent::TYPES[$event->type][0];
+            $event->setRelation('networkSwitch', $switch);
+            $title = $event->label();
 
             $block = ($icons[$event->type] ?? '•') . ' <b>' . e(strtoupper($title)) . '</b>';
             $block .= "\n🖧 <b>" . e($switch->name) . '</b> <code>' . e($switch->ip) . '</code>';

@@ -127,6 +127,12 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
     Route::get('switch-events', [SwitchEventController::class, 'index'])
         ->name('switch-events.index')->middleware('can:access-olt-switches');
 
+    // Routers share the switch pages; their own list and "add" form.
+    Route::get('routers', [SwitchController::class, 'index'])->defaults('deviceType', 'router')
+        ->name('routers.index')->middleware('can:access-olt-switches');
+    Route::get('routers/create', [SwitchController::class, 'create'])->defaults('deviceType', 'router')
+        ->name('routers.create')->middleware('can:access-olt-switches');
+
     Route::resource('switches', SwitchController::class)
         ->middleware('can:access-olt-switches');
 

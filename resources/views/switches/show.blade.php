@@ -3,14 +3,14 @@
 @section('title', $switch->name . ' — ' . $switch->typeLabel())
 
 @section('content_header')
-<x-noc.header :title="$switch->name" :back="route('switches.index')"
+<x-noc.header :title="$switch->name" :back="$switch->listUrl()"
     subtitle="{{ $switch->ip }} · {{ $switch->vendor_label }}{{ $switch->zone ? ' · ' . $switch->zone : '' }}{{ $switch->notify ? '' : ' · alerts muted' }}{{ $switch->is_active ? '' : ' · paused' }}">
     <x-slot:badge><span data-live="sw-status">@include('switches._status', ['status' => $switch->status])</span></x-slot:badge>
     <form action="{{ route('switches.poll', $switch) }}" method="POST" class="d-inline" id="poll-form">
         @csrf
         <button class="btn btn-primary btn-sm" id="poll-btn"><i class="fas fa-sync-alt"></i> Poll Now</button>
     </form>
-    <a href="{{ route('switches.traffic', $switch) }}" class="btn btn-outline-success btn-sm"><i class="fas fa-chart-area"></i> Traffic graphs</a>
+    <a href="{{ route('switches.traffic', $switch) }}" class="btn btn-outline-success btn-sm"><i class="fas fa-chart-area"></i> Port graphs</a>
     <a href="{{ route('switches.edit', $switch) }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-edit"></i> Edit</a>
 </x-noc.header>
 @stop
@@ -169,7 +169,7 @@
 <div class="card card-outline card-primary">
 
     <div class="card-header">
-        <h3 class="card-title">Ports &amp; Transceivers</h3>
+        <h3 class="card-title">{{ $switch->isRouter() ? 'Interfaces & Transceivers' : 'Ports & Transceivers' }}</h3>
     </div>
 
     <div class="card-body pb-0">

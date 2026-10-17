@@ -371,21 +371,23 @@ return [
                 'can'  => 'access-olt-manage',
             ],
             [
-                'text' => 'Switches',
+                'text' => 'Switches & Routers',
                 'icon' => 'fas fa-server',
                 'can'  => 'access-olt-switches',
                 'submenu' => [
                     [
-                        'text' => 'All Switches',
-                        'url'  => 'switches?type=switch',
-                        'icon' => 'fas fa-list',
+                        'text' => 'Switches',
+                        'url'  => 'switches',
+                        'icon' => 'fas fa-server',
                         'can'  => 'access-olt-switches',
+                        'device_type' => 'switch',
                     ],
                     [
                         'text' => 'Routers',
-                        'url'  => 'switches?type=router',
+                        'url'  => 'routers',
                         'icon' => 'fas fa-route',
                         'can'  => 'access-olt-switches',
+                        'device_type' => 'router',
                     ],
                     [
                         'text' => 'Port Events',
@@ -691,6 +693,7 @@ return [
     'filters' => [
         JeroenNoten\LaravelAdminLte\Menu\Filters\GateFilter::class,
         App\Menu\WorkBadgeFilter::class,
+        App\Menu\DeviceTypeFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\HrefFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\SearchFilter::class,
         JeroenNoten\LaravelAdminLte\Menu\Filters\ActiveFilter::class,

@@ -51,6 +51,10 @@
             @endif
         </select>
         <small class="text-muted">One interface gets its own graph. Several are <strong>added up</strong> into one graph — e.g. all IIG uplinks = total upstream.</small>
+        <div class="custom-control custom-checkbox mt-1">
+            <input type="checkbox" class="custom-control-input" id="{{ $uid }}-mirror" name="mirror" value="1" @checked($w ? $w->mirror() : old('mirror'))>
+            <label class="custom-control-label small" for="{{ $uid }}-mirror">Draw Out traffic below the axis (mirrored)</label>
+        </div>
     </div>
 
     <div class="form-row js-for-cpu">
@@ -93,7 +97,7 @@
             <label class="small font-weight-bold mb-1">Size</label>
             <select name="width" class="form-control form-control-sm">
                 @foreach (\App\Models\GraphWidget::WIDTHS as $cols => $label)
-                    <option value="{{ $cols }}" @selected((int) ($w->width ?? old('width', 6)) === $cols)>{{ $label }}</option>
+                    <option value="{{ $cols }}" @selected((int) ($w->width ?? old('width', 4)) === $cols)>{{ $label }}</option>
                 @endforeach
             </select>
         </div>

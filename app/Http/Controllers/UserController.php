@@ -285,7 +285,7 @@ class UserController extends Controller
     private function deviceLists(): array
     {
         return [
-            'employees' => \App\Models\Employee::with('user:id,employee_id,name')->orderBy('name')->get(['id', 'name', 'emp_code', 'designation']),
+            'employees' => \App\Models\Employee::with('user:id,employee_id,name')->ordered()->get(['id', 'name', 'emp_code', 'designation']),
             'olts' => \App\Models\Olt::orderBy('zone')->orderBy('name')->get(['id', 'name', 'ip', 'zone']),
             'switches' => \App\Models\NetworkSwitch::orderBy('zone')->orderBy('name')->get(['id', 'name', 'ip', 'zone']),
         ];

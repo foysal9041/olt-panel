@@ -1,9 +1,11 @@
 @props(['title', 'subtitle' => null, 'icon' => null, 'back' => null])
 
+{{-- Switches and routers share their pages; their tabs follow the device the page is about (DeviceTypeFilter). --}}
 <x-module-header :title="$title" :subtitle="$subtitle" :icon="$icon" :back="$back" :tabs="[
     ['olt.dashboard', 'olt.dashboard', 'Overview', 'fas fa-tachometer-alt', 'access-olt-dashboard'],
     ['olt.index', ['olt.index', 'olt.create', 'olt.edit', 'olt.show'], 'OLTs', 'fas fa-network-wired', 'access-olt-manage'],
-    ['switches.index', 'switches.*', 'Switches', 'fas fa-server', 'access-olt-switches'],
+    ['switches.index', \App\Menu\DeviceTypeFilter::current() === 'router' ? '-' : 'switches.*', 'Switches', 'fas fa-server', 'access-olt-switches'],
+    ['routers.index', \App\Menu\DeviceTypeFilter::current() === 'router' ? ['routers.*', 'switches.*'] : '-', 'Routers', 'fas fa-route', 'access-olt-switches'],
     ['switch-events.index', 'switch-events.*', 'Events', 'fas fa-history', 'access-olt-switches'],
     ['graphs.index', 'graphs.*', 'Graphs', 'fas fa-chart-area', 'access-olt-graphs'],
     ['maps.index', 'maps.*', 'Weathermaps', 'fas fa-project-diagram', 'access-olt-maps'],

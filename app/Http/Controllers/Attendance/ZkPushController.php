@@ -127,17 +127,20 @@ class ZkPushController extends Controller
 
         $lines = preg_split('/\r\n|\r|\n/', trim((string) $request->getContent()));
 
-        $employeeIdsByPin = Employee::whereNotNull('device_user_id')
-            ->pluck('id', 'device_user_id');
+        // Only employees' attendance is kept: punches from any other PIN on the
+        // device (visitors, people not added as employees) are dropped.
+        $employeesByPin = Employee::whereNotNull('device_user_id')
+            ->get(['id', 'device_user_id', 'status', 'left_on'])
+            ->keyBy('device_user_id');
 
         foreach ($lines as $line) {
-            $this->storeAttendanceLine($device, $line, $employeeIdsByPin);
+            $this->storeAttendanceLine($device, $line, $employeesByPin);
         }
 
         return $this->plain('OK');
     }
 
-    private function storeAttendanceLine(ZkDevice $device, string $line, $employeeIdsByPin): void
+    private function storeAttendanceLine(ZkDevice $device, string $line, $employeesByPin): void
     {
         $line = trim($line);
 
@@ -160,6 +163,17 @@ class ZkPushController extends Controller
             return;
         }
 
+        // An employee who has left still gets punches up to their last day
+        // (a device can send old punches late); an inactive one without a
+        // last day, and anyone who isn't an employee, gets none.
+        $employee = $employeesByPin[$pin] ?? null;
+        $counts = $employee && ($employee->left_on
+            ? $punchedAt->toDateString() <= $employee->left_on->toDateString()
+            : $employee->status);
+        if (! $counts) {
+            return;
+        }
+
         AttendanceLog::firstOrCreate(
             [
                 'zk_device_id' => $device->id,
@@ -167,7 +181,7 @@ class ZkPushController extends Controller
                 'punched_at' => $punchedAt,
             ],
             [
-                'employee_id' => $employeeIdsByPin[$pin] ?? null,
+                'employee_id' => $employee->id,
                 'status_code' => isset($fields[2]) ? (int) $fields[2] : null,
                 'verify_mode' => isset($fields[3]) ? (int) $fields[3] : null,
                 'created_at' => now(),

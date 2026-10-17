@@ -93,17 +93,7 @@
 
 </div>
 
-<div data-live="att-unmapped-alert">
-@if($unmappedCount > 0)
-    <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap">
-        <span>
-            <i class="fas fa-exclamation-triangle mr-1"></i>
-            <strong>{{ $unmappedCount }} device {{ $unmappedCount === 1 ? 'PIN' : 'PINs' }}</strong> punched but aren't linked to any employee — their attendance isn't counted.
-        </span>
-        <a href="#unmapped" class="btn btn-sm btn-dark mt-1 mt-md-0">Review</a>
-    </div>
-@endif
-</div>
+
 
 <div class="row">
 
@@ -251,50 +241,7 @@
 
 </div>
 
-<div data-live="att-unmapped">
-@if($unmappedCount > 0)
-    <div class="card acct-panel" id="unmapped">
-        <div class="card-header">
-            <h3 class="card-title">
-                <i class="fas fa-exclamation-triangle text-warning mr-1"></i>
-                Unlinked Device PINs
-            </h3>
-            <span class="text-muted small">Punches from these PINs aren't counted until they're mapped</span>
-        </div>
-        <div class="card-body p-0 table-responsive">
-            <table class="table table-sm table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th class="pl-3">PIN (Device User ID)</th>
-                        <th>Device</th>
-                        <th>Punches</th>
-                        <th>Last Seen</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($unmappedPunches as $punch)
-                        <tr>
-                            <td class="pl-3"><code>{{ $punch->device_user_id }}</code></td>
-                            <td>{{ $punch->zkDevice->name ?? $punch->zkDevice->serial_number ?? 'Unknown device' }}</td>
-                            <td>{{ $punch->punches_count }}</td>
-                            <td>{{ \Illuminate\Support\Carbon::parse($punch->last_punched_at)->format('d M, h:i A') }}</td>
-                            <td class="text-right pr-3">
-                                @can('access-attendance-employees')
-                                    <a href="{{ route('attendance.employees.create', ['device_user_id' => $punch->device_user_id]) }}"
-                                       class="btn btn-xs btn-warning">
-                                        Map to Employee
-                                    </a>
-                                @endcan
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-@endif
-</div>
+
 
 @stop
 

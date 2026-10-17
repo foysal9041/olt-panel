@@ -19,7 +19,12 @@ class SwitchController extends Controller
 
     public function index(Request $request)
     {
-        $type = array_key_exists((string) $request->query('type'), NetworkSwitch::TYPES) ? $request->query('type') : null;
+        // /switches = switches, /routers = routers, /switches?type=all = both.
+        $type = $request->route('deviceType') ?? match ($request->query('type')) {
+            'router' => 'router',
+            'all' => null,
+            default => 'switch',
+        };
         $counts = NetworkSwitch::visibleTo(auth()->user())->selectRaw('device_type, COUNT(*) AS c')->groupBy('device_type')->pluck('c', 'device_type');
 
         $switches = NetworkSwitch::visibleTo(auth()->user())->ofType($type)->withCount([
@@ -41,7 +46,7 @@ class SwitchController extends Controller
 
     public function create(Request $request)
     {
-        $type = $request->query('type') === 'router' ? 'router' : 'switch';
+        $type = ($request->route('deviceType') ?? $request->query('type')) === 'router' ? 'router' : 'switch';
 
         return view('switches.create', [
             'switch' => new NetworkSwitch(['device_type' => $type, 'vendor' => $type === 'router' ? 'mikrotik' : 'generic', 'snmp_version' => '2c', 'snmp_port' => 161, 'is_active' => true, 'notify' => true, 'dom_divisor' => 1, 'dom_power_unit' => 'dbm']),
@@ -73,7 +78,7 @@ class SwitchController extends Controller
         abort_unless(auth()->user()->canSeeSwitch($switch), 403);
 
         $ports = $switch->ports()->get();
-        $events = $switch->events()->with('port')->latest('occurred_at')->limit(25)->get();
+        $events = $switch->events()->with('port')->latest('occurred_at')->limit(25)->get()->each->setRelation('networkSwitch', $switch);
         $settings = NocAlertSetting::current();
         $rxTrend = $this->rxTrend($ports->filter(fn ($p) => $p->rx_power !== null));
 
@@ -86,7 +91,7 @@ class SwitchController extends Controller
 
         abort_unless($port->network_switch_id === $switch->id, 404);
 
-        $events = $switch->events()->where('switch_port_id', $port->id)->latest('occurred_at')->limit(30)->get();
+        $events = $switch->events()->where('switch_port_id', $port->id)->latest('occurred_at')->limit(30)->get()->each->setRelation('networkSwitch', $switch);
         $warning = $port->rxWarning(NocAlertSetting::current());
         $firstReading = $port->readings()->min('recorded_at');
         $ranges = self::HISTORY_RANGES;
@@ -265,9 +270,7 @@ class SwitchController extends Controller
 
         $switch->delete();
 
-        return redirect()
-            ->route('switches.index')
-            ->with('success', 'Switch Deleted Successfully');
+        return redirect($switch->listUrl())->with('success', "{$switch->typeLabel()} {$switch->name} deleted.");
     }
 
     public function poll(NetworkSwitch $switch, SwitchPoller $poller)

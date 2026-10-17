@@ -44,6 +44,12 @@
             <datalist id="emp-depts">@foreach (\App\Models\Employee::DEPARTMENTS as $dep)<option value="{{ $dep }}">@endforeach</datalist>
         </div>
         <div class="col-md-4 form-group">
+            <label>Serial No. <small class="text-muted">(list order)</small></label>
+            <input type="number" name="serial_no" min="1" max="9999" class="form-control @error('serial_no') is-invalid @enderror"
+                   value="{{ old('serial_no', $employee->serial_no ?? ($nextSerial ?? '')) }}" placeholder="1">
+            @error('serial_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+        <div class="col-md-4 form-group">
             <label>Emp ID</label>
             <input type="text" name="emp_code" class="form-control"
                    value="{{ old('emp_code', $employee->emp_code ?? '') }}" placeholder="SNDC-001">

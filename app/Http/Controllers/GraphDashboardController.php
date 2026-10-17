@@ -24,6 +24,13 @@ class GraphDashboardController extends Controller
         $user = $request->user();
         $dashboards = GraphDashboard::visibleTo($user)->with(['owner:id,name', 'roles'])->withCount('widgets')->orderBy('name')->get();
 
+        // As in LibreNMS, "Graph Dashboards" opens a dashboard straight away: the last one seen, else the first.
+        if (! $request->boolean('list') && $dashboards->isNotEmpty()) {
+            $last = $dashboards->firstWhere('id', (int) session('graph_dashboard'));
+
+            return redirect()->route('graphs.show', $last ?? $dashboards->first());
+        }
+
         return view('graphs.index', ['dashboards' => $dashboards, 'user' => $user]);
     }
 
@@ -60,6 +67,7 @@ class GraphDashboardController extends Controller
 
         $canEdit = $dashboard->canEdit($user);
         $editing = $canEdit && $request->boolean('edit');
+        session(['graph_dashboard' => $dashboard->id]);
 
         return view('graphs.show', [
             'dashboard' => $dashboard,
@@ -71,6 +79,7 @@ class GraphDashboardController extends Controller
             // Interfaces already on the dashboard from switches this editor can't see: kept, not offered.
             'otherPorts' => $canEdit ? $ports->reject(fn ($p) => NetworkSwitch::visibleTo($user)->whereKey($p->network_switch_id)->exists())->values() : collect(),
             'graph' => array_key_exists($request->query('graph'), SwitchPortTraffic::GRAPHS) ? $request->query('graph') : null,
+            'allDashboards' => GraphDashboard::visibleTo($user)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -224,6 +233,7 @@ class GraphDashboardController extends Controller
             'switches.*' => 'integer',
             'limit' => 'nullable|integer|min:3|max:25',
             'device' => 'nullable|integer',
+            'mirror' => 'nullable|boolean',
             'metric' => ['nullable', Rule::in(GraphWidget::DEVICE_METRICS)],
         ]);
 
@@ -240,7 +250,7 @@ class GraphDashboardController extends Controller
             if (! $ports) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['ports' => 'Pick at least one interface.']);
             }
-            $settings = ['ports' => $ports];
+            $settings = ['ports' => $ports, 'mirror' => $request->boolean('mirror')];
         } elseif ($data['kind'] === 'cpu') {
             $device = (int) ($data['device'] ?? 0);
             if (! $visibleSwitches->contains($device) && $device !== $widget?->deviceId()) {
