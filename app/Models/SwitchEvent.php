@@ -15,6 +15,8 @@ class SwitchEvent extends Model
         'switch_up'   => ['Switch Up', 'success'],
         'rx_low'      => ['Rx Low', 'warning'],
         'rx_normal'   => ['Rx Normal', 'info'],
+        'util_high'   => ['High Utilisation', 'warning'],
+        'util_normal' => ['Utilisation Normal', 'info'],
     ];
 
     protected $fillable = [

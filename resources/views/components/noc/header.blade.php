@@ -5,6 +5,8 @@
     ['olt.index', ['olt.index', 'olt.create', 'olt.edit', 'olt.show'], 'OLTs', 'fas fa-network-wired', 'access-olt-manage'],
     ['switches.index', 'switches.*', 'Switches', 'fas fa-server', 'access-olt-switches'],
     ['switch-events.index', 'switch-events.*', 'Events', 'fas fa-history', 'access-olt-switches'],
+    ['graphs.index', 'graphs.*', 'Graphs', 'fas fa-chart-area', 'access-olt-graphs'],
+    ['maps.index', 'maps.*', 'Weathermaps', 'fas fa-project-diagram', 'access-olt-maps'],
     ['latency.index', 'latency.*', 'Latency', 'fas fa-wave-square', 'access-latency-graphs'],
     ['zones.index', 'zones.*', 'Zones', 'fas fa-map-marked-alt', 'access-olt-zones'],
     ['vlans.index', 'vlans.*', 'VLANs', 'fas fa-stream', 'access-olt-vlans'],

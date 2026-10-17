@@ -42,6 +42,11 @@ Schedule::call(function () {
     ->name('prune-switch-port-readings')
     ->dailyAt('03:45');
 
+// Traffic graph buckets past what each resolution keeps (1-minute: 3 days … daily: 3 years).
+Schedule::call(fn () => app(\App\Services\PortTrafficRecorder::class)->prune() + app(\App\Services\DeviceCpuRecorder::class)->prune() + app(\App\Services\MetricStore::class)->prune())
+    ->name('prune-port-traffic')
+    ->dailyAt('03:55');
+
 // Employees past their last working day (termination letter): mark them
 // inactive and block their panel login.
 Schedule::call(function () {

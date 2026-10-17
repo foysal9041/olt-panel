@@ -48,6 +48,9 @@ class NocAlertSetting extends Model
         'whatsapp_template',
         'whatsapp_template_lang',
         'whatsapp_api_version',
+        'alert_util',
+        'util_threshold',
+        'util_minutes',
     ];
 
     protected $hidden = ['telegram_bot_token', 'whatsapp_token'];
@@ -62,6 +65,9 @@ class NocAlertSetting extends Model
             'alert_port_status' => 'boolean',
             'alert_switch_status' => 'boolean',
             'alert_nttn_status' => 'boolean',
+            'alert_util' => 'boolean',
+            'util_threshold' => 'integer',
+            'util_minutes' => 'integer',
             'rx_low_threshold' => 'float',
             'rx_warn_10g' => 'float',
             'rx_warn_1g' => 'float',

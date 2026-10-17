@@ -33,7 +33,9 @@ return [
             'ip'        => 'IP Management',
             'nttn'      => 'NTTN Links',
             'support'   => 'Technical Support Contacts',
-            'switches'  => 'Switches (SNMP) & Port Events',
+            'switches'  => 'Switches & Routers (SNMP) & Port Events',
+            'graphs'    => 'Graph Dashboards (build & view traffic dashboards)',
+            'maps'      => 'Weathermaps (build & view network maps)',
         ],
     ],
     'latency' => [

@@ -86,11 +86,32 @@
                         <label class="custom-control-label" for="alert_switch_status">A switch stops / starts answering SNMP</label>
                     </div>
 
-                    <div class="custom-control custom-checkbox mb-3">
+                    <div class="custom-control custom-checkbox">
                         <input type="hidden" name="alert_nttn_status" value="0">
                         <input type="checkbox" class="custom-control-input" id="alert_nttn_status" name="alert_nttn_status" value="1"
                                @checked(old('alert_nttn_status', $settings->alert_nttn_status))>
                         <label class="custom-control-label" for="alert_nttn_status">An NTTN link goes DOWN or comes back UP (ping)</label>
+                    </div>
+
+                    <div class="d-flex flex-wrap align-items-center mb-3" style="gap:.35rem">
+                        <div class="custom-control custom-checkbox">
+                            <input type="hidden" name="alert_util" value="0">
+                            <input type="checkbox" class="custom-control-input" id="alert_util" name="alert_util" value="1"
+                                   @checked(old('alert_util', $settings->alert_util))>
+                            <label class="custom-control-label" for="alert_util">A switch / router port's traffic stays at or above</label>
+                        </div>
+                        <div class="input-group input-group-sm" style="width:6.5rem">
+                            <input type="number" name="util_threshold" min="10" max="100" class="form-control @error('util_threshold') is-invalid @enderror"
+                                   value="{{ old('util_threshold', $settings->util_threshold ?? 85) }}" aria-label="Threshold">
+                            <div class="input-group-append"><span class="input-group-text">%</span></div>
+                        </div>
+                        <span>of its speed for</span>
+                        <div class="input-group input-group-sm" style="width:6.5rem">
+                            <input type="number" name="util_minutes" min="1" max="60" class="form-control @error('util_minutes') is-invalid @enderror"
+                                   value="{{ old('util_minutes', $settings->util_minutes ?? 3) }}" aria-label="Minutes">
+                            <div class="input-group-append"><span class="input-group-text">min</span></div>
+                        </div>
+                        <small class="text-muted w-100">Busier direction (in or out) against the link speed, every minute; "back to normal" once it falls 10 points below.</small>
                     </div>
 
                     <p class="small text-muted mb-3">

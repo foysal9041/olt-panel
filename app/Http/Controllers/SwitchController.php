@@ -17,9 +17,12 @@ class SwitchController extends Controller
 {
     use ChecksIpConflict;
 
-    public function index()
+    public function index(Request $request)
     {
-        $switches = NetworkSwitch::visibleTo(auth()->user())->withCount([
+        $type = array_key_exists((string) $request->query('type'), NetworkSwitch::TYPES) ? $request->query('type') : null;
+        $counts = NetworkSwitch::visibleTo(auth()->user())->selectRaw('device_type, COUNT(*) AS c')->groupBy('device_type')->pluck('c', 'device_type');
+
+        $switches = NetworkSwitch::visibleTo(auth()->user())->ofType($type)->withCount([
             'ports',
             'ports as ports_up_count' => fn ($q) => $q->where('oper_status', SwitchPort::UP),
             'ports as ports_sfp_count' => fn ($q) => $q->whereNotNull('rx_power'),
@@ -33,13 +36,15 @@ class SwitchController extends Controller
             'ports_down' => SwitchPort::whereIn('network_switch_id', $switches->pluck('id'))->where('admin_status', 1)->where('oper_status', '!=', SwitchPort::UP)->count(),
         ];
 
-        return view('switches.index', compact('switches', 'summary'));
+        return view('switches.index', compact('switches', 'summary', 'type', 'counts'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $type = $request->query('type') === 'router' ? 'router' : 'switch';
+
         return view('switches.create', [
-            'switch' => new NetworkSwitch(['vendor' => 'generic', 'snmp_version' => '2c', 'snmp_port' => 161, 'is_active' => true, 'notify' => true, 'dom_divisor' => 1, 'dom_power_unit' => 'dbm']),
+            'switch' => new NetworkSwitch(['device_type' => $type, 'vendor' => $type === 'router' ? 'mikrotik' : 'generic', 'snmp_version' => '2c', 'snmp_port' => 161, 'is_active' => true, 'notify' => true, 'dom_divisor' => 1, 'dom_power_unit' => 'dbm']),
             'zones' => Zone::orderBy('name')->pluck('name'),
         ]);
     }
@@ -52,7 +57,7 @@ class SwitchController extends Controller
             auth()->user()->allowedSwitches()->syncWithoutDetaching([$switch->id]);
         }
 
-        return $this->pollAndRedirect($switch, $poller, 'Switch Added');
+        return $this->pollAndRedirect($switch, $poller, $switch->typeLabel() . ' added');
     }
 
     /** Port history graph ranges: label, span in seconds, bucket size. */
@@ -300,6 +305,7 @@ class SwitchController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'device_type' => ['required', Rule::in(array_keys(NetworkSwitch::TYPES))],
             'ip' => ['required', 'ip', Rule::unique('network_switches', 'ip')->ignore($switch?->id)],
             'zone' => 'nullable|exists:zones,name',
             'vendor' => ['required', Rule::in(array_keys(NetworkSwitch::VENDORS))],
@@ -313,7 +319,7 @@ class SwitchController extends Controller
             'dom_divisor' => 'required|integer|min:1|max:1000000',
             'dom_power_unit' => 'required|in:dbm,mw,uw',
         ], [
-            'ip.unique' => 'A switch with this IP address already exists.',
+            'ip.unique' => 'A switch or router with this IP address already exists.',
             'dom_rx_oid.regex' => 'OIDs must be numeric, e.g. 1.3.6.1.4.1.3320.9.63.1.7.1.3',
             'dom_tx_oid.regex' => 'OIDs must be numeric, e.g. 1.3.6.1.4.1.3320.9.63.1.7.1.4',
             'dom_temp_oid.regex' => 'OIDs must be numeric, e.g. 1.3.6.1.4.1.3320.9.63.1.7.1.2',

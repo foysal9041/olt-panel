@@ -1,9 +1,9 @@
 @extends('adminlte::page')
 
-@section('title', 'Add Switch')
+@section('title', $switch->isRouter() ? 'Add Router' : 'Add Switch')
 
 @section('content_header')
-<x-noc.header title="Add Switch" subtitle="Monitor a switch over SNMP" :back="route('switches.index')" />
+<x-noc.header :title="$switch->isRouter() ? 'Add Router' : 'Add Switch'" :subtitle="$switch->isRouter() ? 'Monitor a router over SNMP' : 'Monitor a switch over SNMP'" :back="route('switches.index')" />
 @stop
 
 @section('content')
@@ -11,7 +11,7 @@
 <div class="card card-outline card-primary col-lg-9 px-0">
 
     <div class="card-header">
-        <h3 class="card-title">Switch &amp; SNMP Details</h3>
+        <h3 class="card-title">Device &amp; SNMP Details</h3>
     </div>
 
     <form method="POST" id="switch-form" action="{{ route('switches.store') }}">

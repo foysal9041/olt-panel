@@ -40,11 +40,22 @@ class SwitchPoller
      */
     protected const PORT_TYPES = [6, 62, 69, 117, 161];
 
+    /**
+     * Routers also keep their logical interfaces, which carry the traffic
+     * worth graphing there: l2vlan (VLANs / sub-interfaces), propVirtual,
+     * tunnel and bridge. Per-session PPP interfaces (PPPoE clients) are
+     * left out — a BRAS would add thousands.
+     */
+    protected const ROUTER_EXTRA_TYPES = [53, 131, 135, 209];
+
     /** A switch must miss this many polls in a row before it's DOWN. */
     protected const FAILS_BEFORE_DOWN = 2;
 
     /** Rx must climb this many dB above the threshold to clear an alarm. */
     protected const RX_HYSTERESIS = 1.0;
+
+    /** Utilisation must fall this many points below the threshold to clear its alarm. */
+    protected const UTIL_HYSTERESIS = 10;
 
     /** @var list<array{event: SwitchEvent, notify: bool}> */
     protected array $events = [];
@@ -52,6 +63,9 @@ class SwitchPoller
     public function __construct(
         protected TransceiverReader $transceivers,
         protected AlertNotifier $alerts,
+        protected PortTrafficRecorder $traffic,
+        protected DeviceCpuRecorder $cpu,
+        protected DeviceHealthRecorder $health,
     ) {
     }
 
@@ -66,7 +80,9 @@ class SwitchPoller
 
         try {
             $snmp = new SnmpClient($switch);
+            $started = microtime(true);
             $system = $snmp->get([self::SYS_NAME, self::SYS_DESCR, self::SYS_UPTIME]);
+            $snmpMs = (int) round((microtime(true) - $started) * 1000);
         } catch (\Throwable $e) {
             $this->markUnreachable($switch, $e->getMessage(), $now, $settings);
             $this->notify($switch, $settings);
@@ -78,7 +94,19 @@ class SwitchPoller
             $this->markReachable($switch, $system, $now, $settings);
 
             $ports = $this->syncPorts($snmp, $switch, $now, $settings);
+            $traffic = $this->measureTraffic($snmp, $switch, $ports);
+            $this->checkUtilisation($switch, $ports, $traffic, $now, $settings);
             $domCount = $this->syncTransceivers($snmp, $switch, $ports, $now, $settings);
+
+            // Ports whose traffic counters changed but weren't saved with DOM readings.
+            foreach ($ports as $port) {
+                if ($port->isDirty()) {
+                    $port->save();
+                }
+            }
+            $this->storeTraffic($switch, $traffic);
+            $this->recordCpu($snmp, $switch);
+            $this->recordHealth($snmp, $switch, $snmpMs);
 
             $switch->last_error = null;
             $switch->save();
@@ -170,7 +198,7 @@ class SwitchPoller
             $ifIndex = (int) $ifIndex;
             $type = isset($types[$ifIndex]) ? (int) $types[$ifIndex] : null;
 
-            if ($type !== null && ! in_array($type, self::PORT_TYPES, true)) {
+            if ($type !== null && ! in_array($type, $switch->isRouter() ? [...self::PORT_TYPES, ...self::ROUTER_EXTRA_TYPES] : self::PORT_TYPES, true)) {
                 continue;
             }
 
@@ -225,6 +253,95 @@ class SwitchPoller
         $switch->ports()->whereNotIn('if_index', $seen)->delete();
 
         return $ports;
+    }
+
+    // ---- Traffic -------------------------------------------------------------
+
+    /**
+     * Octet counters → bits per second on each port (for the traffic
+     * graphs). A switch that won't give its counters must not stop the poll.
+     *
+     * @param  array<int, SwitchPort>  $ports
+     * @return list<array{0: int, 1: int, 2: int}>
+     */
+    protected function measureTraffic(SnmpClient $snmp, NetworkSwitch $switch, array $ports): array
+    {
+        try {
+            return $this->traffic->measure($snmp, $ports);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /**
+     * A port whose busier direction stays at or above the threshold share
+     * of its speed for util_minutes polls in a row raises "High
+     * utilisation"; it clears once it falls UTIL_HYSTERESIS points below.
+     *
+     * @param  array<int, SwitchPort>  $ports
+     * @param  list<array{0: int, 1: int, 2: int}>  $samples  this poll's rates
+     */
+    protected function checkUtilisation(NetworkSwitch $switch, array $ports, array $samples, Carbon $now, NocAlertSetting $settings): void
+    {
+        $threshold = max(1, (int) ($settings->util_threshold ?: 85));
+        $needed = max(1, (int) ($settings->util_minutes ?: 3));
+        $measured = array_flip(array_column($samples, 0));
+
+        foreach ($ports as $port) {
+            if (! isset($measured[$port->id]) || ! $port->speed_mbps) {
+                continue;
+            }
+            $pct = max($port->in_bps, $port->out_bps) / ($port->speed_mbps * 1_000_000) * 100;
+            $line = $this->portLabel($port) . " ({$switch->name}): in " . SwitchPort::formatBps($port->in_bps) . ' / out ' . SwitchPort::formatBps($port->out_bps)
+                . ' — ' . number_format($pct, 0) . "% of {$port->speed_label}";
+
+            if ($pct >= $threshold) {
+                $port->util_streak = min(255, $port->util_streak + 1);
+                if (! $port->util_alarm && $port->util_streak >= $needed) {
+                    $port->util_alarm = true;
+                    $this->event($switch, $port, 'util_high', "High utilisation on {$line} (alert at {$threshold}% for {$needed} min)", $now, $settings->alert_util && $port->notify);
+                }
+            } else {
+                $port->util_streak = 0;
+                if ($port->util_alarm && $pct < $threshold - self::UTIL_HYSTERESIS) {
+                    $port->util_alarm = false;
+                    $this->event($switch, $port, 'util_normal', "Utilisation back to normal on {$line}", $now, $settings->alert_util && $port->notify);
+                }
+            }
+        }
+    }
+
+    /** Memory, uptime, SNMP response time and sensors for the device graphs. */
+    protected function recordHealth(SnmpClient $snmp, NetworkSwitch $switch, int $snmpMs): void
+    {
+        try {
+            $this->health->record($snmp, $switch, $snmpMs);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /** CPU load for the device's CPU graph; a device that won't say must not stop the poll. */
+    protected function recordCpu(SnmpClient $snmp, NetworkSwitch $switch): void
+    {
+        try {
+            if (($cpu = $this->cpu->measure($snmp, $switch)) !== null) {
+                $this->cpu->store($switch, $cpu);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function storeTraffic(NetworkSwitch $switch, array $samples): void
+    {
+        try {
+            $this->traffic->store($samples);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     // ---- Transceivers -------------------------------------------------------
@@ -347,6 +464,7 @@ class SwitchPoller
             'port_down' => '🔴', 'port_up' => '🟢',
             'switch_down' => '🚨', 'switch_up' => '✅',
             'rx_low' => '⚠️', 'rx_normal' => '🔵',
+            'util_high' => '📈', 'util_normal' => '📉',
         ];
 
         $lines = [];
@@ -363,6 +481,11 @@ class SwitchPoller
 
                 if ($port->alias) {
                     $block .= ' — ' . e($port->alias);
+                }
+
+                if (in_array($event->type, ['util_high', 'util_normal'], true) && $port->in_bps !== null) {
+                    $pct = $port->speed_mbps ? ' — ' . number_format(max($port->in_bps, $port->out_bps) / ($port->speed_mbps * 1_000_000) * 100, 0) . "% of {$port->speed_label}" : '';
+                    $block .= "\n📊 In <b>" . SwitchPort::formatBps($port->in_bps) . '</b> · Out <b>' . SwitchPort::formatBps($port->out_bps) . '</b>' . $pct;
                 }
 
                 if ($port->rx_power !== null && in_array($event->type, ['rx_low', 'rx_normal', 'port_up'])) {

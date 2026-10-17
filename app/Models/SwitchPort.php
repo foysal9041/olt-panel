@@ -39,6 +39,17 @@ class SwitchPort extends Model
         'rx_alarm' => 'boolean',
         'last_change_at' => 'datetime',
         'dom_updated_at' => 'datetime',
+        'in_octets' => 'integer',
+        'out_octets' => 'integer',
+        'octets_at' => 'integer',
+        'counter_bits' => 'integer',
+        'in_bps' => 'integer',
+        'out_bps' => 'integer',
+        'traffic_at' => 'datetime',
+        'util_alarm' => 'boolean',
+        'pkt_counters' => 'array',
+        'pkt_rates' => 'array',
+        'util_streak' => 'integer',
     ];
 
     public function networkSwitch()
@@ -97,5 +108,43 @@ class SwitchPort extends Model
         return $this->speed_mbps >= 1000
             ? rtrim(rtrim(number_format($this->speed_mbps / 1000, 1), '0'), '.') . 'G'
             : $this->speed_mbps . 'M';
+    }
+
+    public function traffic()
+    {
+        return $this->hasMany(SwitchPortTraffic::class);
+    }
+
+    /** The traffic rate is from a recent poll (not a port that stopped being polled). */
+    public function hasCurrentTraffic(): bool
+    {
+        return $this->in_bps !== null && $this->traffic_at && $this->traffic_at->gt(now()->subMinutes(5));
+    }
+
+    /** Share of the link speed in use by the busier direction, 0–100, or null. */
+    public function utilisation(): ?float
+    {
+        if (! $this->speed_mbps || ! $this->hasCurrentTraffic()) {
+            return null;
+        }
+
+        return min(100, max($this->in_bps, $this->out_bps) / ($this->speed_mbps * 1_000_000) * 100);
+    }
+
+    /** 1234567 → "1.23 Mbps" (bits, 1000 steps — as the graphs show them). */
+    public static function formatBps(?int $bps): string
+    {
+        if ($bps === null) {
+            return '—';
+        }
+        $units = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
+        $v = (float) $bps;
+        $i = 0;
+        while ($v >= 1000 && $i < count($units) - 1) {
+            $v /= 1000;
+            $i++;
+        }
+
+        return ($i === 0 ? (string) round($v) : number_format($v, $v >= 100 ? 0 : ($v >= 10 ? 1 : 2))) . ' ' . $units[$i];
     }
 }

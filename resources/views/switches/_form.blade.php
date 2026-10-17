@@ -9,6 +9,17 @@
 @endif
 
 <div class="row">
+    <div class="col-md-12 form-group">
+        <label class="d-block">Device type</label>
+        @foreach (\App\Models\NetworkSwitch::TYPES as $key => $label)
+            <div class="custom-control custom-radio custom-control-inline">
+                <input type="radio" id="type-{{ $key }}" name="device_type" value="{{ $key }}" class="custom-control-input" @checked(old('device_type', $switch->device_type ?? 'switch') === $key)>
+                <label class="custom-control-label" for="type-{{ $key }}"><i class="fas {{ $key === 'router' ? 'fa-route' : 'fa-server' }} mr-1"></i>{{ $label }}</label>
+            </div>
+        @endforeach
+        <small class="form-text text-muted">Both are polled over SNMP every minute (interfaces, status, traffic graphs). A router also lists its VLAN, bridge and tunnel interfaces — not per-client PPPoE sessions.</small>
+    </div>
+
     <div class="col-md-6 form-group">
         <label>Name</label>
         <input type="text" name="name" class="form-control" value="{{ old('name', $switch->name) }}"

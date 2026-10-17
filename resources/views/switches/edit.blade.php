@@ -1,9 +1,9 @@
 @extends('adminlte::page')
 
-@section('title', 'Edit Switch')
+@section('title', 'Edit ' . $switch->typeLabel())
 
 @section('content_header')
-<x-noc.header title="Edit Switch" subtitle="{{ $switch->name }} · {{ $switch->ip }}" :back="route('switches.show', $switch)" />
+<x-noc.header :title="'Edit ' . $switch->typeLabel()" subtitle="{{ $switch->name }} · {{ $switch->ip }}" :back="route('switches.show', $switch)" />
 @stop
 
 @section('content')
@@ -11,7 +11,7 @@
 <div class="card card-outline card-primary col-lg-9 px-0">
 
     <div class="card-header">
-        <h3 class="card-title">Switch &amp; SNMP Details</h3>
+        <h3 class="card-title">Device &amp; SNMP Details</h3>
     </div>
 
     <form method="POST" id="switch-form" action="{{ route('switches.update', $switch) }}">

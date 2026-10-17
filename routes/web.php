@@ -140,6 +140,52 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
         ->name('switches.ports.show')->middleware('can:access-olt-switches');
     Route::get('switches/{switch}/ports/{port}/history', [SwitchController::class, 'portHistoryData'])
         ->name('switches.ports.history')->middleware('can:access-olt-switches');
+    Route::get('switches/{switch}/ports/{port}/traffic', [\App\Http\Controllers\PortTrafficController::class, 'data'])
+        ->name('switches.ports.traffic')->middleware('can:access-olt-switches');
+    Route::get('switches/{switch}/traffic', [\App\Http\Controllers\PortTrafficController::class, 'index'])
+        ->name('switches.traffic')->middleware('can:access-olt-switches');
+    Route::get('switches/{switch}/cpu', [\App\Http\Controllers\PortTrafficController::class, 'cpu'])
+        ->name('switches.cpu')->middleware('can:access-olt-switches');
+
+    // Any port / device graph: the full graph page and its data (JSON or CSV).
+    Route::get('graph', [\App\Http\Controllers\GraphController::class, 'show'])
+        ->name('graph.show')->middleware('can:access-olt-switches');
+    Route::get('graph/data', [\App\Http\Controllers\GraphController::class, 'data'])
+        ->name('graph.data')->middleware('can:access-olt-switches');
+
+    // Graph dashboards (LibreNMS-style pages of chosen interfaces' traffic graphs).
+    Route::prefix('graphs')->name('graphs.')->middleware('can:access-olt-graphs')
+        ->controller(\App\Http\Controllers\GraphDashboardController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::post('add-port', 'addPort')->name('add-port');
+            Route::get('{dashboard}', 'show')->name('show');
+            Route::put('{dashboard}', 'update')->name('update');
+            Route::delete('{dashboard}', 'destroy')->name('destroy');
+            Route::post('{dashboard}/widgets', 'storeWidget')->name('widgets.store');
+            Route::put('{dashboard}/widgets/{widget}', 'updateWidget')->name('widgets.update');
+            Route::delete('{dashboard}/widgets/{widget}', 'destroyWidget')->name('widgets.destroy');
+            Route::post('{dashboard}/widgets/{widget}/move', 'moveWidget')->name('widgets.move');
+            Route::get('{dashboard}/widgets/{widget}/data', 'data')->name('widgets.data');
+        });
+
+    // Weathermaps: network maps whose links are coloured by live interface traffic.
+    Route::prefix('weathermaps')->name('maps.')->middleware('can:access-olt-maps')
+        ->controller(\App\Http\Controllers\WeathermapController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('{map}', 'show')->name('show');
+            Route::put('{map}', 'update')->name('update');
+            Route::delete('{map}', 'destroy')->name('destroy');
+            Route::get('{map}/data', 'data')->name('data');
+            Route::post('{map}/positions', 'positions')->name('positions');
+            Route::post('{map}/nodes', 'storeNode')->name('nodes.store');
+            Route::put('{map}/nodes/{node}', 'updateNode')->name('nodes.update');
+            Route::delete('{map}/nodes/{node}', 'destroyNode')->name('nodes.destroy');
+            Route::post('{map}/links', 'storeLink')->name('links.store');
+            Route::put('{map}/links/{link}', 'updateLink')->name('links.update');
+            Route::delete('{map}/links/{link}', 'destroyLink')->name('links.destroy');
+        });
 
 });
 

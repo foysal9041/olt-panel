@@ -377,8 +377,14 @@ return [
                 'submenu' => [
                     [
                         'text' => 'All Switches',
-                        'url'  => 'switches',
+                        'url'  => 'switches?type=switch',
                         'icon' => 'fas fa-list',
+                        'can'  => 'access-olt-switches',
+                    ],
+                    [
+                        'text' => 'Routers',
+                        'url'  => 'switches?type=router',
+                        'icon' => 'fas fa-route',
                         'can'  => 'access-olt-switches',
                     ],
                     [
@@ -388,6 +394,20 @@ return [
                         'can'  => 'access-olt-switches',
                     ],
                 ],
+            ],
+            [
+                'text' => 'Graph Dashboards',
+                'url'  => 'graphs',
+                'icon' => 'fas fa-chart-area',
+                'can'  => 'access-olt-graphs',
+                'active' => ['graphs', 'graphs/*'],
+            ],
+            [
+                'text' => 'Weathermaps',
+                'url'  => 'weathermaps',
+                'icon' => 'fas fa-project-diagram',
+                'can'  => 'access-olt-maps',
+                'active' => ['weathermaps', 'weathermaps/*'],
             ],
             [
                 'text' => 'Latency',

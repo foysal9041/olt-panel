@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', $switch->name.' — Switch')
+@section('title', $switch->name . ' — ' . $switch->typeLabel())
 
 @section('content_header')
 <x-noc.header :title="$switch->name" :back="route('switches.index')"
@@ -10,6 +10,7 @@
         @csrf
         <button class="btn btn-primary btn-sm" id="poll-btn"><i class="fas fa-sync-alt"></i> Poll Now</button>
     </form>
+    <a href="{{ route('switches.traffic', $switch) }}" class="btn btn-outline-success btn-sm"><i class="fas fa-chart-area"></i> Traffic graphs</a>
     <a href="{{ route('switches.edit', $switch) }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-edit"></i> Edit</a>
 </x-noc.header>
 @stop
@@ -113,6 +114,58 @@
     </div>
 </div>
 
+@php $graphTypes = $switch->graphTypes(); $sensors = $switch->sensors()->get(); @endphp
+<div class="card card-outline card-warning" id="device-graphs">
+    <div class="card-header d-flex align-items-center flex-wrap" style="gap:.5rem">
+        <h3 class="card-title mr-auto"><i class="fas fa-chart-area mr-1 text-warning"></i> Graphs</h3>
+        <span class="small" data-live="dev-now">
+            @if ($switch->hasCurrentCpu())
+                CPU <strong class="{{ $switch->cpu_percent >= 85 ? 'text-danger' : ($switch->cpu_percent >= 60 ? 'text-warning' : 'text-success') }}">{{ $switch->cpu_percent }}%</strong>
+            @endif
+            @if ($switch->mem_percent !== null)
+                <span class="ml-2">Memory <strong class="{{ $switch->mem_percent >= 90 ? 'text-danger' : ($switch->mem_percent >= 75 ? 'text-warning' : 'text-success') }}">{{ $switch->mem_percent }}%</strong></span>
+            @endif
+            @if ($switch->snmp_ms !== null)<span class="ml-2 text-muted">SNMP {{ $switch->snmp_ms }} ms</span>@endif
+        </span>
+    </div>
+    <div class="card-body">
+        @include('switches._periods', ['target' => '.dev-tg'])
+        <div class="row">
+            @foreach ($graphTypes as $gt)
+                <div class="col-md-6 col-xl-4 mb-3">
+                    <div class="dg-card">
+                        <a href="{{ route('graph.show', ['type' => $gt, 'id' => $switch->id]) }}" class="dg-title text-reset">{{ \App\Support\Ui::t(\App\Services\GraphEngine::TYPES[$gt][0]) }} <i class="fas fa-angle-right text-muted"></i></a>
+                        <div class="tg dev-tg" data-compact data-points="200" data-zoom data-url="{{ route('graph.data', ['type' => $gt, 'id' => $switch->id]) }}" data-graph="day"
+                             data-page-url="{{ route('graph.show', ['type' => $gt, 'id' => $switch->id]) }}">
+                            <div class="tg-plot" style="height:130px"><canvas></canvas></div>
+                            <div class="tg-legend"></div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        @if ($sensors->isNotEmpty())
+            <h6 class="font-weight-bold mt-1"><i class="fas fa-heartbeat text-danger mr-1"></i> Health</h6>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0" data-live-table="sensors">
+                    <thead class="thead-light"><tr><th>Sensor</th><th>Type</th><th class="text-right">Now</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach ($sensors as $sn)
+                            <tr data-key="{{ $sn->id }}">
+                                <td>{{ $sn->name }}</td>
+                                <td class="text-muted">{{ \App\Models\DeviceSensor::CLASSES[$sn->class][0] ?? $sn->class }}</td>
+                                <td class="text-right font-weight-bold">{{ $sn->formatted() }}</td>
+                                <td class="text-right"><a href="{{ route('graph.show', ['type' => 'device_' . $sn->class, 'id' => $switch->id]) }}" class="small"><i class="fas fa-chart-line"></i> Graph</a></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+</div>
+
 <div class="card card-outline card-primary">
 
     <div class="card-header">
@@ -137,6 +190,7 @@
                     <th>Description</th>
                     <th>Status</th>
                     <th>Speed</th>
+                    <th title="Traffic now (last minute): in / out">Traffic <small class="text-muted text-lowercase">in / out</small></th>
                     <th title="Current Rx, with the change over the last 24 hours">Rx (dBm) <small class="text-muted text-lowercase">24h Δ</small></th>
                     <th>Tx (dBm)</th>
                     <th>Temp (°C)</th>
@@ -173,6 +227,21 @@
                             @endif
                         </td>
                         <td>{{ $port->speed_label ?? '—' }}</td>
+                        <td class="text-nowrap">
+                            @if ($port->hasCurrentTraffic())
+                                <a href="{{ route('switches.ports.show', [$switch, $port]) }}#traffic" class="text-reset small" title="Traffic graphs">
+                                    <span class="text-success"><i class="fas fa-arrow-down"></i> {{ \App\Models\SwitchPort::formatBps($port->in_bps) }}</span><br>
+                                    <span class="text-primary"><i class="fas fa-arrow-up"></i> {{ \App\Models\SwitchPort::formatBps($port->out_bps) }}</span>
+                                </a>
+                                @if (($u = $port->utilisation()) !== null)
+                                    <div class="progress mt-1" style="height:3px; width:4.5rem" title="{{ number_format($u, 1) }}% of {{ $port->speed_label }}">
+                                        <div class="progress-bar {{ $u >= 90 ? 'bg-danger' : ($u >= 70 ? 'bg-warning' : 'bg-success') }}" style="width: {{ max(2, $u) }}%"></div>
+                                    </div>
+                                @endif
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         <td class="{{ $rxClass($port) }}" title="{{ $rxTitle($port) }}">
                             @if ($port->rx_power !== null)
                                 <a href="{{ route('switches.ports.show', [$switch, $port]) }}" class="text-reset">{{ $port->rx_power }}</a>
@@ -217,7 +286,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-4">
+                        <td colspan="12" class="text-center text-muted py-4">
                             No ports yet. Check the SNMP community and click <strong>Poll Now</strong>.
                         </td>
                     </tr>
@@ -252,6 +321,19 @@
 @stop
 
 @section('js')
+@include('switches._traffic-assets')
+<style>
+    .dg-card { height: 100%; padding: .5rem .6rem; border: 1px solid #eef2f7; border-radius: .5rem; }
+    .dg-title { display: inline-block; font-weight: 700; font-size: .9rem; margin-bottom: .2rem; }
+    .dg-card .tg-legend { font-size: .72rem; }
+</style>
+<script>
+(function () {
+    var graphs = Array.prototype.slice.call(document.querySelectorAll('.dev-tg'));
+    TrafficGraph.lazy(graphs);
+    setInterval(function () { if (!document.hidden) graphs.forEach(function (el) { if (el._data) TrafficGraph.load(el); }); }, 60000);
+})();
+</script>
 <script>
 LiveRefresh.start(30000);
 

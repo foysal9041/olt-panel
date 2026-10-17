@@ -21,8 +21,15 @@ class NetworkSwitch extends Model
         'generic'  => 'Other / Generic',
     ];
 
+    /** Switches and routers are polled the same way (SNMP); routers also list VLAN, bridge and tunnel interfaces. */
+    public const TYPES = [
+        'switch' => 'Switch',
+        'router' => 'Router',
+    ];
+
     protected $fillable = [
         'name',
+        'device_type',
         'ip',
         'zone',
         'vendor',
@@ -48,6 +55,12 @@ class NetworkSwitch extends Model
             'notify' => 'boolean',
             'status' => 'integer',
             'last_polled_at' => 'datetime',
+            'cpu_percent' => 'integer',
+            'cpu_at' => 'datetime',
+            'mem_percent' => 'integer',
+            'mem_total_bytes' => 'integer',
+            'snmp_ms' => 'integer',
+            'sensors_at' => 'datetime',
         ];
     }
 
@@ -56,12 +69,38 @@ class NetworkSwitch extends Model
         return [
             'community', 'created_at', 'updated_at', 'status', 'fail_count',
             'sys_name', 'sys_descr', 'uptime_seconds', 'last_polled_at', 'last_error',
+            'cpu_percent', 'cpu_source', 'cpu_at', 'mem_percent', 'mem_source', 'mem_total_bytes', 'snmp_ms', 'sensors_at',
         ];
     }
 
     public function ports()
     {
         return $this->hasMany(SwitchPort::class)->orderBy('if_index');
+    }
+
+    /** The device graphs worth showing, LibreNMS order (only what it reports). */
+    public function graphTypes(): array
+    {
+        $classes = $this->sensors()->reorder()->distinct()->pluck('class')->all();
+        $types = ['device_bits'];
+        if ($this->cpu_source && $this->cpu_source !== 'none') {
+            $types[] = 'device_cpu';
+        }
+        if ($this->mem_source && $this->mem_source !== 'none') {
+            $types[] = 'device_mem';
+        }
+        foreach (array_keys(DeviceSensor::CLASSES) as $class) {
+            if (in_array($class, $classes, true)) {
+                $types[] = 'device_' . $class;
+            }
+        }
+
+        return [...$types, 'device_uptime', 'device_snmp'];
+    }
+
+    public function sensors()
+    {
+        return $this->hasMany(DeviceSensor::class)->orderBy('class')->orderBy('name');
     }
 
     public function events()
@@ -72,6 +111,27 @@ class NetworkSwitch extends Model
     public function getVendorLabelAttribute(): string
     {
         return self::VENDORS[$this->vendor] ?? $this->vendor;
+    }
+
+    /** The CPU % is from a recent poll. */
+    public function hasCurrentCpu(): bool
+    {
+        return $this->cpu_percent !== null && $this->cpu_at && $this->cpu_at->gt(now()->subMinutes(5));
+    }
+
+    public function isRouter(): bool
+    {
+        return $this->device_type === 'router';
+    }
+
+    public function typeLabel(): string
+    {
+        return self::TYPES[$this->device_type] ?? self::TYPES['switch'];
+    }
+
+    public function scopeOfType(Builder $query, ?string $type): Builder
+    {
+        return array_key_exists((string) $type, self::TYPES) ? $query->where('device_type', $type) : $query;
     }
 
     public function getUptimeHumanAttribute(): ?string

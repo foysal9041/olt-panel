@@ -1,11 +1,15 @@
 @extends('adminlte::page')
 
-@section('title', 'Switches')
+@section('title', $type === 'router' ? 'Routers' : ($type === 'switch' ? 'Switches' : 'Switches & Routers'))
 
 @section('content_header')
-<x-noc.header title="Switches" icon="fas fa-server" subtitle="SNMP-monitored switches, ports and SFP transceivers">
+<x-noc.header :title="$type === 'router' ? 'Routers' : ($type === 'switch' ? 'Switches' : 'Switches & Routers')" :icon="$type === 'router' ? 'fas fa-route' : 'fas fa-server'"
+    subtitle="SNMP-monitored switches and routers: interfaces, traffic and SFP transceivers">
     <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm">
         <i class="fas fa-plus"></i> Add Switch
+    </a>
+    <a href="{{ route('switches.create', ['type' => 'router']) }}" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-plus"></i> Add Router
     </a>
 </x-noc.header>
 @stop
@@ -23,11 +27,17 @@
     @include('partials.telegram-off-banner')
 @endif
 
+<div class="btn-group btn-group-sm mb-3" role="group" aria-label="Device type">
+    <a href="{{ route('switches.index') }}" class="btn {{ $type ? 'btn-outline-secondary' : 'btn-primary' }}">All ({{ $counts->sum() }})</a>
+    <a href="{{ route('switches.index', ['type' => 'switch']) }}" class="btn {{ $type === 'switch' ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-server"></i> Switches ({{ $counts['switch'] ?? 0 }})</a>
+    <a href="{{ route('switches.index', ['type' => 'router']) }}" class="btn {{ $type === 'router' ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-route"></i> Routers ({{ $counts['router'] ?? 0 }})</a>
+</div>
+
 <div class="row" data-live="sw-stats">
     @foreach ([
-        ['Total Switches', $summary['total'], 'bg-info', 'fas fa-server'],
-        ['Switches Up', $summary['up'], 'bg-success', 'fas fa-check'],
-        ['Switches Down', $summary['down'], 'bg-danger', 'fas fa-times'],
+        ['Devices', $summary['total'], 'bg-info', 'fas fa-server'],
+        ['Up', $summary['up'], 'bg-success', 'fas fa-check'],
+        ['Down', $summary['down'], 'bg-danger', 'fas fa-times'],
         ['Ports Down (enabled)', $summary['ports_down'], 'bg-warning', 'fas fa-plug'],
     ] as [$label, $value, $bg, $icon])
         <div class="col-lg-3 col-6">
@@ -62,6 +72,7 @@
                     <th>Zone</th>
                     <th>Ports Up</th>
                     <th>SFP</th>
+                    <th>CPU</th>
                     <th>Uptime</th>
                     <th>Last Poll</th>
                     <th width="170">Actions</th>
@@ -82,6 +93,7 @@
                         </td>
                         <td>
                             <a href="{{ route('switches.show', $switch) }}"><strong>{{ $switch->name }}</strong></a>
+                            @if ($switch->isRouter())<span class="badge badge-light border ml-1"><i class="fas fa-route"></i> Router</span>@endif
                             @if ($switch->sys_name)
                                 <div class="small text-muted">{{ $switch->sys_name }}</div>
                             @endif
@@ -98,6 +110,13 @@
                                 <span class="badge badge-warning" title="Ports with low Rx power">
                                     <i class="fas fa-exclamation-triangle"></i> {{ $switch->ports_rx_alarm_count }}
                                 </span>
+                            @endif
+                        </td>
+                        <td data-order="{{ $switch->hasCurrentCpu() ? $switch->cpu_percent : -1 }}">
+                            @if ($switch->hasCurrentCpu())
+                                <span class="{{ $switch->cpu_percent >= 85 ? 'text-danger font-weight-bold' : ($switch->cpu_percent >= 60 ? 'text-warning font-weight-bold' : '') }}">{{ $switch->cpu_percent }}%</span>
+                            @else
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td data-order="{{ $switch->uptime_seconds ?? -1 }}">{{ $switch->uptime_human ?? '—' }}</td>

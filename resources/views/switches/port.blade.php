@@ -35,6 +35,86 @@
 
 @section('content')
 
+@if (session('success'))
+    <div class="alert alert-success d-flex align-items-center flex-wrap" style="gap:.5rem">
+        <span class="mr-auto">{{ session('success') }}</span>
+        @if (session('dashboard_link'))<a href="{{ session('dashboard_link') }}" class="btn btn-sm btn-light"><i class="fas fa-chart-area"></i> Open dashboard</a>@endif
+    </div>
+@endif
+@if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+@endif
+
+<div class="card card-outline card-success" id="traffic">
+    <div class="card-header d-flex align-items-center flex-wrap" style="gap:.5rem">
+        <h3 class="card-title mr-auto"><i class="fas fa-chart-area mr-1"></i> Traffic</h3>
+        @if ($port->hasCurrentTraffic())
+            <span class="small">
+                <span class="text-success"><i class="fas fa-arrow-down"></i> In <strong>{{ \App\Models\SwitchPort::formatBps($port->in_bps) }}</strong></span>
+                <span class="text-primary ml-2"><i class="fas fa-arrow-up"></i> Out <strong>{{ \App\Models\SwitchPort::formatBps($port->out_bps) }}</strong></span>
+                @if (($u = $port->utilisation()) !== null)<span class="text-muted ml-2" title="Share of the link speed in use">{{ number_format($u, 1) }}% / {{ $port->speed_label }}</span>@endif
+            </span>
+        @endif
+        @can('access-olt-graphs')
+            @php $editable = \App\Models\GraphDashboard::visibleTo(auth()->user())->with('roles')->orderBy('name')->get()->filter->canEdit(auth()->user()); @endphp
+            @if ($editable->isNotEmpty())
+                <form method="POST" action="{{ route('graphs.add-port') }}" class="d-flex align-items-center" style="gap:.25rem">
+                    @csrf
+                    <input type="hidden" name="switch_port_id" value="{{ $port->id }}">
+                    <select name="graph_dashboard_id" class="form-control form-control-sm" style="width:auto; max-width:12rem" aria-label="Dashboard">
+                        @foreach ($editable as $d)<option value="{{ $d->id }}">{{ $d->name }}</option>@endforeach
+                    </select>
+                    <button class="btn btn-outline-success btn-sm text-nowrap"><i class="fas fa-plus"></i> Add to dashboard</button>
+                </form>
+            @elseif (! auth()->user()->isViewer())
+                <a href="{{ route('graphs.index') }}" class="btn btn-outline-success btn-sm"><i class="fas fa-plus"></i> Make a graph dashboard</a>
+            @endif
+        @endcan
+    </div>
+    <div class="card-body">
+        @if ($port->counter_bits === null)
+            <div class="alert alert-light border small mb-3"><i class="fas fa-info-circle text-primary"></i> No traffic counters from this port yet — they are read on every poll (each minute), and the graphs fill in from then.</div>
+        @endif
+        @include('switches._periods', ['target' => 'port-tg'])
+        <div class="tg" id="port-tg" data-zoom data-url="{{ route('graph.data', ['type' => 'port_bits', 'id' => $port->id]) }}" data-graph="day"
+             data-page-url="{{ route('graph.show', ['type' => 'port_bits', 'id' => $port->id]) }}">
+            <div class="tg-head"></div>
+            <div class="tg-plot" style="height:280px"><canvas></canvas></div>
+            <div class="tg-legend tg-wrap"></div>
+        </div>
+        <div class="text-right mt-1">
+            <a href="{{ route('graph.show', ['type' => 'port_bits', 'id' => $port->id]) }}" class="small"><i class="fas fa-expand"></i> Full graph — custom range, zoom, export</a>
+        </div>
+
+        {{-- LibreNMS-style: every port graph, Day / Week / Month / Year --}}
+        @foreach (\App\Services\GraphEngine::PORT_GRAPHS as $gt)
+            <div class="pg-row">
+                <a href="{{ route('graph.show', ['type' => $gt, 'id' => $port->id]) }}" class="pg-title text-reset">{{ \App\Support\Ui::t(\App\Services\GraphEngine::TYPES[$gt][0]) }} <i class="fas fa-angle-right text-muted"></i></a>
+                <div class="row">
+                    @foreach (['day' => '24 Hours', 'week' => 'Weekly', 'month' => 'Monthly', 'year' => 'Yearly'] as $key => $label)
+                        <div class="col-6 col-xl-3">
+                            <a href="{{ route('graph.show', ['type' => $gt, 'id' => $port->id, 'graph' => $key]) }}" class="pg-thumb d-block text-reset" title="{{ $label }}">
+                                <div class="small text-muted">{{ \App\Support\Ui::t($label) }}</div>
+                                <div class="tg" data-compact data-points="120" data-url="{{ route('graph.data', ['type' => $gt, 'id' => $port->id]) }}" data-graph="{{ $key }}">
+                                    <div class="tg-plot" style="height:90px"><canvas></canvas></div>
+                                    <div class="tg-legend"></div>
+                                </div>
+                            </a>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endforeach
+
+        <div class="small text-muted mt-3">
+            <i class="fas fa-info-circle"></i>
+            In and out bits per second from the port's SNMP counters{{ $port->counter_bits ? ' (' . $port->counter_bits . '-bit)' : '' }}, read every minute.
+            1 hour to 48 hours show every minute (kept 3 days); Weekly uses 30-minute averages (45 days), Monthly 2-hour (400 days), Yearly daily (3 years).
+            Peaks inside each point show in the tooltip.
+        </div>
+    </div>
+</div>
+
 <div class="card card-outline card-primary">
     <div class="card-header d-flex align-items-center flex-wrap">
         <h3 class="card-title mr-auto"><i class="fas fa-chart-line mr-1"></i> Rx / Tx Power History</h3>
@@ -116,6 +196,18 @@
 @stop
 
 @section('js')
+@include('switches._traffic-assets')
+<style>
+    .pg-row { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #eef2f7; }
+    .pg-title { display: inline-block; font-weight: 700; margin-bottom: .35rem; }
+    .pg-thumb { padding: .25rem; border-radius: .4rem; }
+    .pg-thumb:hover { background: #f8fafc; box-shadow: 0 0 0 1px #cbd5e1; }
+    .pg-thumb .tg-legend { font-size: .7rem; }
+</style>
+<script>
+TrafficGraph.load(document.getElementById('port-tg'));
+TrafficGraph.lazy(Array.prototype.slice.call(document.querySelectorAll('.pg-row .tg')));
+</script>
 <script>
 (function () {
     var url = @json(route('switches.ports.history', [$switch, $port]));
