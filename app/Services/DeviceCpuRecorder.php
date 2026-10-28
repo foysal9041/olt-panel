@@ -81,7 +81,7 @@ class DeviceCpuRecorder
     public function prune(): int
     {
         $deleted = 0;
-        foreach (SwitchPortTraffic::RESOLUTIONS as $res => $days) {
+        foreach (SwitchPortTraffic::resolutions() as $res => $days) {
             do {
                 $n = DB::table('device_cpu')->where('res', $res)->where('at', '<', time() - $days * 86400)->limit(5000)->delete();
                 $deleted += $n;

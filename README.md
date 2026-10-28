@@ -24,6 +24,7 @@ Built with Laravel 12 (PHP 8.2+), MariaDB/MySQL, AdminLTE 3 and Chart.js.
 | **Inventory** | Products, stock in and out, and company assets |
 | **Tickets & tasks** | Support tickets, and tasks with a team board |
 | **Users** | Per-module and sub-module permissions, zone-limited access, activity log |
+| **Server settings** | The panel's address (the server's IP or a domain) and HTTPS (Let's Encrypt), changed from the browser. How long graph and monitoring history is kept, and auto delete. |
 | **Company branding** | Name, legal name, logos, favicon, colours, contact details, invoice-number prefix, footer and legal links. They appear on every page, invoice, receipt, letter, ID card and e-mail |
 
 ---
@@ -97,15 +98,16 @@ sudo bash install.sh
    - logo, square icon and favicon
    - colours
    - invoice-number prefix, copyright and footer lines, privacy and terms links
-3. **Settings → Email**: the SMTP mailbox used to send invoices and receipts to clients. It has a button for a test mail.
-4. **Settings → Telegram** and **WhatsApp**: where alerts go, and the alert thresholds.
-5. Add **zones**, then **OLTs**, **switches and routers** (SNMP v2c or v1 community), **NTTN links** and **latency targets**.
-6. **HR & Attendance**:
+3. **Settings → Server & HTTPS**: the panel's address (IP or domain), and HTTPS on or off. **Settings → Data Retention**: how many days of graph and monitoring history to keep.
+4. **Settings → Email**: the SMTP mailbox used to send invoices and receipts to clients. It has a button for a test mail.
+5. **Settings → Telegram** and **WhatsApp**: where alerts go, and the alert thresholds.
+6. Add **zones**, then **OLTs**, **switches and routers** (SNMP v2c or v1 community), **NTTN links** and **latency targets**.
+7. **HR & Attendance**:
    - Add employees with their device user ID.
    - Set **Duty Shifts** (start, end and grace period).
    - Set the weekly off day and the **Office Time** under Devices.
-7. **ZKTeco F18 devices**: on the device, open *Menu → COMM → Cloud Server Setting*. Set *Enable Domain Name* to Off, the server address to this server's IP, and the port to **80**. Then add the device under **HR & Attendance → Devices** with its serial number.
-8. **Users**: create accounts for staff and tick the modules each one can use.
+8. **ZKTeco F18 devices**: on the device, open *Menu → COMM → Cloud Server Setting*. Set *Enable Domain Name* to Off, the server address to this server's IP, and the port to **80**. Then add the device under **HR & Attendance → Devices** with its serial number.
+9. **Users**: create accounts for staff and tick the modules each one can use.
 
 ---
 
@@ -209,9 +211,56 @@ The backup file contains passwords. Keep it private, and delete copies you no lo
 
 ---
 
+## Address and HTTPS from the browser
+
+**Settings → Server & HTTPS** (admins, or users given the *Server* permission):
+
+- **Panel address:** either the server's IP, or a domain whose DNS A record already points to the server. The nginx site and `APP_URL` change together. After the change, open the panel at its new address.
+- **HTTPS:** turn it on or off. Turning it on gets a free Let's Encrypt certificate, which needs a domain address and port 80 open to the internet. The certificate renews by itself, and the page shows its expiry date. Plain HTTP stays open for `/iclock/` (the ZKTeco devices) and for certificate renewals. Everything else redirects to HTTPS.
+- If something is wrong, nothing is changed and the page says why. For example: the domain doesn't point here, nginx didn't accept the change, or an IP address can't have a certificate.
+
+How the browser is allowed to do this:
+
+- The web server isn't root. `install.sh` adds a small root helper, `/usr/local/sbin/olt-panel-admin` (from `deploy/olt-panel-admin`), and a sudoers rule. The rule lets the web server run that one file and nothing else.
+- The helper does four things only: `status`, `address <ip-or-domain>`, `ssl-on <email>` and `ssl-off`. It checks every argument itself, changes only its own nginx site (`/etc/nginx/sites-available/olt-panel.conf`) and `APP_URL`, and puts the old config back if nginx rejects the new one.
+- On a server where nginx was set up by hand, the page shows the address and certificate but doesn't change them.
+
+The same from the command line:
+
+```bash
+sudo olt-panel-admin status
+sudo olt-panel-admin address noc.example.com
+sudo olt-panel-admin ssl-on you@example.com
+sudo olt-panel-admin ssl-off
+```
+
+Changing the domain when updating is also possible: `sudo bash install.sh --domain=new.example.com`.
+
+---
+
+## Data retention
+
+**Settings → Data Retention** sets how many days of history are kept before it is deleted automatically, every night at 03:30. *Auto delete* can be switched off.
+
+| History | Default | Allowed |
+|---|---|---|
+| Graphs — every minute (1 h … 48 h graphs) | 3 days | 2–14 |
+| Graphs — 30-minute averages (weekly) | 45 days | 8–365 |
+| Graphs — 2-hour averages (monthly) | 400 days | 32–1100 |
+| Graphs — daily averages (yearly) | 1100 days | 366–3650 |
+| Latency checks | 30 days | 1–365 |
+| Optical Rx/Tx readings | 90 days | 7–730 |
+| Port up / down events | 90 days | 7–730 |
+
+- The page also shows how much disk each kind of history uses and its oldest record.
+- **Delete old data now** deletes what is past the kept days at once, instead of waiting for the night.
+- From the command line: `php artisan app:prune-data` (add `--force` to run it while auto delete is off).
+
+---
+
 ## HTTPS
 
-- **Let's Encrypt:** install with `--ssl --email=…`, or run the installer again later with them. The certificate renews automatically. Plain HTTP stays open only for `/iclock/` (the ZKTeco devices) and the certificate checks. Everything else redirects to HTTPS.
+- **Let's Encrypt:** turn it on in **Settings → Server & HTTPS**, or install with `--ssl --email=…`. The certificate renews automatically. Plain HTTP stays open only for `/iclock/` (the ZKTeco devices) and the certificate checks. Everything else redirects to HTTPS.
 - **Behind Cloudflare** with an Origin Certificate: `sudo bash deploy/enable-https.sh`. It asks for the certificate and key, takes the domain from `APP_URL` in `.env` (or `DOMAIN=…`), and writes the nginx site from `deploy/nginx/https-site.conf.template`. `deploy/enable-letsencrypt.sh` does the same with a Let's Encrypt certificate.
 
 ---
@@ -307,6 +356,9 @@ curl -fsSL https://raw.githubusercontent.com/foysal9041/olt-panel/master/install
 শেষে লগইনের ঠিকানা আর পাসওয়ার্ড দেখাবে। এগুলো `/root/olt-panel-install.txt`-এও সেভ থাকবে।
 
 - **এক ইনস্টলেশন = এক কোম্পানি:** প্রতিটি কোম্পানির নিজস্ব সার্ভার, ডোমেইন, ডাটাবেস আর ফাইল থাকবে। নাম, লোগো, রং, ঠিকানা, ইনভয়েস নম্বরের শুরু আর ফুটার দিতে হবে **Settings → Company Branding**-এ, কোড বদলাতে হবে না।
+- **ঠিকানা, HTTPS আর পুরনো ডেটা:**
+  - ব্রাউজার থেকেই **Settings → Server & HTTPS**-এ প্যানেলের ঠিকানা (সার্ভারের IP বা ডোমেইন) বদলানো যায়, আর HTTPS (Let's Encrypt) চালু বা বন্ধ করা যায়।
+  - **Settings → Data Retention**-এ ঠিক করা যায় গ্রাফ, লেটেন্সি, Rx/Tx আর পোর্ট ইভেন্ট কতদিন রেখে নিজে থেকে মুছবে।
 - **আপডেট:** `sudo bash /var/www/olt-panel/install.sh`।
   - আপডেটের আগে নিজে থেকেই ব্যাকআপ নেয় (`/var/backups/olt-panel`)।
   - ডাটা, সেটিংস আর ব্র্যান্ডিং যেমন আছে তেমনই থাকবে।

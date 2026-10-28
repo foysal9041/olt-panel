@@ -8,6 +8,8 @@
     ['settings.mail', 'settings.mail*', 'Email', 'fas fa-envelope', 'access-settings-mail'],
     ['settings', 'settings', 'General', 'fas fa-sliders-h', 'access-settings-general'],
     ['settings.branding', 'settings.branding*', 'Company Branding', 'fas fa-palette', 'access-settings-branding'],
+    ['settings.server', 'settings.server*', 'Server & HTTPS', 'fas fa-server', 'access-settings-server'],
+    ['settings.retention', 'settings.retention*', 'Data Retention', 'fas fa-broom', 'access-settings-server'],
     ['profile.edit', 'profile.edit', 'My Profile', 'fas fa-user-circle', null],
     ['profile.activity', 'profile.activity', 'My Activity', 'fas fa-user-clock', null],
 ]">

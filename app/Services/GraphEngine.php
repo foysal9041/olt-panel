@@ -73,7 +73,7 @@ class GraphEngine
             $to = min($to, $now);
             $from = min($from, $to - 300);
             $res = 1440;
-            foreach (SwitchPortTraffic::RESOLUTIONS as $r => $days) {
+            foreach (SwitchPortTraffic::resolutions() as $r => $days) {
                 if ($now - $from <= $days * 86400 && ($to - $from) / ($r * 60) <= 3000) {
                     $res = $r;
                     break;

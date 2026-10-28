@@ -149,7 +149,7 @@ class PortTrafficRecorder
     public function prune(): int
     {
         $deleted = 0;
-        foreach (SwitchPortTraffic::RESOLUTIONS as $res => $days) {
+        foreach (SwitchPortTraffic::resolutions() as $res => $days) {
             $cutoff = time() - $days * 86400;
             do {
                 $n = SwitchPortTraffic::where('res', $res)->where('at', '<', $cutoff)->limit(5000)->delete();

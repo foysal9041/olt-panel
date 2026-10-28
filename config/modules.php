@@ -106,6 +106,7 @@ return [
         'submodules' => [
             'general'  => 'General',
             'branding' => 'Company Branding (name, logos, colours)',
+            'server'   => 'Server: address (IP / domain), HTTPS and data retention',
             'users'    => 'User Management',
             'telegram' => 'Telegram Alerts',
             'mail'     => 'Email (invoices & receipts to clients)',

@@ -651,6 +651,18 @@ return [
                 'can'  => 'access-settings-branding',
             ],
             [
+                'text' => 'Server & HTTPS',
+                'url'  => 'settings/server',
+                'icon' => 'fas fa-server',
+                'can'  => 'access-settings-server',
+            ],
+            [
+                'text' => 'Data Retention',
+                'url'  => 'settings/retention',
+                'icon' => 'fas fa-broom',
+                'can'  => 'access-settings-server',
+            ],
+            [
                 'text' => 'Users & Roles',
                 'url'  => 'users',
                 'icon' => 'fas fa-user-shield',

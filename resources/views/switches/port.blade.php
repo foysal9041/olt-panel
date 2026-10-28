@@ -143,7 +143,7 @@
 
         <div class="small text-muted mt-3">
             <i class="fas fa-info-circle"></i>
-            Recorded every minute while the module reports DOM readings, kept for {{ \App\Models\SwitchPortReading::RETENTION_DAYS }} days.
+            Recorded every minute while the module reports DOM readings, kept for {{ \App\Support\Retention::days('port_readings') }} days.
             @if ($firstReading)
                 History starts {{ \Illuminate\Support\Carbon::parse($firstReading)->format('d M Y, h:i A') }}.
             @endif

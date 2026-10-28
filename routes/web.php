@@ -221,6 +221,18 @@ Route::middleware(['auth', 'can:access-settings-branding'])->prefix('settings')-
     Route::put('branding', [\App\Http\Controllers\BrandingController::class, 'update'])->name('branding.update');
 });
 
+// Settings → Server & HTTPS (address, certificate) and Data Retention (how long history is kept).
+Route::middleware(['auth', 'can:access-settings-server'])->prefix('settings')->name('settings.')
+    ->controller(\App\Http\Controllers\ServerSettingsController::class)->group(function () {
+        Route::get('server', 'server')->name('server');
+        Route::post('server/address', 'address')->name('server.address')->middleware('throttle:10,1,server');
+        Route::post('server/ssl-on', 'sslOn')->name('server.ssl-on')->middleware('throttle:10,1,server');
+        Route::post('server/ssl-off', 'sslOff')->name('server.ssl-off')->middleware('throttle:10,1,server');
+        Route::get('retention', 'retention')->name('retention');
+        Route::put('retention', 'updateRetention')->name('retention.update');
+        Route::post('retention/prune', 'pruneNow')->name('retention.prune')->middleware('throttle:5,1,prune');
+    });
+
 // The company's logo, mark, grey mark and favicon — public (sign-in page, e-mails).
 Route::get('brand/{which}', [\App\Http\Controllers\BrandingController::class, 'asset'])
     ->whereIn('which', \App\Services\BrandAssets::WHICH)->name('brand.asset');

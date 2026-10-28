@@ -23,6 +23,12 @@ class SwitchPortTraffic extends Model
     /** Bucket size in minutes => days kept. */
     public const RESOLUTIONS = [1 => 3, 30 => 45, 120 => 400, 1440 => 1100];
 
+    /** Bucket minutes => days kept, as set under Settings → Data Retention (defaults: RESOLUTIONS). */
+    public static function resolutions(): array
+    {
+        return \App\Support\Retention::graphResolutions();
+    }
+
     /** Graph periods: key => [title, span in seconds, bucket minutes]. Up to 48 hours uses the 1-minute buckets (kept 3 days). */
     public const GRAPHS = [
         'hour' => ['1 Hour', 3600, 1],

@@ -163,6 +163,11 @@ if [[ "$UPDATING" == yes ]]; then
 fi
 
 SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+DOMAIN_GIVEN="$DOMAIN"
+# Updating: the address is the one already in use, unless --domain changes it.
+if [[ "$UPDATING" == yes && -z "$DOMAIN" ]]; then
+    DOMAIN="$(env_value APP_URL "$APP_DIR/.env" | sed -E 's#^https?://##; s#[/:].*$##')"
+fi
 
 echo "${B}OLT Panel installer${N} — $PRETTY_NAME"
 if [[ "$UPDATING" == yes ]]; then
@@ -192,10 +197,15 @@ DOMAIN="${DOMAIN:-$SERVER_IP}"
 step "Installing system packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git unzip openssl perl gnupg lsb-release cron \
-    nginx mariadb-server mariadb-client iputils-ping snmp >/dev/null
+apt-get install -y -qq ca-certificates curl git unzip openssl perl gnupg lsb-release cron sudo \
+    nginx mariadb-server mariadb-client iputils-ping snmp certbot >/dev/null
 
-# PHP: the system's own when it is 8.2 or newer, else from the well-known Sury / Ondřej repository.
+# PHP: an update keeps the version already in use; a new install takes the system's own when
+# it is 8.2 or newer, else 8.3 from the well-known Sury / Ondřej repository.
+if [[ -z "$PHP_VERSION" && "$UPDATING" == yes ]]; then
+    PHP_VERSION="$(sed -n 's/^PHP_VERSION=//p' /etc/olt-panel/admin.conf 2>/dev/null | tail -n1)"
+    [[ -n "$PHP_VERSION" ]] || PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2>/dev/null || true)"
+fi
 if [[ -z "$PHP_VERSION" ]]; then
     PHP_VERSION="$(apt-cache policy php 2>/dev/null | awk '/Candidate:/ {print $2}' | sed -E 's/^[0-9]+://; s/^([0-9]+\.[0-9]+).*/\1/')"
 fi
@@ -325,7 +335,7 @@ SQL
 
     step "Writing the settings (.env)"
     cp "$APP_DIR/.env.example" "$APP_DIR/.env"
-    SCHEME=http; [[ "$SSL" == yes ]] && SCHEME=https
+    SCHEME=http   # https once a certificate is in (olt-panel-admin ssl-on)
     set_env APP_NAME "${COMPANY:-$APP_NAME}"
     set_env APP_ENV production
     set_env APP_DEBUG false
@@ -402,102 +412,51 @@ CRON
     chmod 644 /etc/cron.d/olt-panel
 fi
 
+# ---- The root helper: address and HTTPS, also from the panel (Settings → Server & HTTPS) ----
+
+HELPER=/usr/local/sbin/olt-panel-admin
+install -m 755 -o root -g root "$APP_DIR/deploy/olt-panel-admin" "$HELPER"
+install -d -m 755 /etc/olt-panel
+cat > /etc/olt-panel/admin.conf <<CONF
+# OLT Panel (install.sh): read by $HELPER.
+APP_DIR=$APP_DIR
+PHP_VERSION=$PHP_VERSION
+RUN_AS=$RUN_AS
+CONF
+chmod 644 /etc/olt-panel/admin.conf
+# The web server may run that one file as root — nothing else.
+SUDOERS_TMP="$(mktemp)"
+printf '# OLT Panel (install.sh): the panel changes its address and HTTPS through this helper only.\n%s ALL=(root) NOPASSWD: %s\n' "$WEB_USER" "$HELPER" > "$SUDOERS_TMP"
+if visudo -cqf "$SUDOERS_TMP"; then
+    install -m 440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/olt-panel
+else
+    warn "couldn't add the sudoers rule — address and HTTPS can't be changed from the panel."
+fi
+rm -f "$SUDOERS_TMP"
+
 # ---- nginx ------------------------------------------------------------------------
 
 SITE=/etc/nginx/sites-available/olt-panel.conf
-php_block() {
-    cat <<NGINX
-    root $APP_DIR/public;
-    index index.php;
-    charset utf-8;
-    client_max_body_size 20m;
-
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
-        fastcgi_read_timeout 120;
-    }
-
-    # Never serve dotfiles (.env, .git, …).
-    location ~ /\.(?!well-known) {
-        deny all;
-    }
-NGINX
-}
-write_http_site() {
-    { echo "# OLT Panel (install.sh). ZKTeco attendance devices push to http://<this server>/iclock/…"
-      echo "server {"
-      echo "    listen 80$DEFAULT;"
-      echo "    listen [::]:80$DEFAULT;"
-      echo "    server_name $DOMAIN _;"
-      php_block
-      echo "}"; } > "$SITE"
-}
-write_https_site() {
-    { echo "# OLT Panel (install.sh): HTTPS, plus plain HTTP for the ZKTeco devices and certificate renewals."
-      echo "server {"
-      echo "    listen 80$DEFAULT;"
-      echo "    listen [::]:80$DEFAULT;"
-      echo "    server_name $DOMAIN _;"
-      php_block | sed '/^    location \/ {/,/^    }/d'
-      echo "    location /iclock/ {"
-      echo "        try_files \$uri /index.php?\$query_string;"
-      echo "    }"
-      echo "    location /.well-known/acme-challenge/ {"
-      echo "        try_files \$uri =404;"
-      echo "    }"
-      echo "    location / {"
-      echo "        return 301 https://$DOMAIN\$request_uri;"
-      echo "    }"
-      echo "}"
-      echo
-      echo "server {"
-      echo "    listen 443 ssl http2;"
-      echo "    listen [::]:443 ssl http2;"
-      echo "    server_name $DOMAIN;"
-      echo "    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;"
-      echo "    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;"
-      echo "    ssl_protocols TLSv1.2 TLSv1.3;"
-      php_block
-      echo "}"; } > "$SITE"
-}
-
-if [[ "$UPDATING" != yes || ! -f "$SITE" ]] && [[ -z "$(grep -rl "root $APP_DIR/public" /etc/nginx/sites-enabled/ 2>/dev/null | grep -v olt-panel.conf || true)" ]]; then
-    step "Configuring nginx"
-    rm -f /etc/nginx/sites-enabled/default
-    # The panel answers on the bare IP too (the ZKTeco devices use it) — unless another site already does.
-    DEFAULT=" default_server"
-    grep -rlsE 'listen[^;]*default_server' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | grep -qv 'olt-panel.conf$' && DEFAULT=""
-    write_http_site
-    ln -sf "$SITE" /etc/nginx/sites-enabled/olt-panel.conf
-    nginx -t -q || die "nginx didn't accept the configuration (see above)."
-    systemctl reload nginx
-
+if [[ ! -f "$SITE" && -n "$(grep -rl "root $APP_DIR/public" /etc/nginx/sites-enabled/ 2>/dev/null || true)" ]]; then
+    info "nginx already serves $APP_DIR (set up by hand) — left as it is; the panel can't change its address or HTTPS."
+else
+    if [[ ! -f "$SITE" ]]; then
+        step "Configuring nginx"
+        rm -f /etc/nginx/sites-enabled/default
+        "$HELPER" address "$DOMAIN" --create | sed 's/^/    /'
+    elif [[ "$UPDATING" == yes && -n "$DOMAIN_GIVEN" ]]; then
+        step "Changing the panel's address to $DOMAIN_GIVEN"
+        "$HELPER" address "$DOMAIN_GIVEN" | sed 's/^/    /'
+        DOMAIN="$DOMAIN_GIVEN"
+    fi
     if [[ "$SSL" == yes ]]; then
         step "Getting a Let's Encrypt certificate for $DOMAIN"
-        apt-get install -y -qq certbot >/dev/null
-        if certbot certonly --webroot -w "$APP_DIR/public" -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive \
-                --deploy-hook "systemctl reload nginx" >/dev/null; then
-            write_https_site
-            nginx -t -q || die "nginx didn't accept the HTTPS configuration (see above)."
-            systemctl reload nginx
-            info "HTTPS is on; certbot renews it by itself."
+        if "$HELPER" ssl-on "$EMAIL" | sed 's/^/    /'; then
+            info "certbot renews it by itself."
         else
-            warn "Let's Encrypt didn't issue a certificate (is $DOMAIN pointing to this server, port 80 open?). The panel stays on plain HTTP; run the installer again with --ssl to retry."
-            set_env APP_URL "http://$DOMAIN"
-            artisan optimize -q
+            warn "The panel stays on plain HTTP. Turn HTTPS on later in Settings → Server & HTTPS (or run the installer again with --ssl)."
         fi
     fi
-else
-    info "nginx already serves $APP_DIR — left as it is."
 fi
 
 if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then

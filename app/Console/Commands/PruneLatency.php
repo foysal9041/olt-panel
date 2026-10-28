@@ -13,7 +13,7 @@ class PruneLatency extends Command
 
     public function handle()
     {
-        $cutoff = now()->subDays(config('latency.retention_days'));
+        $cutoff = now()->subDays(\App\Support\Retention::days('latency'));
         $deleted = 0;
 
         // Chunked so a big backlog doesn't lock the table for long.

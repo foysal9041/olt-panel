@@ -13,8 +13,6 @@ Schedule::command('app:probe-latency')
     ->withoutOverlapping()
     ->runInBackground();
 
-Schedule::command('app:prune-latency')
-    ->dailyAt('03:15');
 
 Schedule::command('app:check-nttn-links')
     ->everyMinute()
@@ -26,26 +24,11 @@ Schedule::command('app:poll-switches')
     ->withoutOverlapping()
     ->runInBackground();
 
-// Keep 90 days of switch port/status history.
-Schedule::call(fn () => \App\Models\SwitchEvent::where('occurred_at', '<', now()->subDays(90))->delete())
-    ->name('prune-switch-events')
-    ->dailyAt('03:30');
-
-// Rx/Tx history: delete in chunks so a large backlog doesn't lock the table.
-Schedule::call(function () {
-    $cutoff = now()->subDays(\App\Models\SwitchPortReading::RETENTION_DAYS);
-
-    do {
-        $deleted = \App\Models\SwitchPortReading::where('recorded_at', '<', $cutoff)->limit(5000)->delete();
-    } while ($deleted > 0);
-})
-    ->name('prune-switch-port-readings')
-    ->dailyAt('03:45');
-
-// Traffic graph buckets past what each resolution keeps (1-minute: 3 days … daily: 3 years).
-Schedule::call(fn () => app(\App\Services\PortTrafficRecorder::class)->prune() + app(\App\Services\DeviceCpuRecorder::class)->prune() + app(\App\Services\MetricStore::class)->prune())
-    ->name('prune-port-traffic')
-    ->dailyAt('03:55');
+// Old history — graphs, latency checks, optical readings, port events — past
+// what Settings → Data Retention keeps (skipped while auto delete is off).
+Schedule::command('app:prune-data')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();
 
 // Employees past their last working day (termination letter): mark them
 // inactive and block their panel login.

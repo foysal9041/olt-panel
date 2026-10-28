@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+#
+# OLT Panel's root helper: the panel's address (domain or IP) and HTTPS.
+# The panel (Settings → Server & HTTPS) runs it through sudo — only this file,
+# only these commands; every argument is checked here.
+#
+#   olt-panel-admin status
+#   olt-panel-admin address <domain-or-ip> [--create]
+#   olt-panel-admin ssl-on <email>
+#   olt-panel-admin ssl-off
+#
+# install.sh puts it in /usr/local/sbin with /etc/olt-panel/admin.conf and the
+# sudoers rule /etc/sudoers.d/olt-panel. It only touches the nginx site it
+# made (/etc/nginx/sites-available/olt-panel.conf) and APP_URL in .env.
+set -Eeuo pipefail
+umask 022
+
+CONF=/etc/olt-panel/admin.conf
+SITE=/etc/nginx/sites-available/olt-panel.conf
+SITE_LINK=/etc/nginx/sites-enabled/olt-panel.conf
+
+fail() { echo "ERROR: $*" >&2; exit 1; }
+LOG="$(mktemp)"
+trap 'rm -f "$LOG"' EXIT
+say() { echo "$*"; }
+
+[[ $EUID -eq 0 ]] || fail "run as root (sudo)."
+[[ -f "$CONF" && "$(stat -c %u "$CONF")" == 0 && ! "$(stat -c %A "$CONF")" =~ ^.....w|^........w ]] || fail "$CONF is missing or not root's own."
+
+# The settings file is parsed, not sourced.
+conf() { sed -n "s/^$1=//p" "$CONF" | tail -n1; }
+APP_DIR="$(conf APP_DIR)"
+PHP_VERSION="$(conf PHP_VERSION)"
+RUN_AS="$(conf RUN_AS)"
+[[ "$APP_DIR" =~ ^/[A-Za-z0-9._/-]+$ && -f "$APP_DIR/artisan" ]] || fail "APP_DIR in $CONF isn't the panel."
+[[ "$PHP_VERSION" =~ ^[0-9]+\.[0-9]+$ ]] || fail "PHP_VERSION in $CONF looks wrong."
+[[ "$RUN_AS" =~ ^[a-z_][a-z0-9_-]*$ ]] && id "$RUN_AS" >/dev/null 2>&1 || fail "RUN_AS in $CONF isn't a user."
+ENV_FILE="$APP_DIR/.env"
+
+# ---- Checks of what the panel sends ------------------------------------------------
+
+is_ip() { [[ "$1" =~ ^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$ ]]; }
+is_domain() { [[ ${#1} -le 253 && "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]; }
+is_email() { [[ ${#1} -le 254 && "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; }
+
+# ---- .env ---------------------------------------------------------------------------
+
+env_value() { local v; v="$(grep -E "^$1=" "$ENV_FILE" | tail -n1 | cut -d= -f2-)" || true; v="${v#\"}"; printf '%s' "${v%\"}"; }
+set_app_url() {
+    local url="$1"
+    if grep -qE '^APP_URL=' "$ENV_FILE"; then
+        URL="$url" perl -0pi -e 's/^APP_URL=.*$/APP_URL=$ENV{URL}/m' "$ENV_FILE"
+    else
+        printf 'APP_URL=%s\n' "$url" >> "$ENV_FILE"
+    fi
+    # New settings in effect (config cache), as the user the app runs as.
+    (cd "$APP_DIR" && runuser -u "$RUN_AS" -- php artisan optimize -q) || true
+}
+current_host() { env_value APP_URL | sed -E 's#^https?://##; s#[/:].*$##'; }
+ssl_on() { [[ -f "$SITE" ]] && grep -q 'listen 443 ssl' "$SITE"; }
+cert_for() { [[ -s "/etc/letsencrypt/live/$1/fullchain.pem" && -s "/etc/letsencrypt/live/$1/privkey.pem" ]]; }
+
+# ---- nginx ----------------------------------------------------------------------------
+
+php_block() {
+    cat <<NGINX
+    root $APP_DIR/public;
+    index index.php;
+    charset utf-8;
+    client_max_body_size 20m;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php$PHP_VERSION-fpm.sock;
+        fastcgi_read_timeout 240;
+    }
+
+    # Never serve dotfiles (.env, .git, …).
+    location ~ /\.(?!well-known) {
+        deny all;
+    }
+NGINX
+}
+
+# The panel answers on the bare IP too (the ZKTeco devices use it), unless another site already does.
+default_flag() {
+    if grep -rlsE 'listen[^;]*default_server' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | grep -qv 'olt-panel.conf$'; then
+        echo ""
+    else
+        echo " default_server"
+    fi
+}
+
+http_site() { # http_site HOST
+    local d; d="$(default_flag)"
+    echo "# OLT Panel (olt-panel-admin). ZKTeco attendance devices push to http://<this server>/iclock/…"
+    echo "server {"
+    echo "    listen 80$d;"
+    echo "    listen [::]:80$d;"
+    echo "    server_name $1 _;"
+    php_block
+    echo "}"
+}
+
+https_site() { # https_site HOST — HTTPS, plus plain HTTP for the ZKTeco devices and certificate renewals
+    local d; d="$(default_flag)"
+    echo "# OLT Panel (olt-panel-admin): HTTPS for $1."
+    echo "server {"
+    echo "    listen 80$d;"
+    echo "    listen [::]:80$d;"
+    echo "    server_name $1 _;"
+    php_block | sed '/^    location \/ {/,/^    }/d'
+    echo "    location /iclock/ {"
+    echo "        try_files \$uri /index.php?\$query_string;"
+    echo "    }"
+    echo "    location /.well-known/acme-challenge/ {"
+    echo "        try_files \$uri =404;"
+    echo "    }"
+    echo "    location / {"
+    echo "        return 301 https://$1\$request_uri;"
+    echo "    }"
+    echo "}"
+    echo
+    echo "server {"
+    echo "    listen 443 ssl http2;"
+    echo "    listen [::]:443 ssl http2;"
+    echo "    server_name $1;"
+    echo "    ssl_certificate /etc/letsencrypt/live/$1/fullchain.pem;"
+    echo "    ssl_certificate_key /etc/letsencrypt/live/$1/privkey.pem;"
+    echo "    ssl_protocols TLSv1.2 TLSv1.3;"
+    php_block
+    echo "}"
+}
+
+# Write the site; if nginx doesn't accept it, put the old one back.
+apply_site() { # apply_site < new config
+    local tmp backup
+    tmp="$(mktemp)"; cat > "$tmp"
+    backup=""
+    [[ -f "$SITE" ]] && { backup="$(mktemp)"; cp -a "$SITE" "$backup"; }
+    install -m 644 "$tmp" "$SITE"
+    ln -sfn "$SITE" "$SITE_LINK"
+    rm -f "$tmp"
+    if ! nginx -t -q 2>"$LOG"; then
+        if [[ -n "$backup" ]]; then cp -a "$backup" "$SITE"; else rm -f "$SITE" "$SITE_LINK"; fi
+        rm -f "$backup"
+        fail "nginx didn't accept the new configuration — nothing changed. $(tr '\n' ' ' < "$LOG" | cut -c1-300)"
+    fi
+    rm -f "$backup"
+    systemctl reload nginx
+}
+
+certificate() { # certificate HOST [EMAIL]
+    command -v certbot >/dev/null || { DEBIAN_FRONTEND=noninteractive apt-get install -y -qq certbot >/dev/null 2>&1 || fail "certbot isn't installed and couldn't be installed."; }
+    local account=(--register-unsafely-without-email)
+    [[ -n "${2:-}" ]] && account=(--email "$2")
+    install -d -m 755 "$APP_DIR/public/.well-known/acme-challenge"
+    certbot certonly --webroot -w "$APP_DIR/public" -d "$1" --non-interactive --agree-tos "${account[@]}" \
+        --keep-until-expiring --deploy-hook "systemctl reload nginx" >"$LOG" 2>&1 && cert_for "$1"
+}
+
+need_managed() {
+    [[ -f "$SITE" ]] || fail "nginx on this server isn't set up by the installer (no $SITE), so the address and HTTPS are managed outside the panel."
+}
+
+# ---- Commands -------------------------------------------------------------------------------
+
+cmd="${1:-}"
+case "$cmd" in
+    status)
+        host="$(current_host)"
+        echo "managed=$([[ -f "$SITE" ]] && echo yes || echo no)"
+        echo "app_url=$(env_value APP_URL)"
+        echo "host=$host"
+        echo "ssl=$(ssl_on && echo on || echo off)"
+        if [[ -n "$host" ]] && cert_for "$host"; then
+            echo "cert_expiry=$(date -d "$(openssl x509 -in "/etc/letsencrypt/live/$host/fullchain.pem" -noout -enddate | cut -d= -f2)" +%Y-%m-%d)"
+        fi
+        echo "certbot=$(command -v certbot >/dev/null && echo yes || echo no)"
+        echo "ips=$(hostname -I 2>/dev/null | xargs)"
+        ;;
+
+    address)
+        host="$(printf '%s' "${2:-}" | tr '[:upper:]' '[:lower:]')"
+        is_ip "$host" || is_domain "$host" || fail "\"${2:-}\" isn't a domain name (panel.example.com) or an IPv4 address."
+        [[ "${3:-}" == --create ]] || need_managed
+        if ssl_on && is_domain "$host" && { cert_for "$host" || certificate "$host"; }; then
+            https_site "$host" | apply_site
+            set_app_url "https://$host"
+            say "The panel's address is now https://$host"
+        else
+            was_ssl=no; ssl_on && was_ssl=yes
+            http_site "$host" | apply_site
+            set_app_url "http://$host"
+            say "The panel's address is now http://$host"
+            if [[ "$was_ssl" == yes ]]; then
+                say "HTTPS is off: $(is_ip "$host" && echo 'an IP address cannot have a certificate' || echo "no certificate could be issued for $host — turn HTTPS on again once the domain points here")."
+            fi
+        fi
+        ;;
+
+    ssl-on)
+        need_managed
+        email="${2:-}"
+        [[ -z "$email" ]] || is_email "$email" || fail "\"$email\" isn't an e-mail address."
+        host="$(current_host)"
+        is_domain "$host" || fail "HTTPS needs a domain name — set the panel's address to a domain first (now: ${host:-none})."
+        if ! cert_for "$host" && ! certificate "$host" "$email"; then
+            fail "Let's Encrypt didn't issue a certificate for $host. Check that the domain points to this server and port 80 is open. $(grep -iE 'error|detail|problem' "$LOG" | tail -n2 | tr '\n' ' ' | cut -c1-300)"
+        fi
+        https_site "$host" | apply_site
+        set_app_url "https://$host"
+        say "HTTPS is on: https://$host (certificate until $(date -d "$(openssl x509 -in "/etc/letsencrypt/live/$host/fullchain.pem" -noout -enddate | cut -d= -f2)" +%d\ %b\ %Y); renews by itself)."
+        ;;
+
+    ssl-off)
+        need_managed
+        host="$(current_host)"
+        [[ -n "$host" ]] || fail "APP_URL in .env has no host."
+        http_site "$host" | apply_site
+        set_app_url "http://$host"
+        say "HTTPS is off: http://$host"
+        ;;
+
+    *)
+        echo "usage: olt-panel-admin status | address <domain-or-ip> | ssl-on <email> | ssl-off" >&2
+        exit 2
+        ;;
+esac
+exit 0
