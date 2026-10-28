@@ -56,6 +56,74 @@
 
 </div>
 
+<div class="card card-outline card-primary">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-users mr-1"></i> Summary — {{ $start->format('d M Y') }} to {{ $end->format('d M Y') }}</h3>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="thead-light">
+                <tr>
+                    <th class="pl-3">Employee</th>
+                    <th class="text-center">Present</th>
+                    <th class="text-center">Late days</th>
+                    <th class="text-right">Late time</th>
+                    <th class="text-center">Absent</th>
+                    <th class="text-center">On Leave</th>
+                    <th class="text-center" title="Weekly off days they came in">Off days worked</th>
+                    <th class="text-right" title="After the shift's end on working days, plus whole weekly off days">Extra duty</th>
+                    <th class="text-right pr-3">Hours worked</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($reportEmployees as $employee)
+                    @php $t = $totals[$employee->id] ?? null; @endphp
+                    @continue(! $t)
+                    <tr>
+                        <td class="pl-3">{{ $employee->name }}</td>
+                        <td class="text-center">{{ $t['present'] }}</td>
+                        <td class="text-center">{{ $t['late'] ?: '' }}</td>
+                        <td class="text-right {{ $t['late_minutes'] ? 'text-warning font-weight-bold' : '' }}">{{ $t['late_minutes'] ? \App\Support\Ui::minutes($t['late_minutes']) : '' }}</td>
+                        <td class="text-center {{ $t['absent'] ? 'text-danger' : '' }}">{{ $t['absent'] ?: '' }}</td>
+                        <td class="text-center">{{ $t['leave'] ?: '' }}</td>
+                        <td class="text-center {{ $t['overtime_days'] ? 'text-primary font-weight-bold' : '' }}">{{ $t['overtime_days'] ?: '' }}</td>
+                        <td class="text-right">
+                            @if ($t['extra_minutes'])
+                                <span class="text-primary font-weight-bold">{{ \App\Support\Ui::minutes($t['extra_minutes']) }}</span>
+                                @if ($t['extra_offday'] && $t['extra_shift'])
+                                    <div class="small text-muted">{{ \App\Support\Ui::minutes($t['extra_shift']) }} + {{ \App\Support\Ui::minutes($t['extra_offday']) }} {{ \App\Support\Ui::t('off day') }}</div>
+                                @endif
+                            @endif
+                        </td>
+                        <td class="text-right pr-3">{{ $t['hours'] ? number_format($t['hours'], 1) . ' hrs' : '-' }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer small text-muted">
+        <i class="fas fa-info-circle"></i> Check-in is the day's first punch and check-out its last. Late time runs from the shift's start to the check-in, on days past the grace period. Extra duty is the time from the shift's end to the check-out, and on the weekly off day all of that day's hours.
+        @if ($officeTime)
+            <div class="mt-1">
+                <i class="fas fa-clock"></i>
+                {{ \App\Support\Ui::t('Office time:') }} <strong>{{ $officeTime }}</strong> —
+                {{ \App\Support\Ui::t('punches outside it are not counted.') }}
+            </div>
+        @endif
+        @if ($shiftsWithoutEnd->isNotEmpty())
+            <div class="text-warning mt-1">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ \App\Support\Ui::t('No end time set for these shifts, so their extra duty after the shift is not counted:') }}
+                <strong>{{ $shiftsWithoutEnd->implode(', ') }}</strong>
+                @can('access-attendance-shifts')
+                    —
+                    <a href="{{ route('attendance.shifts.index') }}">{{ \App\Support\Ui::t('Set end times') }}</a>
+                @endcan
+            </div>
+        @endif
+    </div>
+</div>
+
 <div class="card card-outline card-secondary">
 
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -78,6 +146,8 @@
                     <th>Check In</th>
                     <th>Check Out</th>
                     <th>Hours Worked</th>
+                    <th>Late</th>
+                    <th>Extra Duty</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -94,6 +164,8 @@
                             <td>{{ $info['check_in']?->format('h:i A') ?? '-' }}</td>
                             <td>{{ $info['check_out']?->format('h:i A') ?? '-' }}</td>
                             <td>{{ $info['hours_worked'] !== null ? $info['hours_worked'] . ' hrs' : '-' }}</td>
+                            <td data-order="{{ $info['late_minutes'] ?? 0 }}" class="{{ $info['late_minutes'] ? 'text-warning font-weight-bold' : '' }}">{{ $info['late_minutes'] ? \App\Support\Ui::minutes($info['late_minutes']) : '-' }}</td>
+                            <td data-order="{{ $info['extra_minutes'] ?? 0 }}" class="{{ $info['extra_minutes'] ? 'text-primary font-weight-bold' : '' }}">{{ $info['extra_minutes'] ? \App\Support\Ui::minutes($info['extra_minutes']) : '-' }}</td>
                             <td>
                                 @switch($info['status'])
                                     @case('present')
@@ -107,6 +179,9 @@
                                         @break
                                     @case('weekend')
                                         <span class="badge badge-secondary">WEEKLY OFF</span>
+                                        @break
+                                    @case('overtime')
+                                        <span class="badge badge-primary" title="Came in on the weekly off day — counted as overtime">OVERTIME</span>
                                         @break
                                     @case('leave')
                                         <span class="badge badge-info">ON LEAVE</span>
@@ -122,7 +197,7 @@
                 @empty
 
                     <tr>
-                        <td colspan="6" class="text-center">No employees linked to a device yet</td>
+                        <td colspan="8" class="text-center">No employees linked to a device yet</td>
                     </tr>
 
                 @endforelse

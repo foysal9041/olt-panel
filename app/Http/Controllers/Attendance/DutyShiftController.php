@@ -69,6 +69,7 @@ class DutyShiftController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'start_time' => 'required|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i|different:start_time',
             'late_grace_minutes' => 'required|integer|min:0|max:120',
             'is_default' => 'nullable|boolean',
         ]);

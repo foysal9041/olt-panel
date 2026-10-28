@@ -21,9 +21,15 @@ window.TrafficGraph = (function () {
     var P95 = '#dc2626';
     var TITLES = { '1 Hour': '১ ঘণ্টা', '6 Hours': '৬ ঘণ্টা', '24 Hours': '২৪ ঘণ্টা', '48 Hours': '৪৮ ঘণ্টা', Weekly: 'সাপ্তাহিক', Monthly: 'মাসিক', Yearly: 'বার্ষিক', Custom: 'কাস্টম' };
     var NAMES = { In: 'ইন', Out: 'আউট', Traffic: 'ট্রাফিক', 'Traffic (all ports)': 'ট্রাফিক (সব পোর্ট)', 'Unicast packets': 'ইউনিকাস্ট প্যাকেট', 'Non-unicast packets': 'নন-ইউনিকাস্ট প্যাকেট', Errors: 'এরর', Discards: 'ডিসকার্ড', Processor: 'প্রসেসর', Memory: 'মেমরি', 'Memory used': 'মেমরি ব্যবহার', Temperature: 'তাপমাত্রা', 'Fan speed': 'ফ্যান স্পিড', Voltage: 'ভোল্টেজ', Current: 'কারেন্ট', Power: 'পাওয়ার', Uptime: 'আপটাইম', 'SNMP response time': 'SNMP রেসপন্স টাইম', Response: 'রেসপন্স' };
-    var STEP_LABEL = { 60: t('1 minute average', '১ মিনিটের গড়'), 300: t('5 minute average', '৫ মিনিটের গড়'), 1800: t('30 minute average', '৩০ মিনিটের গড়'), 7200: t('2 hour average', '২ ঘণ্টার গড়'), 86400: t('1 day average', '১ দিনের গড়') };
+    var BN_DIGITS = '০১২৩৪৫৬৭৮৯';
 
     function tr(name) { return t(name, NAMES[name] || name); }
+
+    /** "4 minute average", "2 hour average", "1 day average". */
+    function stepLabel(step) {
+        var n = step % 86400 === 0 ? [step / 86400, 'day', 'দিনের'] : step % 3600 === 0 ? [step / 3600, 'hour', 'ঘণ্টার'] : [Math.round(step / 60), 'minute', 'মিনিটের'];
+        return t(n[0] + ' ' + n[1] + ' average', String(n[0]).replace(/\d/g, function (c) { return BN_DIGITS[c]; }) + ' ' + n[2] + ' গড়');
+    }
     function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
     function scaled(v, units, base) {
@@ -71,22 +77,46 @@ window.TrafficGraph = (function () {
         return pad(h % 12 || 12) + ':' + pad(d.getMinutes()) + (h >= 12 ? ' PM' : ' AM');
     }
 
-    /** Axis label, by how long the graph spans. */
-    function tick(ts, span) {
-        var d = new Date(ts * 1000);
-        if (span <= 86400 + 60) return clock(d);
-        if (span <= 8 * 86400) return DAYS[d.getDay()] + ' ' + pad(d.getHours()) + ':00';
-        if (span <= 62 * 86400) return d.getDate() + ' ' + MONTHS[d.getMonth()];
-        return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
-    }
+    /**
+     * X-axis labels only at round times, LibreNMS style — 09:00, 10:00 … on
+     * a day, Mon, Tue … on a week, 1 Oct, 8 Oct … on a month, months on a
+     * year — as many as fit the graph's width; null (no label, no grid line)
+     * everywhere else.
+     */
+    function axisLabels(d, width, rrd) {
+        var times = d.times, step = d.step, n = times.length, out = [], i;
+        for (i = 0; i < n; i++) out.push(null);
+        if (n < 2) return out;
+        var H = 3600, D = 86400, span = times[n - 1] + step - times[0];
+        var max = Math.max(3, Math.min(14, Math.floor(width / (rrd ? 62 : 78))));
+        var steps = [300, 600, 900, 1800, H, 2 * H, 3 * H, 4 * H, 6 * H, 12 * H, D, 2 * D, 7 * D], every = null;
+        // Over three days, whole days at least: "12:00 PM" between the dates only clutters.
+        for (i = 0; i < steps.length; i++) if (steps[i] >= step && (span <= 3 * D || steps[i] >= D) && span / steps[i] <= max) { every = steps[i]; break; }
+        function off(ts) { return -new Date(ts * 1000).getTimezoneOffset() * 60; }
 
-    /** RRD-style axis label: 24-hour clock up to two days, then dates. */
-    function rrdTick(ts, span) {
-        var d = new Date(ts * 1000);
-        if (span <= 2 * 86400 + 60) return pad(d.getHours()) + ':' + pad(d.getMinutes());
-        if (span <= 8 * 86400) return DAYS[d.getDay()] + ' ' + pad(d.getHours()) + ':00';
-        if (span <= 62 * 86400) return d.getDate() + ' ' + MONTHS[d.getMonth()];
-        return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+        if (every === null) {
+            // Months: every 1, 2, 3 or 6, whichever fits.
+            var months = span / (30.4 * D), m = [1, 2, 3, 6].filter(function (k) { return months / k <= max; })[0] || 12;
+            for (i = 1; i < n; i++) {
+                var a = new Date(times[i - 1] * 1000), b = new Date(times[i] * 1000);
+                if (a.getMonth() !== b.getMonth() && b.getMonth() % m === 0) out[i] = MONTHS[b.getMonth()] + (b.getMonth() === 0 ? ' ' + b.getFullYear() : '');
+            }
+            return out;
+        }
+        var align = every === 7 * D ? 4 * D : 0; // weeks start on Monday (5 Jan 1970)
+        for (i = 0; i < n; i++) {
+            var local = times[i] + off(times[i]);
+            var mark = Math.ceil((local - align) / every) * every + align;
+            if (mark >= local + step) continue;
+            var t = new Date((mark - off(times[i])) * 1000), hm = pad(t.getHours()) + ':' + pad(t.getMinutes());
+            if (every < D) {
+                var clockText = rrd ? hm : clock(t);
+                out[i] = span > D + step && hm === '00:00' ? DAYS[t.getDay()] + ' ' + t.getDate() : (span > D + step && rrd ? DAYS[t.getDay()] + ' ' + hm : clockText);
+            } else {
+                out[i] = span <= 8 * D ? DAYS[t.getDay()] + ' ' + t.getDate() : t.getDate() + ' ' + MONTHS[t.getMonth()];
+            }
+        }
+        return out;
     }
 
     function full(ts, step) {
@@ -99,7 +129,7 @@ window.TrafficGraph = (function () {
         var box = el.querySelector('.tg-head');
         if (!box || el.hasAttribute('data-compact') || el.getAttribute('data-style') === 'rrd') { if (box) box.innerHTML = ''; return; }
         box.innerHTML = '<span class="tg-title">' + (el.getAttribute('data-title') || tr(d.title)) + ' · ' + t(d.period, TITLES[d.period] || d.period) + '</span>' +
-            '<span class="tg-sub">' + (STEP_LABEL[d.step] || '') + ' · ' + full(d.start, d.step) + ' – ' + full(d.end - d.step, d.step) + '</span>';
+            '<span class="tg-sub">' + stepLabel(d.step) + ' · ' + full(d.start, d.step) + ' – ' + full(d.end - d.step, d.step) + '</span>';
     }
 
     function legend(el, d) {
@@ -198,12 +228,14 @@ window.TrafficGraph = (function () {
             datasets.push({ label: t('95th percentile', '৯৫তম পার্সেন্টাইল') + ' ' + fmt(d.p95, d.unit), data: d.times.map(function () { return d.p95; }), borderColor: P95, borderDash: [6, 4], borderWidth: 1, pointRadius: 0, pointHoverRadius: 0, fill: false });
         }
         var mono = { fontFamily: "'DejaVu Sans Mono', Menlo, Consolas, monospace", fontSize: 10, fontColor: '#333' };
+        var labels = axisLabels(d, plot.clientWidth || 600, rrd);
+        var xTicks = { autoSkip: false, maxRotation: 0, callback: function (v, i) { return labels[i]; } };
         var grid = { color: 'rgba(255,0,0,0.16)', borderDash: [1, 2], zeroLineColor: '#555', drawBorder: true };
 
         if (el._chart) el._chart.destroy();
         el._chart = new Chart(el.querySelector('canvas').getContext('2d'), {
             type: 'line',
-            data: { labels: d.times.map(function (ts) { return rrd ? rrdTick(ts, span) : tick(ts, span); }), datasets: datasets },
+            data: { labels: d.times, datasets: datasets },
             options: {
                 maintainAspectRatio: false,
                 animation: { duration: 0 },
@@ -224,13 +256,13 @@ window.TrafficGraph = (function () {
                         ticks: Object.assign({ beginAtZero: ['celsius', 'volts', 'days'].indexOf(d.unit) < 0, max: d.unit === 'percent' ? 100 : undefined, maxTicksLimit: 7, callback: function (v) { return short(v, d.unit, true); } }, mono),
                         gridLines: grid,
                     }],
-                    xAxes: [{ ticks: Object.assign({ autoSkip: true, maxTicksLimit: 7, maxRotation: 0 }, mono), gridLines: grid }],
+                    xAxes: [{ ticks: Object.assign(xTicks, mono), gridLines: grid }],
                 } : {
                     yAxes: [{
                         ticks: { beginAtZero: ['celsius', 'volts', 'days'].indexOf(d.unit) < 0, max: d.unit === 'percent' ? 100 : undefined, fontColor: '#94a3b8', maxTicksLimit: compact ? 4 : 6, callback: function (v) { return fmt(v, d.unit); } },
                         gridLines: { color: '#eef2f7', drawBorder: false },
                     }],
-                    xAxes: [{ ticks: { fontColor: '#64748b', autoSkip: true, maxTicksLimit: compact ? 6 : 12, maxRotation: 0 }, gridLines: { display: false } }],
+                    xAxes: [{ ticks: Object.assign(xTicks, { fontColor: '#64748b' }), gridLines: { display: false } }],
                 },
             },
         });

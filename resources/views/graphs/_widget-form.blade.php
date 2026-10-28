@@ -95,9 +95,17 @@
     <div class="form-row align-items-end">
         <div class="col-6 col-md-4 form-group">
             <label class="small font-weight-bold mb-1">Size</label>
+            @php
+                $width = (int) ($w->width ?? old('width', 4));
+                $widths = \App\Models\GraphWidget::WIDTHS;
+                if (! isset($widths[$width])) {
+                    $widths[$width] = $width . '/12';
+                    krsort($widths);
+                }
+            @endphp
             <select name="width" class="form-control form-control-sm">
-                @foreach (\App\Models\GraphWidget::WIDTHS as $cols => $label)
-                    <option value="{{ $cols }}" @selected((int) ($w->width ?? old('width', 4)) === $cols)>{{ $label }}</option>
+                @foreach ($widths as $cols => $label)
+                    <option value="{{ $cols }}" @selected($width === $cols)>{{ \App\Support\Ui::t($label) }}</option>
                 @endforeach
             </select>
         </div>

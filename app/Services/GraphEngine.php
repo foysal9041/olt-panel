@@ -53,6 +53,13 @@ class GraphEngine
     protected const CURRENT_FOR = 300;
 
     /**
+     * RRD's heartbeat: a missed poll leaves an empty minute (the next poll's
+     * rate covers it), so gaps up to this many 1-minute buckets are filled
+     * in from both sides instead of cutting a white line through the graph.
+     */
+    protected const HEARTBEAT = 5;
+
+    /**
      * The time window: a period key, or from/to (custom range). Picks the
      * finest bucket size whose history reaches back to "from" and keeps the
      * graph under ~3000 points; avg = 5 merges 1-minute buckets into 5.
@@ -115,8 +122,19 @@ class GraphEngine
             default => abort(404, 'Unknown graph type.'),
         };
 
+        // Missed polls filled in; the current minute (not polled yet) left off the end.
+        if ($w['res'] === 1) {
+            foreach ($out['series'] as &$s) {
+                $s['values'] = $this->fillGaps($s['values']);
+                $s['peaks'] = $s['peaks'] !== null ? $this->fillGaps($s['peaks']) : null;
+            }
+            unset($s);
+            $this->trimUnpolled($out);
+        }
+
         // 5-minute averages, then the small-graph shrink.
         $times = $out['times'];
+        $step = $w['step'];
         foreach ($out['series'] as &$s) {
             if ($w['step'] > $w['res'] * 60) {
                 [$t, $s['values'], $s['peaks']] = $this->regroup($times, $s['values'], $s['peaks'], $w['step']);
@@ -137,6 +155,7 @@ class GraphEngine
             }
             unset($s);
             $times = $this->regroup($times, [], null, null, $n)[0];
+            $step *= $n;
         }
 
         $p95 = null;
@@ -150,7 +169,7 @@ class GraphEngine
             'period' => $w['title'],
             'key' => $w['key'],
             'unit' => $out['unit'],
-            'step' => $w['step'],
+            'step' => $step,
             'start' => $times[0] ?? $w['first'],
             'end' => $w['last'] + $w['res'] * 60,
             'from' => $w['from'],
@@ -342,6 +361,55 @@ class GraphEngine
                 'total' => $have ? $total : null,
             ],
         ];
+    }
+
+    /** Short runs of nulls between two readings: drawn as a straight line between them. */
+    protected function fillGaps(array $values, int $max = self::HEARTBEAT): array
+    {
+        $n = count($values);
+        for ($i = 1; $i < $n; $i++) {
+            if ($values[$i] !== null || $values[$i - 1] === null) {
+                continue;
+            }
+            $j = $i;
+            while ($j < $n && $values[$j] === null) {
+                $j++;
+            }
+            if ($j < $n && $j - $i <= $max) {
+                $a = $values[$i - 1];
+                $b = $values[$j];
+                for ($k = $i; $k < $j; $k++) {
+                    $values[$k] = round($a + ($b - $a) * ($k - $i + 1) / ($j - $i + 1), 3);
+                }
+            }
+            $i = $j;
+        }
+
+        return $values;
+    }
+
+    /** Drop the newest one or two minutes while no poll has filled them yet. */
+    protected function trimUnpolled(array &$out): void
+    {
+        for ($k = 0; $k < 2 && count($out['times']) > 2; $k++) {
+            $last = count($out['times']) - 1;
+            if ($out['times'][$last] < time() - 180) {
+                return;
+            }
+            foreach ($out['series'] as $s) {
+                if ($s['values'][$last] !== null) {
+                    return;
+                }
+            }
+            array_pop($out['times']);
+            foreach ($out['series'] as &$s) {
+                array_pop($s['values']);
+                if ($s['peaks'] !== null) {
+                    array_pop($s['peaks']);
+                }
+            }
+            unset($s);
+        }
     }
 
     protected function p95(array $values): ?float

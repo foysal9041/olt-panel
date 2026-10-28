@@ -35,14 +35,22 @@ class GraphWidget extends Model
         return in_array($m, self::DEVICE_METRICS, true) ? $m : 'cpu';
     }
 
-    /** Bootstrap columns: full, half, third of the row. */
-    public const WIDTHS = [12 => 'Full width', 6 => 'Half', 4 => 'Third'];
+    /** Columns of the 12-column dashboard grid; dragging a corner sets any of 2–12. */
+    public const WIDTHS = [12 => 'Full width', 9 => 'Three quarters', 8 => 'Two thirds', 6 => 'Half', 4 => 'Third', 3 => 'Quarter'];
 
-    protected $fillable = ['graph_dashboard_id', 'kind', 'title', 'width', 'graph', 'settings', 'position'];
+    /** Graph height in pixels: the default, and the range a corner drag allows. */
+    public const HEIGHT = 200;
+
+    public const MIN_HEIGHT = 120;
+
+    public const MAX_HEIGHT = 600;
+
+    protected $fillable = ['graph_dashboard_id', 'kind', 'title', 'width', 'height', 'graph', 'settings', 'position'];
 
     protected $casts = [
         'settings' => 'array',
         'width' => 'integer',
+        'height' => 'integer',
         'position' => 'integer',
     ];
 
@@ -89,6 +97,17 @@ class GraphWidget extends Model
     {
         return SwitchPort::with('networkSwitch:id,name')->whereIn('id', $this->portIds())->get()
             ->sortBy(fn ($p) => array_search($p->id, $this->portIds(), true))->values();
+    }
+
+    public function plotHeight(): int
+    {
+        return max(self::MIN_HEIGHT, min(self::MAX_HEIGHT, $this->height ?: self::HEIGHT));
+    }
+
+    /** Columns on a medium screen (tablets): two to a row at most. */
+    public function mediumWidth(): int
+    {
+        return $this->width > 6 ? 12 : 6;
     }
 
     /** Title shown on the box: its own, else the interface (or "N interfaces"). */

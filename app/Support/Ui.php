@@ -83,6 +83,18 @@ class Ui
             : $date->format('j F Y');
     }
 
+    /** A length of time: "1h 05m" / "১ ঘণ্টা ০৫ মিনিট"; "45m" / "৪৫ মিনিট". */
+    public static function minutes(int $minutes): string
+    {
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if (self::isBangla()) {
+            return $h ? Bangla::digits($h . ' ঘণ্টা ' . sprintf('%02d', $m) . ' মিনিট') : Bangla::digits($m . ' মিনিট');
+        }
+
+        return $h ? $h . 'h ' . sprintf('%02d', $m) . 'm' : $m . 'm';
+    }
+
     public static function isBangla(): bool
     {
         return app()->getLocale() === 'bn';

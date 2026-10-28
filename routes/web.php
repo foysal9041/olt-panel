@@ -172,6 +172,7 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
             Route::put('{dashboard}/widgets/{widget}', 'updateWidget')->name('widgets.update');
             Route::delete('{dashboard}/widgets/{widget}', 'destroyWidget')->name('widgets.destroy');
             Route::post('{dashboard}/widgets/{widget}/move', 'moveWidget')->name('widgets.move');
+            Route::post('{dashboard}/layout', 'layout')->name('layout');
             Route::get('{dashboard}/widgets/{widget}/data', 'data')->name('widgets.data');
         });
 

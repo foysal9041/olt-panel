@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Attendance;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceLog;
 use App\Models\AttendanceSetting;
+use App\Models\DutyShift;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\ZkDevice;
@@ -25,7 +26,29 @@ class AttendanceController extends Controller
         $employees = $this->employeesQuery()->ordered()->get();
 
         $summary = $this->calculator->todaySummary($employees, $settings);
-        $trend = $this->calculator->trend($employees, $settings, 7);
+
+        // The last 7 days (today included): the chart, the week's totals and today's board.
+        $today = Carbon::today();
+        $weekReport = $this->calculator->buildReport($employees, $today->copy()->subDays(6), $today, $settings);
+        $trend = $this->calculator->trend($employees, $settings, 7, $weekReport);
+        $weekTotals = collect($this->calculator->totals($weekReport));
+        $present = array_sum(array_column($trend, 'present'));
+        $expected = array_sum(array_column($trend, 'expected'));
+        $byId = $employees->keyBy('id');
+        $top = fn (string $field) => $weekTotals->filter(fn ($t) => $t[$field] > 0)->sortByDesc($field)->take(3)
+            ->map(fn ($t, $id) => ['employee' => $byId[$id]] + $t)->values();
+        $week = [
+            'rate' => $expected ? (int) round($present / $expected * 100) : null,
+            'present' => $present,
+            'expected' => $expected,
+            'late_days' => $weekTotals->sum('late'),
+            'late_minutes' => $weekTotals->sum('late_minutes'),
+            'absent' => $weekTotals->sum('absent'),
+            'extra_minutes' => $weekTotals->sum('extra_minutes'),
+            'overtime_days' => $weekTotals->sum('overtime_days'),
+            'most_late' => $top('late_minutes'),
+            'most_extra' => $top('extra_minutes'),
+        ];
 
         $recentPunches = AttendanceLog::with(['employee', 'zkDevice'])
             ->whereIn('employee_id', $employees->pluck('id'))
@@ -33,12 +56,35 @@ class AttendanceController extends Controller
             ->limit(15)
             ->get();
 
+        // IN / OUT on those punches: each employee's first and last punch of
+        // that attendance day; 'ignored' for one outside office time.
+        $punchRoles = [];
+        foreach ($recentPunches as $punch) {
+            if ($settings->workDay($punch->punched_at) === null) {
+                $punchRoles[$punch->id] = 'ignored';
+            }
+        }
+        $counted = $recentPunches->reject(fn ($p) => isset($punchRoles[$p->id]));
+        foreach ($counted->groupBy(fn ($p) => $p->employee_id . '|' . $settings->workDay($p->punched_at))->keys() as $key) {
+            [$employeeId, $date] = explode('|', $key);
+            [$in, $out] = AttendanceCalculator::inAndOut(
+                AttendanceLog::where('employee_id', $employeeId)
+                    ->whereBetween('punched_at', $settings->workDayRange(Carbon::parse($date)))
+                    ->get(['id', 'punched_at'])
+                    ->filter(fn ($p) => $settings->workDay($p->punched_at) === $date)
+            );
+            if ($in) {
+                $punchRoles[$in->id] = 'in';
+            }
+            if ($out) {
+                $punchRoles[$out->id] = 'out';
+            }
+        }
+
         // Today's board: one row per employee with status and times.
-        $today = Carbon::today();
-        $todayReport = $this->calculator->buildReport($employees, $today, $today, $settings);
         $board = $employees->map(fn (Employee $employee) => [
             'employee' => $employee,
-        ] + ($todayReport[$employee->id][$today->toDateString()] ?? ['status' => 'absent', 'check_in' => null, 'check_out' => null, 'hours_worked' => null]))
+        ] + ($weekReport[$employee->id][$today->toDateString()] ?? ['status' => 'absent', 'check_in' => null, 'check_out' => null, 'hours_worked' => null, 'late_minutes' => null, 'extra_minutes' => null]))
             ->values(); // in serial number order, like the employee list
 
         $devices = ZkDevice::orderBy('name')->get();
@@ -53,7 +99,9 @@ class AttendanceController extends Controller
         return view('attendance.dashboard', compact(
             'summary',
             'trend',
+            'week',
             'recentPunches',
+            'punchRoles',
             'employees',
             'board',
             'devices',
@@ -65,9 +113,21 @@ class AttendanceController extends Controller
     public function report(Request $request)
     {
         [$report, $reportEmployees, $employees, $start, $end, $selectedEmployee] = $this->buildReportData($request);
+        $totals = $this->calculator->totals($report);
+
+        // Shifts in this report with no end time yet: their extra duty after the shift can't be counted.
+        $defaultShift = DutyShift::default();
+        $shiftsWithoutEnd = $reportEmployees->map(fn (Employee $e) => $e->dutyShift ?? $defaultShift)
+            ->filter(fn (DutyShift $s) => ! $s->end_time)
+            ->unique('id')
+            ->pluck('name');
+        $officeTime = AttendanceSetting::current()->punchWindowLabel();
 
         return view('attendance.report', compact(
             'report',
+            'totals',
+            'shiftsWithoutEnd',
+            'officeTime',
             'reportEmployees',
             'employees',
             'start',
@@ -85,7 +145,7 @@ class AttendanceController extends Controller
         return response()->streamDownload(function () use ($report, $reportEmployees) {
             $out = fopen('php://output', 'w');
 
-            fputcsv($out, ['Employee', 'Date', 'Check In', 'Check Out', 'Hours Worked', 'Status']);
+            fputcsv($out, ['Employee', 'Date', 'Check In', 'Check Out', 'Hours Worked', 'Late (minutes)', 'Extra Duty (minutes)', 'Status']);
 
             foreach ($reportEmployees as $employee) {
                 foreach ($report[$employee->id] as $date => $info) {
@@ -95,7 +155,9 @@ class AttendanceController extends Controller
                         $info['check_in']?->format('h:i A') ?? '-',
                         $info['check_out']?->format('h:i A') ?? '-',
                         $info['hours_worked'] ?? '-',
-                        ucfirst($info['status']),
+                        $info['late_minutes'] ?? '',
+                        $info['extra_minutes'] ?? '',
+                        $info['status'] === 'overtime' ? 'Overtime (weekly off)' : ucfirst($info['status']),
                     ]);
                 }
             }
@@ -147,11 +209,15 @@ class AttendanceController extends Controller
     {
         $request->validate([
             'weekly_off_day' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-        ]);
+            'punch_from' => 'nullable|date_format:H:i|required_with:punch_until',
+            'punch_until' => 'nullable|date_format:H:i|required_with:punch_from|different:punch_from',
+        ], [], ['punch_from' => 'office time start', 'punch_until' => 'office time end']);
 
-        AttendanceSetting::current()->update($request->only([
-            'weekly_off_day',
-        ]));
+        AttendanceSetting::current()->update([
+            'weekly_off_day' => $request->weekly_off_day,
+            'punch_from' => $request->punch_from ?: null,
+            'punch_until' => $request->punch_until ?: null,
+        ]);
 
         return redirect()
             ->route('attendance.devices.index')

@@ -35,7 +35,7 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Start Time</th>
+                    <th>Hours</th>
                     <th>Late Grace</th>
                     <th>Employees</th>
                     <th>Default</th>
@@ -49,7 +49,7 @@
 
                     <tr>
                         <td>{{ $shift->name }}</td>
-                        <td>{{ \Illuminate\Support\Carbon::parse($shift->start_time)->format('h:i A') }}</td>
+                        <td>{{ $shift->hoursLabel() }}@unless ($shift->end_time) <span class="badge badge-warning" title="Set an end time to see extra duty">no end time</span>@endunless</td>
                         <td>{{ $shift->late_grace_minutes }} min</td>
                         <td>{{ $shift->employees_count }}</td>
                         <td>

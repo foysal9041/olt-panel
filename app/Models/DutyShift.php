@@ -12,6 +12,7 @@ class DutyShift extends Model
     protected $fillable = [
         'name',
         'start_time',
+        'end_time',
         'late_grace_minutes',
         'is_default',
     ];
@@ -21,6 +22,14 @@ class DutyShift extends Model
         return [
             'is_default' => 'boolean',
         ];
+    }
+
+    /** "09:00 AM – 06:00 PM", or just the start when no end is set. */
+    public function hoursLabel(): string
+    {
+        $start = \Illuminate\Support\Carbon::parse($this->start_time)->format('h:i A');
+
+        return $this->end_time ? $start . ' – ' . \Illuminate\Support\Carbon::parse($this->end_time)->format('h:i A') : $start;
     }
 
     public function employees()

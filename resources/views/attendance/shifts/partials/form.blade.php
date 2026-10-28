@@ -29,6 +29,13 @@
     </div>
 
     <div class="form-group">
+        <label>End Time <small class="text-muted">(for extra duty)</small></label>
+        <input type="time" name="end_time" class="form-control"
+               value="{{ old('end_time', $shift && $shift->end_time ? \Illuminate\Support\Carbon::parse($shift->end_time)->format('H:i') : '') }}">
+        <small class="form-text text-muted">Time worked after this shows as extra duty in the attendance report. An end earlier than the start means the shift ends after midnight.</small>
+    </div>
+
+    <div class="form-group">
         <label>Late Grace Period (minutes)</label>
         <input type="number" min="0" max="120" name="late_grace_minutes" class="form-control"
                value="{{ old('late_grace_minutes', $shift->late_grace_minutes ?? 15) }}"

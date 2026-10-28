@@ -5,7 +5,6 @@
 @use('App\Models\SwitchPort')
 @php
     $graphs = \App\Models\SwitchPortTraffic::GRAPHS;
-    $cols = [12 => 'col-12', 6 => 'col-lg-6', 4 => 'col-md-6 col-xl-4'];
     $hasTop = $widgets->contains('kind', 'top');
 @endphp
 
@@ -71,6 +70,13 @@
     @endif
 </div>
 
+@if ($editing && $widgets->isNotEmpty())
+    <div class="lw-hint mb-3">
+        <i class="fas fa-arrows-alt mr-1"></i>
+        Drag a graph by its title bar to move it, and its bottom-right corner to make it wider, narrower, taller or shorter. Changes save by themselves.
+    </div>
+@endif
+
 @if ($editing)
     <div class="collapse {{ $widgets->isEmpty() || $errors->any() ? 'show' : '' }}" id="add-graph">
         <div class="card card-outline card-success">
@@ -93,30 +99,42 @@
         </div>
     </div>
 @else
-    <div class="row">
+    <div class="lw-grid {{ $editing ? 'is-editing' : '' }}" id="lw-grid" data-layout-url="{{ route('graphs.layout', $dashboard) }}">
         @foreach ($widgets as $widget)
             @php
                 $ports = $widget->portList;
-                $small = $widget->width === 4;
+                $one = $widget->kind === 'traffic' && $ports->count() === 1 ? $ports->first() : null;
+                $periodKey = $graph ?? ($widget->graph ?: $dashboard->default_graph);
+                $sub = match (true) {
+                    $one !== null => trim($one->networkSwitch?->name . ' · ' . $one->label . ($one->speed_label ? ' · ' . $one->speed_label : '')),
+                    $widget->kind === 'traffic' && $ports->count() > 1 => $ports->map(fn ($p) => $p->alias ?: $p->label)->take(3)->implode(' + ') . ($ports->count() > 3 ? ' + ' . ($ports->count() - 3) . ' ' . \App\Support\Ui::t('more') : ''),
+                    default => null,
+                };
             @endphp
-            <div class="{{ $cols[$widget->width] ?? 'col-lg-6' }}">
+            <div class="lw-item" data-id="{{ $widget->id }}" data-w="{{ $widget->width }}" data-h="{{ $widget->plotHeight() }}"
+                 style="--w: {{ $widget->width }}; --wm: {{ $widget->mediumWidth() }}; --h: {{ $widget->plotHeight() }}px">
                 <div class="lw-card">
-                    <div class="lw-head">
-                        @php $one = $widget->kind === 'traffic' && $ports->count() === 1 ? $ports->first() : null; @endphp
-                        @if ($one)
-                            <a href="{{ route('graph.show', ['type' => 'port_bits', 'id' => $one->id]) }}" class="lw-title" title="{{ $one->networkSwitch?->name }} · {{ $one->label }}{{ $one->speed_label ? ' · ' . $one->speed_label : '' }}">{{ $widget->displayTitle($ports) }}</a>
+                    <div class="lw-head" @if ($editing) title="{{ \App\Support\Ui::t('Drag to move') }}" @endif>
+                        @if ($editing)
+                            <span class="lw-grip"><i class="fas fa-grip-vertical"></i></span>
+                        @endif
+                        <div class="lw-titles">
+                            @if ($one && ! $editing)
+                                <a href="{{ route('graph.show', ['type' => 'port_bits', 'id' => $one->id]) }}" class="lw-title">{{ $widget->displayTitle($ports) }}</a>
+                            @else
+                                <span class="lw-title">{{ $widget->displayTitle($ports) }}</span>
+                            @endif
+                            @if ($sub)
+                                <div class="lw-sub" title="{{ $sub }}">{{ $sub }}</div>
+                            @endif
+                        </div>
+                        @if ($widget->kind === 'top')
+                            <span class="lw-period">{{ \App\Support\Ui::t('Now') }}</span>
                         @else
-                            <span class="lw-title">{{ $widget->displayTitle($ports) }}</span>
+                            <span class="lw-period">{{ \App\Support\Ui::t($graphs[$periodKey][0] ?? '24 Hours') }}</span>
                         @endif
                         @if ($editing)
                             <div class="btn-group btn-group-sm lw-tools">
-                                @foreach (['up' => 'fa-arrow-up', 'down' => 'fa-arrow-down'] as $dir => $icon)
-                                    <form method="POST" action="{{ route('graphs.widgets.move', [$dashboard, $widget]) }}" class="d-inline">
-                                        @csrf
-                                        <input type="hidden" name="dir" value="{{ $dir }}">
-                                        <button class="btn btn-light btn-sm" title="Move {{ $dir }}" @disabled(($dir === 'up' && $loop->parent->first) || ($dir === 'down' && $loop->parent->last))><i class="fas {{ $icon }}"></i></button>
-                                    </form>
-                                @endforeach
                                 <button type="button" class="btn btn-light btn-sm" data-toggle="collapse" data-target="#edit-{{ $widget->id }}" title="Edit"><i class="fas fa-pen"></i></button>
                                 <form method="POST" action="{{ route('graphs.widgets.destroy', [$dashboard, $widget]) }}" class="d-inline js-confirm-delete" data-confirm-message="Remove this graph from the dashboard?">
                                     @csrf
@@ -140,7 +158,7 @@
                             @if (! $widget->cpuDevice)
                                 <div class="text-muted small py-4 text-center">This device no longer exists.</div>
                             @else
-                                <div class="tg" data-style="rrd" data-points="{{ $widget->width === 12 ? 720 : 360 }}"
+                                <div class="tg" data-style="rrd" data-points="{{ $widget->width >= 8 ? 720 : 360 }}"
                                      data-url="{{ route('graphs.widgets.data', [$dashboard, $widget]) }}" data-graph="{{ $graph ?? ($widget->graph ?: $dashboard->default_graph) }}">
                                     <div class="tg-head"></div>
                                     <div class="tg-plot"><canvas></canvas></div>
@@ -151,7 +169,7 @@
                             @if ($ports->isEmpty())
                                 <div class="text-muted small py-4 text-center">The interfaces on this graph no longer exist.</div>
                             @else
-                                <div class="tg" data-style="rrd" @if ($widget->mirror()) data-mirror @endif data-points="{{ $widget->width === 12 ? 720 : 360 }}"
+                                <div class="tg" data-style="rrd" @if ($widget->mirror()) data-mirror @endif data-points="{{ $widget->width >= 8 ? 720 : 360 }}"
                                      data-url="{{ route('graphs.widgets.data', [$dashboard, $widget]) }}" data-graph="{{ $graph ?? ($widget->graph ?: $dashboard->default_graph) }}">
                                     <div class="tg-head"></div>
                                     <div class="tg-plot"><canvas></canvas></div>
@@ -199,6 +217,9 @@
                             </div>
                         @endif
                     </div>
+                    @if ($editing)
+                        <span class="lw-resize" title="{{ \App\Support\Ui::t('Drag to resize') }}"></span>
+                    @endif
                 </div>
             </div>
         @endforeach
@@ -243,13 +264,36 @@
 <style>
     .lw-bar { width: auto; max-width: 100%; }
     .lw-bar select { min-width: 12rem; }
-    .lw-card { background: #fff; border: 1px solid #dee2e6; margin-bottom: 1rem; }
-    .lw-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 2.4rem; padding: .35rem 2.5rem; background: #e9ecef; border-bottom: 1px solid #dee2e6; }
-    .lw-title { font-size: .95rem; color: #222; text-align: center; }
+    /* 12-column grid: each graph spans its width; two to a row on tablets, one on phones */
+    .lw-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1rem; align-items: start; margin-bottom: 1rem; }
+    .lw-item { grid-column: span var(--w, 6); min-width: 0; }
+    @media (max-width: 1199.98px) { .lw-item { grid-column: span var(--wm, 6); } }
+    @media (max-width: 767.98px) { .lw-item { grid-column: span 12; } }
+    .lw-card { position: relative; background: #fff; border: 1px solid #d8dde4; border-radius: 4px; box-shadow: 0 1px 2px rgba(15, 23, 42, .05); }
+    .lw-head { display: flex; align-items: center; gap: .5rem; min-height: 2.6rem; padding: .3rem .55rem .3rem .7rem; background: #f3f5f8; border-bottom: 1px solid #e2e6eb; border-radius: 4px 4px 0 0; }
+    .lw-titles { flex: 1; min-width: 0; line-height: 1.2; }
+    .lw-title { display: block; font-size: .92rem; font-weight: 600; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     a.lw-title:hover { color: #0d6efd; text-decoration: none; }
-    .lw-tools { position: absolute; right: .35rem; }
-    .lw-body { padding: .5rem .6rem .6rem; }
-    .lw-body .tg[data-style="rrd"] .tg-plot { height: 170px; }
+    .lw-sub { font-size: .72rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lw-period { flex: none; padding: .05rem .5rem; border: 1px solid #dfe3e8; border-radius: 999px; background: #fff; font-size: .68rem; font-weight: 700; color: #475569; white-space: nowrap; }
+    .lw-tools { flex: none; }
+    .lw-body { padding: .45rem .55rem .55rem; }
+    .lw-body .tg[data-style="rrd"] .tg-plot { height: var(--h, 200px); }
+    .lw-hint { padding: .45rem .75rem; border: 1px dashed #86efac; border-radius: 4px; background: #f0fdf4; font-size: .85rem; color: #166534; }
+
+    /* Arranging: drag by the title bar, resize by the corner */
+    .is-editing .lw-card { outline: 1px dashed #94a3b8; outline-offset: 2px; }
+    .is-editing .lw-head { cursor: grab; touch-action: none; user-select: none; }
+    .lw-grip { flex: none; color: #94a3b8; }
+    .lw-resize { position: absolute; right: 1px; bottom: 1px; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; z-index: 2;
+        background: linear-gradient(135deg, transparent 0 55%, #94a3b8 55% 62%, transparent 62% 72%, #94a3b8 72% 79%, transparent 79% 89%, #94a3b8 89%); }
+    .lw-item.is-dragging { position: fixed; z-index: 1060; pointer-events: none; opacity: .92; }
+    .lw-item.is-dragging .lw-card { box-shadow: 0 14px 34px rgba(15, 23, 42, .28); cursor: grabbing; }
+    .lw-placeholder { border: 2px dashed #16a34a; border-radius: 4px; background: rgba(22, 163, 74, .06); }
+    .lw-size-tip { position: absolute; right: 20px; bottom: 3px; z-index: 3; padding: 0 .4rem; border-radius: 3px; background: #0f172a; color: #fff; font-size: .7rem; font-variant-numeric: tabular-nums; }
+    .lw-toast { position: fixed; right: 1rem; bottom: 4.2rem; z-index: 1070; padding: .4rem .8rem; border-radius: 4px; background: #166534; color: #fff; font-size: .85rem; box-shadow: 0 6px 18px rgba(15, 23, 42, .2); opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .lw-toast.is-error { background: #b91c1c; }
+    .lw-toast.is-on { opacity: 1; }
     .rrd-legend { border-collapse: collapse; margin-top: .3rem; }
     .rrd-legend th, .rrd-legend td { padding: 0 .9rem 0 0; font-weight: normal; text-align: left; white-space: nowrap; }
     .tg[data-style="rrd"] .tg-legend { font-family: 'DejaVu Sans Mono', Menlo, Consolas, monospace; font-size: 11px; color: #222; line-height: 1.35; overflow-x: auto; }
@@ -270,6 +314,120 @@
         if (document.hidden) return;
         graphs.forEach(function (el) { if (el._data) TrafficGraph.load(el); });
     }, {{ max(30, $dashboard->refresh_seconds) * 1000 }});
+
+    // Arranging (edit mode): drag a graph by its title bar, resize it by its corner; saved by itself.
+    (function () {
+        var grid = document.getElementById('lw-grid');
+        if (!grid || !grid.classList.contains('is-editing')) return;
+        var token = (document.querySelector('meta[name="csrf-token"]') || {}).content;
+        var MIN = {{ \App\Models\GraphWidget::MIN_HEIGHT }}, MAX = {{ \App\Models\GraphWidget::MAX_HEIGHT }};
+        var toastEl = document.createElement('div'), toastTimer, saveTimer;
+        toastEl.className = 'lw-toast';
+        document.body.appendChild(toastEl);
+
+        function toast(text, error) {
+            toastEl.textContent = text;
+            toastEl.classList.toggle('is-error', !!error);
+            toastEl.classList.add('is-on');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(function () { toastEl.classList.remove('is-on'); }, error ? 6000 : 1800);
+        }
+        function save() {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(function () {
+                var items = Array.prototype.map.call(grid.querySelectorAll('.lw-item[data-id]'), function (it) {
+                    return { id: +it.getAttribute('data-id'), width: +it.getAttribute('data-w'), height: +it.getAttribute('data-h') };
+                });
+                fetch(grid.getAttribute('data-layout-url'), {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': token },
+                    body: JSON.stringify({ items: items }),
+                }).then(function (r) {
+                    if (!r.ok) throw new Error(r.status);
+                    toast(uiText('Layout saved', 'সাজানো সেভ হয়েছে'));
+                }).catch(function () {
+                    toast(uiText('Could not save the layout — reload the page and try again.', 'সাজানো সেভ করা যায়নি — পেজ রিলোড করে আবার চেষ্টা করুন।'), true);
+                });
+            }, 250);
+        }
+        function setSize(it, w, h) {
+            it.setAttribute('data-w', w);
+            it.setAttribute('data-h', h);
+            it.style.setProperty('--w', w);
+            it.style.setProperty('--wm', w > 6 ? 12 : 6);
+            it.style.setProperty('--h', h + 'px');
+        }
+        function drag(e, onMove, onEnd) {
+            e.preventDefault();
+            function move(ev) { onMove(ev); }
+            function up(ev) {
+                document.removeEventListener('pointermove', move);
+                document.removeEventListener('pointerup', up);
+                document.removeEventListener('pointercancel', up);
+                onEnd(ev);
+            }
+            document.addEventListener('pointermove', move);
+            document.addEventListener('pointerup', up);
+            document.addEventListener('pointercancel', up);
+        }
+
+        grid.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0) return;
+
+            // Resize by the bottom-right corner: width in grid columns (wide screens), height in 10 px steps.
+            var handle = e.target.closest('.lw-resize');
+            if (handle) {
+                var it = handle.closest('.lw-item'), card = it.querySelector('.lw-card');
+                var hasPlot = !!it.querySelector('.tg-plot');
+                var gap = parseFloat(getComputedStyle(grid).columnGap) || 16;
+                var colW = (grid.getBoundingClientRect().width + gap) / 12, left = it.getBoundingClientRect().left;
+                var startY = e.clientY, startH = +it.getAttribute('data-h');
+                var tip = document.createElement('span');
+                tip.className = 'lw-size-tip';
+                card.appendChild(tip);
+                drag(e, function (ev) {
+                    var w = window.innerWidth >= 1200 ? Math.max(2, Math.min(12, Math.round((ev.clientX - left + gap) / colW))) : +it.getAttribute('data-w');
+                    var h = hasPlot ? Math.max(MIN, Math.min(MAX, Math.round((startH + ev.clientY - startY) / 10) * 10)) : startH;
+                    setSize(it, w, h);
+                    tip.textContent = w + '/12' + (hasPlot ? ' · ' + h + ' px' : '');
+                }, function () { tip.remove(); save(); });
+                return;
+            }
+
+            // Move by the title bar (not its buttons and links).
+            var head = e.target.closest('.lw-head');
+            if (!head || e.target.closest('a, button, input, select, form, .lw-tools')) return;
+            var item = head.closest('.lw-item'), r = item.getBoundingClientRect();
+            var dx = e.clientX - r.left, dy = e.clientY - r.top;
+            var ph = document.createElement('div');
+            ph.className = 'lw-item lw-placeholder';
+            ph.style.cssText = item.style.cssText;
+            ph.style.height = r.height + 'px';
+            grid.insertBefore(ph, item);
+            item.classList.add('is-dragging');
+            item.style.width = r.width + 'px';
+            item.style.left = r.left + 'px';
+            item.style.top = r.top + 'px';
+            drag(e, function (ev) {
+                item.style.left = (ev.clientX - dx) + 'px';
+                item.style.top = (ev.clientY - dy) + 'px';
+                var under = document.elementFromPoint(ev.clientX, ev.clientY);
+                var target = under && under.closest('.lw-item');
+                if (target && target !== ph && target.parentNode === grid) {
+                    var tr = target.getBoundingClientRect();
+                    grid.insertBefore(ph, ev.clientX > tr.left + tr.width / 2 ? target.nextSibling : target);
+                }
+                if (ev.clientY < 70) window.scrollBy(0, -14);
+                else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 14);
+            }, function () {
+                item.classList.remove('is-dragging');
+                item.style.width = item.style.left = item.style.top = '';
+                grid.insertBefore(item, ph);
+                ph.remove();
+                save();
+            });
+        });
+    })();
 
     // Dashboard picker.
     var pick = document.getElementById('dash-pick');

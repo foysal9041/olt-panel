@@ -137,6 +137,44 @@
                         </small>
                     </div>
 
+                    @php
+                        $timeValue = fn ($field) => old($field, $settings->$field ? \Illuminate\Support\Carbon::parse($settings->$field)->format('H:i') : '');
+                        // Shifts that start or end outside office time: those punches wouldn't count.
+                        $outsideShifts = $settings->hasPunchWindow()
+                            ? \App\Models\DutyShift::orderBy('start_time')->get()->filter(function ($shift) use ($settings) {
+                                $day = \Illuminate\Support\Carbon::today();
+                                $end = \App\Services\AttendanceCalculator::shiftEnd($day, $shift);
+                                return $settings->workDay($day->copy()->setTimeFromTimeString($shift->start_time)) === null
+                                    || ($end && $settings->workDay($end) === null);
+                            })
+                            : collect();
+                    @endphp
+                    <div class="form-group mb-0">
+                        <label>Office Time <small class="text-muted">(punches counted)</small></label>
+                        <div class="d-flex align-items-center" style="gap:.5rem">
+                            <input type="time" name="punch_from" class="form-control @error('punch_from') is-invalid @enderror" value="{{ $timeValue('punch_from') }}">
+                            <span class="text-muted">–</span>
+                            <input type="time" name="punch_until" class="form-control @error('punch_until') is-invalid @enderror" value="{{ $timeValue('punch_until') }}">
+                        </div>
+                        @error('punch_from')
+                            <div class="text-danger small">{{ $message }}</div>
+                        @enderror
+                        @error('punch_until')
+                            <div class="text-danger small">{{ $message }}</div>
+                        @enderror
+                        <small class="text-muted d-block mt-1">
+                            Only punches inside this time count for check-in, check-out, late and extra duty; the rest stay in the device log as "not counted".
+                            Leave both empty to count the whole day. An end earlier than the start runs past midnight, and those punches count for the day before.
+                        </small>
+                        @if ($outsideShifts->isNotEmpty())
+                            <div class="text-warning small mt-1">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                {{ \App\Support\Ui::t('These shifts start or end outside office time:') }}
+                                <strong>{{ $outsideShifts->map(fn ($s) => $s->name . ' (' . $s->hoursLabel() . ')')->implode(', ') }}</strong>
+                            </div>
+                        @endif
+                    </div>
+
                 </div>
 
                 <div class="card-footer">

@@ -169,6 +169,36 @@ class GraphDashboardController extends Controller
         return redirect()->route('graphs.show', [$dashboard, 'edit' => 1]);
     }
 
+    /**
+     * Drag and drop: the dashboard's graphs in their new order, each with
+     * its width (grid columns) and height.
+     */
+    public function layout(Request $request, GraphDashboard $dashboard)
+    {
+        abort_unless($dashboard->canEdit($request->user()), 403);
+        $data = $request->validate([
+            'items' => 'required|array|max:200',
+            'items.*.id' => 'required|integer',
+            'items.*.width' => 'required|integer|between:2,12',
+            'items.*.height' => 'required|integer|between:' . GraphWidget::MIN_HEIGHT . ',' . GraphWidget::MAX_HEIGHT,
+        ]);
+
+        $ids = $dashboard->widgets()->pluck('id')->all();
+        $items = collect($data['items'])->filter(fn ($i) => in_array((int) $i['id'], $ids, true))->unique('id')->values();
+        DB::transaction(function () use ($items, $ids) {
+            foreach ($items as $i => $item) {
+                GraphWidget::whereKey($item['id'])->update(['position' => $i + 1, 'width' => (int) $item['width'], 'height' => (int) $item['height']]);
+            }
+            // Any graph the page didn't send (added meanwhile) goes after.
+            $n = $items->count();
+            foreach (array_diff($ids, $items->pluck('id')->map(fn ($id) => (int) $id)->all()) as $id) {
+                GraphWidget::whereKey($id)->update(['position' => ++$n]);
+            }
+        });
+
+        return response()->json(['ok' => true]);
+    }
+
     /** A traffic graph's points and legend (public/js/traffic-graph.js). */
     public function data(Request $request, GraphDashboard $dashboard, GraphWidget $widget, \App\Services\GraphEngine $engine)
     {
@@ -225,7 +255,7 @@ class GraphDashboardController extends Controller
         $data = $request->validate([
             'kind' => ['required', Rule::in(array_keys(GraphWidget::KINDS))],
             'title' => 'nullable|string|max:150',
-            'width' => ['required', Rule::in(array_keys(GraphWidget::WIDTHS))],
+            'width' => 'required|integer|between:2,12',
             'graph' => ['nullable', Rule::in(array_keys(SwitchPortTraffic::GRAPHS))],
             'ports' => 'nullable|array|max:64',
             'ports.*' => 'integer',
