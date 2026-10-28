@@ -23,7 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
     $middleware->appendToGroup('web', \App\Http\Middleware\SetLocale::class);
     $middleware->encryptCookies(except: ['locale']);
 
-    // The site is served through Cloudflare (noc.sunlitnetwork.com). Trust
+    // Installations served through Cloudflare: trust
     // only Cloudflare's edge ranges, so request()->ip() is the real visitor
     // and HTTPS is detected from X-Forwarded-Proto — a direct hit on the
     // server can't spoof these headers.

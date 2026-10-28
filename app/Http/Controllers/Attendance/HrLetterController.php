@@ -130,7 +130,7 @@ class HrLetterController extends Controller
                 'working_hours' => '9:00 AM to 6:00 PM',
                 'weekly_off' => $e?->weekly_off_day ?? 'Friday',
                 'reporting_to' => null,
-                'workplace' => 'Sunlit Network DC, ' . $s['address'],
+                'workplace' => \App\Support\Branding::legalName() . ', ' . $s['address'],
                 'notice_days' => 30,
                 'terms' => implode("\n", self::DEFAULT_TERMS),
             ];

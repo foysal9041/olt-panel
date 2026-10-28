@@ -57,7 +57,7 @@
                     <div class="form-row">
                         <div class="col-md-6 form-group">
                             <label>Mail server (SMTP host)</label>
-                            <input type="text" name="host" class="form-control mono{{ $err('host') }}" value="{{ old('host', $settings->host) }}" placeholder="mail.sunlitnetwork.com">
+                            <input type="text" name="host" class="form-control mono{{ $err('host') }}" value="{{ old('host', $settings->host) }}" placeholder="mail.example.com">
                         </div>
                         <div class="col-7 col-md-4 form-group">
                             <label>Encryption</label>
@@ -76,7 +76,7 @@
                     <div class="form-row">
                         <div class="col-md-6 form-group">
                             <label>Username</label>
-                            <input type="text" name="username" class="form-control{{ $err('username') }}" value="{{ old('username', $settings->username) }}" placeholder="billing@sunlitnetwork.com" autocomplete="off">
+                            <input type="text" name="username" class="form-control{{ $err('username') }}" value="{{ old('username', $settings->username) }}" placeholder="billing@example.com" autocomplete="off">
                             <small class="form-text text-muted">Usually the full email address of the mailbox.</small>
                         </div>
                         <div class="col-md-6 form-group">
@@ -90,23 +90,23 @@
                     <div class="form-row">
                         <div class="col-md-6 form-group">
                             <label>From address</label>
-                            <input type="email" name="from_address" class="form-control{{ $err('from_address') }}" value="{{ old('from_address', $settings->from_address) }}" placeholder="billing@sunlitnetwork.com">
+                            <input type="email" name="from_address" class="form-control{{ $err('from_address') }}" value="{{ old('from_address', $settings->from_address) }}" placeholder="billing@example.com">
                             <small class="form-text text-muted">Normally the same as the username.</small>
                         </div>
                         <div class="col-md-6 form-group">
                             <label>From name</label>
-                            <input type="text" name="from_name" maxlength="255" class="form-control{{ $err('from_name') }}" value="{{ old('from_name', $settings->from_name ?: 'Sunlit Network DC') }}">
+                            <input type="text" name="from_name" maxlength="255" class="form-control{{ $err('from_name') }}" value="{{ old('from_name', $settings->from_name ?: \App\Support\Branding::legalName()) }}">
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="col-md-6 form-group">
                             <label>Replies go to <small class="text-muted">(optional)</small></label>
-                            <input type="email" name="reply_to" class="form-control{{ $err('reply_to') }}" value="{{ old('reply_to', $settings->reply_to) }}" placeholder="accounts@sunlitnetwork.com">
+                            <input type="email" name="reply_to" class="form-control{{ $err('reply_to') }}" value="{{ old('reply_to', $settings->reply_to) }}" placeholder="accounts@example.com">
                         </div>
                         <div class="col-md-6 form-group">
                             <label>Office copy (BCC) <small class="text-muted">(optional)</small></label>
-                            <input type="text" name="bcc" maxlength="500" class="form-control{{ $err('bcc') }}" value="{{ old('bcc', $settings->bcc) }}" placeholder="accounts@sunlitnetwork.com">
+                            <input type="text" name="bcc" maxlength="500" class="form-control{{ $err('bcc') }}" value="{{ old('bcc', $settings->bcc) }}" placeholder="accounts@example.com">
                             <small class="form-text text-muted">Gets a hidden copy of every mail sent to clients.</small>
                         </div>
                     </div>
@@ -171,8 +171,8 @@
     <div class="card-header"><h3 class="card-title"><i class="fas fa-list-ol mr-1 text-primary"></i> How to set up (one time)</h3></div>
     <div class="card-body small">
         <ol class="pl-3 mb-0">
-            <li class="mb-2"><strong>Make a mailbox</strong> on the hosting where sunlitnetwork.com's email lives (cPanel → <em>Email Accounts</em> → Create), e.g. <code>billing@sunlitnetwork.com</code>.</li>
-            <li class="mb-2"><strong>Find the SMTP details:</strong> cPanel → Email Accounts → <em>Connect Devices</em> shows the outgoing server (often <code>mail.sunlitnetwork.com</code>) with port <strong>465 (SSL)</strong>. Use those here.</li>
+            <li class="mb-2"><strong>Make a mailbox</strong> on the hosting where your domain's email lives (cPanel → <em>Email Accounts</em> → Create), e.g. <code>{{ 'billing@' . (\App\Support\Branding::websiteShort() ?: 'example.com') }}</code>.</li>
+            <li class="mb-2"><strong>Find the SMTP details:</strong> cPanel → Email Accounts → <em>Connect Devices</em> shows the outgoing server (often <code>mail.{{ \App\Support\Branding::websiteShort() ?: 'example.com' }}</code>) with port <strong>465 (SSL)</strong>. Use those here.</li>
             <li class="mb-2"><strong>Cloudflare:</strong> the mail host's DNS record must be <em>DNS only</em> (grey cloud) — Cloudflare's proxy doesn't carry mail.</li>
             <li class="mb-2"><strong>Avoid the spam folder:</strong> in the domain's DNS keep the SPF record (<code>v=spf1 … include:…</code>) and DKIM that the hosting gives you; cPanel → <em>Email Deliverability</em> shows if anything is missing.</li>
             <li><strong>Here:</strong> fill in the form, turn <em>Email invoices and money receipts</em> on, Save, then <em>Send test</em> to your own address.</li>

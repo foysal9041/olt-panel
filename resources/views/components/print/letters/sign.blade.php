@@ -4,6 +4,6 @@
     @if ($signature)<img src="{{ $signature }}" alt="">@endif
     <div class="ln">
         <b>{{ $d['signatory'] }}</b><br>
-        {{ $d['signatory_title'] }}, Sunlit Network DC
+        {{ $d['signatory_title'] }}, {{ \App\Support\Branding::legalName() }}
     </div>
 </div>

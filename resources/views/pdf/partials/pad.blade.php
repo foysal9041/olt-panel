@@ -23,15 +23,21 @@
     $globe = $svg('<g fill="none" stroke="#ffffff" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></g>', '0 0 24 24');
 @endphp
 <img class="pad-bg" src="{{ $bg }}" alt="">
-<img class="pad-mark" src="{{ public_path('images/logo-icon-gray.png') }}" alt="">
-<img class="pad-logo" src="{{ public_path('images/logo.png') }}" alt="Sunlit Network DC">
+<img class="pad-mark" src="{{ \App\Support\Branding::path('icon-gray') }}" alt="">
+<img class="pad-logo" src="{{ \App\Support\Branding::path('logo') }}" alt="{{ \App\Support\Branding::legalName() }}">
 <div class="pad-contact">
-    <div>09614-552233<img src="{{ $phone }}" alt=""></div>
-    <div>sunlitnetwork@gmail.com<img src="{{ $mail }}" alt=""></div>
+    @if (\App\Support\Branding::phone())
+        <div>{{ \App\Support\Branding::phone() }}<img src="{{ $phone }}" alt=""></div>
+    @endif
+    @if (\App\Support\Branding::email())
+        <div>{{ \App\Support\Branding::email() }}<img src="{{ $mail }}" alt=""></div>
+    @endif
 </div>
 <div class="pad-rule"></div>
 <div class="pad-rule-bar"></div>
 <div class="pad-foot">
-    <div class="pad-web"><img src="{{ $globe }}" alt="">www.sunlitnetwork.com</div>
-    <div class="pad-addr">Sunlit Network DC, Roshid Super Market 2nd Floor<br>Navaron Bazar, Sharsha, Jashore</div>
+    @if (\App\Support\Branding::website())
+        <div class="pad-web"><img src="{{ $globe }}" alt="">{{ \App\Support\Branding::website() }}</div>
+    @endif
+    <div class="pad-addr">{{ \App\Support\Branding::letterheadAddress() }}</div>
 </div>

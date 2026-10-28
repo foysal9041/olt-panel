@@ -58,7 +58,7 @@
                     <div class="line"></div>
                     <div><strong>Received By</strong></div>
                     <div>{{ $payment->received_by ?: '' }}</div>
-                    <div>Sunlit Network DC</div>
+                    <div>{{ \App\Support\Branding::legalName() }}</div>
                 </td>
                 <td class="gap"></td>
                 <td>

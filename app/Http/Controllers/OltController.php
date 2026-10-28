@@ -311,7 +311,7 @@ class OltController extends Controller
         $allOlts = Olt::get(['id', 'name', 'ip', 'zone', 'vlan']);
         $zoneOlts = $allOlts->where('zone', $zone->name);
 
-        // Names: reuse the zone's prefix ("Kaliganj" for "Sunlit Kaliganj_Ovi").
+        // Names: reuse the zone's prefix ("Kaliganj" for "Acme Kaliganj_Ovi").
         $prefix = $zoneOlts->map(fn ($o) => preg_match('/^(.*?)\s*OLT-?\s*\d+$/i', $o->name, $m) ? trim($m[1]) : null)
             ->filter()->countBy()->sortDesc()->keys()->first() ?? $zone->name;
         $number = $zoneOlts->map(fn ($o) => preg_match('/(\d+)\s*$/', $o->name, $m) ? (int) $m[1] : 0)->max() ?? 0;

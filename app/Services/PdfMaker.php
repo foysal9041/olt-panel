@@ -41,7 +41,7 @@ class PdfMaker
         return $dompdf->output();
     }
 
-    /** A safe file name, as the print pages' Download PDF names it: "Sunlit-DC-019 Navaron.pdf". */
+    /** A safe file name, as the print pages' Download PDF names it: "INV-019 Navaron.pdf". */
     public static function fileName(string ...$parts): string
     {
         return trim(preg_replace('/[^\w\s.()-]+/u', ' ', str_replace('/', '-', implode(' ', $parts)))) . '.pdf';

@@ -1,6 +1,7 @@
 /* ==========================================================================
    Sign-in and other guest pages (layouts/guest.blade.php + auth/*).
-   Brand colours follow the Sunlit Network logo (sky blue on deep navy).
+   The design's colours (sky blue on deep navy); a company's own colours
+   override these variables (Settings → Company Branding).
    Plain CSS so it works without a Vite rebuild; Tailwind utilities used by
    the other auth pages (forgot / reset password …) still come from @vite.
    ========================================================================== */
@@ -478,3 +479,7 @@ body.auth-body {
 @media (prefers-reduced-motion: reduce) {
     .auth-panel, .auth-pulses circle, .auth-spinner { animation: none; }
 }
+
+/* Brand panel without an uploaded logo: the mark and the company name. */
+.auth-brand-wordmark { display: inline-flex; align-items: center; gap: .75rem; color: #fff; font-size: 1.35rem; font-weight: 800; letter-spacing: .01em; }
+.auth-brand-wordmark img { width: 2.6rem; height: 2.6rem; border-radius: .6rem; }

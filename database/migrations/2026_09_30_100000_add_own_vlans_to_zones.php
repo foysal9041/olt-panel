@@ -17,11 +17,8 @@ return new class extends Migration
             $table->boolean('own_vlans')->default(false)->after('notes');
         });
 
-        DB::table('zones')
-            ->where(fn ($q) => $q->where('name', 'like', 'Sunlit %')
-                ->orWhere('name', 'like', '%POP%')
-                ->orWhereIn('name', ['Kushkhali', 'Koyla', 'Buita', 'Batra', 'Khulna -Daulotpur']))
-            ->update(['own_vlans' => true]);
+        // Existing POPs (names with "POP") get it switched on; others are set per zone.
+        DB::table('zones')->where('name', 'like', '%POP%')->update(['own_vlans' => true]);
     }
 
     public function down(): void

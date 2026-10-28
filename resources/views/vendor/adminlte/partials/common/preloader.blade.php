@@ -9,9 +9,9 @@
 
     @else
 
-        {{-- Sunlit Network's logo is a wide wordmark, not a square icon, so
-        it skips the upstream default's img-circle class (which would crop
-        it into an oval). --}}
+        {{-- The company logo is a wide wordmark, not a square icon, so it
+        skips the upstream default's img-circle class (which would crop it
+        into an oval). --}}
         <img src="{{ asset(config('adminlte.preloader.img.path', 'vendor/adminlte/dist/img/AdminLTELogo.png')) }}"
              class="{{ config('adminlte.preloader.img.effect', 'animation__shake') }}"
              alt="{{ config('adminlte.preloader.img.alt', 'AdminLTE Preloader Image') }}"

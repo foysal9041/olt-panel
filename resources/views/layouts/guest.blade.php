@@ -1,3 +1,4 @@
+@use('App\Support\Branding')
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
@@ -6,16 +7,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#071a33">
+    <meta name="theme-color" content="{{ Branding::themeColor() }}">
 
-    <title>Sign in · Sunlit Network</title>
-    <link rel="icon" type="image/png" href="{{ asset('images/logo-icon.png') }}">
+    <title>{{ \App\Support\Ui::t('Sign in') }} · {{ Branding::name() }}</title>
+    <link rel="icon" href="{{ Branding::url('favicon') }}">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ asset('css/auth.css') }}?v={{ filemtime(public_path('css/auth.css')) }}">
+    @if ($brandCss = Branding::authCss())
+        <style id="brand-colors">{{ $brandCss }}</style>
+    @endif
     <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         html[lang="bn"] body { font-family: 'Hind Siliguri', 'Inter', system-ui, sans-serif; }
@@ -28,14 +32,16 @@
 <body class="auth-body">
 
 @php
-    $logo = asset('images/logo.png') . '?v=' . filemtime(public_path('images/logo.png'));
-    $mark = asset('images/logo-icon.png') . '?v=' . filemtime(public_path('images/logo-icon.png'));
+    $logo = Branding::url('logo');
+    $mark = Branding::url('icon');
+    // "Network Operations & Business Panel" breaks before the "&", as designed.
+    $headline = str_replace(' &amp; ', '<br>&amp; ', e(Branding::tagline()));
 @endphp
 
 <div class="auth-shell">
 
     {{-- ================= Brand panel (desktop) ================= --}}
-    <aside class="auth-brand" aria-label="Sunlit Network">
+    <aside class="auth-brand" aria-label="{{ Branding::name() }}">
 
         {{-- Orbit rings (echo the logo) and a live-looking network map --}}
         <svg class="auth-art" viewBox="0 0 800 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -70,13 +76,18 @@
         </svg>
 
         <div class="auth-brand-top">
-            <img src="{{ $logo }}" alt="Sunlit Network DC" class="auth-brand-logo">
+            @if (Branding::hasLogo())
+                <img src="{{ $logo }}" alt="{{ Branding::legalName() }}" class="auth-brand-logo">
+            @else
+                {{-- No uploaded logo: the mark and the name, readable on the dark panel. --}}
+                <span class="auth-brand-wordmark"><img src="{{ $mark }}" alt=""><span>{{ Branding::name() }}</span></span>
+            @endif
         </div>
 
         <div class="auth-brand-body">
-            <span class="auth-eyebrow"><span class="auth-eyebrow-dot"></span> Sunlit Network DC</span>
+            <span class="auth-eyebrow"><span class="auth-eyebrow-dot"></span> {{ Branding::legalName() }}</span>
 
-            <h1 class="auth-brand-title">Network Operations<br>&amp; Business Panel</h1>
+            <h1 class="auth-brand-title">{!! $headline !!}</h1>
 
             <p class="auth-brand-text">
                 Monitor OLTs, switches, links and latency, keep every IP and VLAN in one register,
@@ -115,7 +126,7 @@
         <div class="auth-panel">
 
             <div class="auth-mobile-brand">
-                <img src="{{ $logo }}" alt="Sunlit Network DC">
+                <img src="{{ $logo }}" alt="{{ Branding::legalName() }}">
             </div>
 
             <div class="auth-card">
@@ -124,8 +135,13 @@
             </div>
 
             <p class="auth-footer">
-                &copy; {{ now()->year }} Sunlit Network DC. All rights reserved.<br>
-                Developed by <strong>Foysal</strong>, CTO, Sunlit Network
+                &copy; {{ now()->year }} {{ Branding::copyrightHolder() }}. {{ \App\Support\Ui::t('All rights reserved.') }}
+                @if ($credit = Branding::footerCredit())
+                    <br>{{ $credit }}
+                @endif
+                @foreach (Branding::legalLinks() as $label => $url)
+                    <br><a href="{{ $url }}" target="_blank" rel="noopener">{{ \App\Support\Ui::t($label) }}</a>
+                @endforeach
             </p>
 
         </div>

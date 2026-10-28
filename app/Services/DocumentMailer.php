@@ -10,6 +10,7 @@ use App\Models\Customer;
 use App\Models\MailSetting;
 use App\Models\SentMail;
 use App\Models\ZoneSettlementRow;
+use App\Support\Branding;
 use App\Support\Dec;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Database\Eloquent\Model;
@@ -78,9 +79,9 @@ class DocumentMailer
         $rows[$due < 0 ? 'Advance' : 'Amount due'] = $this->taka(abs($due));
 
         $mail = new DocumentMail(
-            title: "Invoice {$invoice->invoice_no} — Bill for {$invoice->month->format('F Y')} · Sunlit Network DC",
+            title: "Invoice {$invoice->invoice_no} — Bill for {$invoice->month->format('F Y')} · " . Branding::legalName(),
             greeting: 'Dear ' . ($customer->contact_person ?: $customer->name) . ',',
-            intro: "Please find your bandwidth bill for {$invoice->month->format('F Y')} from Sunlit Network DC.",
+            intro: "Please find your bandwidth bill for {$invoice->month->format('F Y')} from " . Branding::legalName() . '.',
             rows: $rows,
             pdf: $this->pdf->render('pdf.bandwidth-invoice', ['invoices' => collect([$invoice])]),
             fileName: PdfMaker::fileName($invoice->invoice_no, $customer->name),
@@ -109,7 +110,7 @@ class DocumentMailer
         ];
 
         $mail = new DocumentMail(
-            title: "Money Receipt {$payment->receiptNo()} — " . $this->taka($payment->amount) . ' received · Sunlit Network DC',
+            title: "Money Receipt {$payment->receiptNo()} — " . $this->taka($payment->amount) . ' received · ' . Branding::legalName(),
             greeting: 'Dear ' . ($customer->contact_person ?: $customer->name) . ',',
             intro: 'Thank you for your payment of ' . $this->taka($payment->amount) . " on {$payment->paid_on->format('d M Y')}. Your money receipt is below.",
             rows: $rows,
@@ -130,9 +131,9 @@ class DocumentMailer
         $c = $row->calc($settlement->bkash_percent);
 
         $mail = new DocumentMail(
-            title: "Invoice {$row->invoice_no} — Bill for {$settlement->month->format('M Y')} · Sunlit Network DC",
+            title: "Invoice {$row->invoice_no} — Bill for {$settlement->month->format('M Y')} · " . Branding::legalName(),
             greeting: 'Dear ' . ($row->customer->contact_person ?: $row->customer->name) . ',',
-            intro: "Please find your invoice for {$settlement->month->format('F Y')} (billing period {$settlement->periodLabel('d M Y')}) from Sunlit Network DC.",
+            intro: "Please find your invoice for {$settlement->month->format('F Y')} (billing period {$settlement->periodLabel('d M Y')}) from " . Branding::legalName() . '.',
             rows: [
                 'Invoice No' => $row->invoice_no,
                 'Invoice date' => $settlement->invoice_date->format('d M Y'),
@@ -151,12 +152,12 @@ class DocumentMailer
     public function test(string $to, ?int $userId = null): SentMail
     {
         $settings = $this->settings();
-        $log = SentMail::create(['kind' => 'test', 'to' => $to, 'subject' => 'Test mail — Sunlit Network DC', 'user_id' => $userId]);
+        $log = SentMail::create(['kind' => 'test', 'to' => $to, 'subject' => 'Test mail — ' . Branding::legalName(), 'user_id' => $userId]);
 
         try {
             $this->mailer()->raw(
-                "This is a test mail from the Sunlit Network DC panel.\n\nInvoices and money receipts will be emailed to clients from {$settings->from_address}.\n\n" . now()->format('d M Y, h:i A'),
-                fn ($m) => $m->to($to)->from($settings->from_address, $settings->from_name ?: 'Sunlit Network DC')->subject($log->subject)
+                "This is a test mail from the " . Branding::legalName() . " panel.\n\nInvoices and money receipts will be emailed to clients from {$settings->from_address}.\n\n" . now()->format('d M Y, h:i A'),
+                fn ($m) => $m->to($to)->from($settings->from_address, $settings->from_name ?: Branding::legalName())->subject($log->subject)
             );
             $log->update(['status' => 'sent']);
         } catch (\Throwable $e) {

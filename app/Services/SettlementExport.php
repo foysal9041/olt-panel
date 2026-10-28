@@ -28,7 +28,7 @@ class SettlementExport
     public function build(ZoneSettlement $s): string
     {
         $book = new Spreadsheet();
-        $book->getProperties()->setCreator('Sunlit Network DC')->setTitle('Zone Settlement ' . $s->month->format('F Y'));
+        $book->getProperties()->setCreator(\App\Support\Branding::legalName())->setTitle('Zone Settlement ' . $s->month->format('F Y'));
 
         $this->original($book->getActiveSheet(), $s);
         [$calc, $first, $last, $totalRow] = $this->calculation($book->createSheet(), $s);
@@ -197,7 +197,7 @@ class SettlementExport
 
     protected function title(Worksheet $ws, string $text, string $lastCol): void
     {
-        $ws->setCellValue('A1', 'Sunlit Network DC — ' . $text);
+        $ws->setCellValue('A1', \App\Support\Branding::legalName() . ' — ' . $text);
         $ws->mergeCells("A1:{$lastCol}1");
         $ws->getStyle('A1')->getFont()->setBold(true)->setSize(13)->getColor()->setRGB(self::NAVY);
     }

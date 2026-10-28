@@ -10,7 +10,8 @@
     $initials = collect(preg_split('/\s+/', trim($c['name'] ?? '')))->filter()->take(2)->map(fn ($w) => mb_substr($w, 0, 1))->implode('');
     $vars = "--d: {$t[1]}; --m: {$t[2]}; --a: {$t[3]};";
     $layout = $t[4] ?? 'wave';
-    $icon_logo = asset('images/logo-icon.png') . '?v=' . filemtime(public_path('images/logo-icon.png'));
+    $icon_logo = \App\Support\Branding::url('icon');
+    [$brandTop, $brandRest] = \App\Support\Branding::cardWords();
     $icon = [
         'phone' => '<svg viewBox="0 0 512 512"><path d="M497 361l-111-48a24 24 0 0 0-28 7l-49 60A371 371 0 0 1 132 202l60-49a24 24 0 0 0 7-28L151 14a24 24 0 0 0-27-14L21 24A24 24 0 0 0 2 47c0 256 207 463 463 463a24 24 0 0 0 24-19l24-103a24 24 0 0 0-14-27z"/></svg>',
         'office' => '<svg viewBox="0 0 448 512"><path d="M436 480h-20V24c0-13-11-24-24-24H56C43 0 32 11 32 24v456H12c-7 0-12 5-12 12v20h448v-20c0-7-5-12-12-12zM128 76c0-7 5-12 12-12h40c7 0 12 5 12 12v40c0 7-5 12-12 12h-40c-7 0-12-5-12-12V76zm0 96c0-7 5-12 12-12h40c7 0 12 5 12 12v40c0 7-5 12-12 12h-40c-7 0-12-5-12-12v-40zm52 148h-40c-7 0-12-5-12-12v-40c0-7 5-12 12-12h40c7 0 12 5 12 12v40c0 7-5 12-12 12zm76 160h-64v-84c0-7 5-12 12-12h40c7 0 12 5 12 12v84zm64-172c0 7-5 12-12 12h-40c-7 0-12-5-12-12v-40c0-7 5-12 12-12h40c7 0 12 5 12 12v40zm0-96c0 7-5 12-12 12h-40c-7 0-12-5-12-12v-40c0-7 5-12 12-12h40c7 0 12 5 12 12v40zm0-96c0 7-5 12-12 12h-40c-7 0-12-5-12-12V76c0-7 5-12 12-12h40c7 0 12 5 12 12v40z"/></svg>',
@@ -67,8 +68,8 @@
         <rect class="fd" y="804" width="540" height="52"/>
         <rect class="fa" y="796" width="540" height="8"/>
     </svg>
-    <img class="idc-logo" src="{{ $logo }}" alt="Sunlit Network DC">
-    <div class="idc-brand"><img src="{{ $icon_logo }}" alt=""><div><b>SUNLIT</b><span>NETWORK DC</span></div></div>
+    <img class="idc-logo" src="{{ $logo }}" alt="{{ \App\Support\Branding::legalName() }}">
+    <div class="idc-brand"><img src="{{ $icon_logo }}" alt=""><div><b>{{ $brandTop }}</b><span>{{ $brandRest }}</span></div></div>
     <div class="idc-photo">
         @if (! empty($c['photo']))
             <img src="{{ $c['photo'] }}" alt="" data-photo>
@@ -113,7 +114,7 @@
             <rect class="fd" width="540" height="12"/>
         </g>
     </svg>
-    <img class="idc-logo" src="{{ $logo }}" alt="Sunlit Network DC">
+    <img class="idc-logo" src="{{ $logo }}" alt="{{ \App\Support\Branding::legalName() }}">
     <div class="idc-line"></div>
     <div class="idc-contact">
         <div data-row="office_phone" @style(['display:none' => blank($s['office_phone'])])><i>{!! $icon['office'] !!}</i><span>Office: <span data-s="office_phone">{{ $s['office_phone'] }}</span></span></div>
@@ -122,7 +123,7 @@
         <div data-row="address" @style(['display:none' => blank($s['address'])])><i>{!! $icon['pin'] !!}</i><span data-s="address">{{ $s['address'] }}</span></div>
     </div>
     <div class="idc-qr" data-qr="{{ $c['qr'] ?? '' }}"></div>
-    <div class="idc-note">This card is the property of Sunlit Network DC. If found, please return it to the address above.</div>
+    <div class="idc-note">This card is the property of {{ \App\Support\Branding::legalName() }}. If found, please return it to the address above.</div>
     <div class="idc-sign">
         @if ($signature)<img src="{{ $signature }}" alt="" data-sign>@else<div class="gap" data-sign-gap></div>@endif
         <div class="ln"></div>

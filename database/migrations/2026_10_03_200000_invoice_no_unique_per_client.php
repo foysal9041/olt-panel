@@ -8,8 +8,8 @@ return new class extends Migration
 {
     /**
      * The office gives every client the same number for a month
-     * ("Sunlit/DC/JULY"), so a number only has to be unique per client.
-     * Numbers made here (Sunlit/DC/OCT26/01, …) stay unique anyway.
+     * ("INV/JULY"), so a number only has to be unique per client.
+     * Numbers made here (INV/OCT26/01, …) stay unique anyway.
      */
     public function up(): void
     {

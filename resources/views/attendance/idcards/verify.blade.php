@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <title>ID Card Check — Sunlit Network DC</title>
+    <title>ID Card Check — {{ \App\Support\Branding::legalName() }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -37,11 +37,11 @@
             'valid' => 'Card is valid' . ($card->expiry_date ? ' until ' . $card->expiry_date->format('d M Y') : ''),
             'expired' => 'This card expired on ' . $card->expiry_date?->format('d M Y'),
             'revoked' => 'This card has been cancelled',
-            'left' => 'No longer works at Sunlit Network DC' . ($card->employee?->left_on ? ' (since ' . $card->employee->left_on->format('d M Y') . ')' : ''),
+            'left' => 'No longer works at ' . \App\Support\Branding::legalName() . ($card->employee?->left_on ? ' (since ' . $card->employee->left_on->format('d M Y') . ')' : ''),
         ][$status];
     @endphp
     <div class="box">
-        <div class="top"><img src="{{ asset('images/logo.png') }}" alt="Sunlit Network DC"></div>
+        <div class="top"><img src="{{ \App\Support\Branding::url('logo') }}" alt="{{ \App\Support\Branding::legalName() }}"></div>
         <div class="status {{ $valid ? 'ok' : 'bad' }}">
             {{ $valid ? '✔ VALID ID CARD' : '✖ NOT VALID' }}
             <small>{{ $line }}</small>

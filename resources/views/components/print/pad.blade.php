@@ -1,7 +1,7 @@
 @props(['plain' => false])
 
 {{--
-    One A4 page of the Sunlit Network DC letterhead pad: low-poly grey
+    One A4 page of the company's letterhead pad: low-poly grey
     background, globe watermark, logo + phone/email header with a blue/grey
     rule, and the blue address footer. The slot is laid out in the writing area
     between the rule and the footer.
@@ -9,9 +9,7 @@
     on the office's pre-printed pad paper.
 --}}
 
-@php
-    $img = fn ($file) => asset('images/' . $file) . '?v=' . filemtime(public_path('images/' . $file));
-@endphp
+@use('App\Support\Branding')
 
 @once
 <style>
@@ -71,14 +69,18 @@
         <polygon points="0,800 165,690 280,800" fill="#f4f4f4"/>
         <polygon points="280,800 613,800 613,720" fill="#f8f8f8"/>
     </svg>
-    <img class="pad-mark" src="{{ $img('logo-icon-gray.png') }}" alt="">
+    <img class="pad-mark" src="{{ Branding::url('icon-gray') }}" alt="">
 
-    <img class="pad-logo" src="{{ $img('logo.png') }}" alt="Sunlit Network DC">
+    <img class="pad-logo" src="{{ Branding::url('logo') }}" alt="{{ Branding::legalName() }}">
     <div class="pad-contact">
-        <div>09614-552233
+        @if (Branding::phone())
+        <div>{{ Branding::phone() }}
             <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></div>
-        <div>sunlitnetwork@gmail.com
+        @endif
+        @if (Branding::email())
+        <div>{{ Branding::email() }}
             <svg viewBox="0 0 24 24"><path d="M2 5h20v14H2V5zm2 2v.5l8 5 8-5V7H4zm16 2.8-8 5-8-5V17h16V9.8z"/></svg></div>
+        @endif
     </div>
     <div class="pad-rule"></div>
 
@@ -92,13 +94,14 @@
             <polygon points="330,0 470,0 420,50 300,50" fill="rgba(0,0,0,.04)"/>
             <polygon points="470,0 613,0 613,50 520,50" fill="rgba(255,255,255,.07)"/>
         </svg>
+        @if (Branding::website())
         <div class="pad-web">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></svg>
-            www.sunlitnetwork.com
+            {{ Branding::website() }}
         </div>
+        @endif
         <div class="pad-addr">
-            Sunlit Network DC, Roshid Super Market 2nd Floor<br>
-            Navaron Bazar, Sharsha, Jashore
+            {{ Branding::letterheadAddress() }}
         </div>
     </footer>
 </section>

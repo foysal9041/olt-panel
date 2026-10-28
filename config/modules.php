@@ -105,6 +105,7 @@ return [
         'icon' => 'fas fa-cog',
         'submodules' => [
             'general'  => 'General',
+            'branding' => 'Company Branding (name, logos, colours)',
             'users'    => 'User Management',
             'telegram' => 'Telegram Alerts',
             'mail'     => 'Email (invoices & receipts to clients)',

@@ -9,6 +9,8 @@
 #
 # Move the panel to another machine:  copy the file there, then
 #   sudo bash install.sh --restore=/path/olt-panel-backup-….tar.gz
+# Undo an update on this machine:
+#   sudo bash deploy/rollback.sh /path/olt-panel-backup-….tar.gz
 #
 # The file holds passwords and the app key: keep it private.
 set -Eeuo pipefail
@@ -45,13 +47,12 @@ DUMP=(mysqldump --no-defaults -h "${DB_HOST:-127.0.0.1}" -P "${DB_PORT:-3306}" -
       --single-transaction --quick --routines --triggers --default-character-set=utf8mb4 --no-tablespaces)
 
 echo "Backing up $APP_DIR (database $DB_NAME)…"
-{
-    IGNORE=()
-    for t in "${SKIP[@]}"; do IGNORE+=("--ignore-table=$DB_NAME.$t"); done
-    "${DUMP[@]}" "${IGNORE[@]}" "$DB_NAME"
-    # …and the skipped tables' structure, so a restore has every table.
-    "${DUMP[@]}" --no-data "$DB_NAME" "${SKIP[@]}"
-} | gzip -6 > "$TMP/database.sql.gz"
+IGNORE=()
+for t in "${SKIP[@]}"; do IGNORE+=("--ignore-table=$DB_NAME.$t"); done
+"${DUMP[@]}" "${IGNORE[@]}" "$DB_NAME" | gzip -6 > "$TMP/database.sql.gz"
+# The skipped tables' structure on its own: a new machine gets every table, while
+# a rollback (deploy/rollback.sh) leaves their current rows alone.
+"${DUMP[@]}" --no-data "$DB_NAME" "${SKIP[@]}" | gzip -6 > "$TMP/skipped-tables.sql.gz"
 echo "  database: $(du -h "$TMP/database.sql.gz" | cut -f1)"
 
 tar -czf "$TMP/storage.tar.gz" -C "$APP_DIR/storage" app
@@ -59,7 +60,8 @@ echo "  uploaded files: $(du -h "$TMP/storage.tar.gz" | cut -f1)"
 
 cp "$ENV_FILE" "$TMP/env"
 date '+%Y-%m-%d %H:%M' > "$TMP/created"
-echo "$(hostname) $(git -C "$APP_DIR" log -1 --format=%h 2>/dev/null || true)" > "$TMP/source"
+echo "$(hostname) $(git -c safe.directory="$APP_DIR" -C "$APP_DIR" log -1 --format=%h 2>/dev/null || true)" > "$TMP/source"
+git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse HEAD > "$TMP/version" 2>/dev/null || true
 [[ "$HISTORY" == no ]] && echo "without graph/latency history" >> "$TMP/source"
 
 (umask 077 && tar -czf "$FILE" -C "$TMP" .)

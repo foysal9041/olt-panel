@@ -165,7 +165,8 @@
     }
 
     function note(o) {
-        return 'Sunlit Network DC — office ID cards · '
+        // The company's name comes from the page (window.BRAND_NAME).
+        return (window.BRAND_NAME ? window.BRAND_NAME + ' — ' : '') + 'office ID cards · '
             + (o.fold ? 'fold on the dark dashed line, then cut / die-cut on the marks' : 'top: front, below: back · cut on the marks')
             + ' · print at 100% (actual size)' + (o.mirror ? ' · MIRRORED' : '');
     }

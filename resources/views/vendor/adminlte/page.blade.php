@@ -3,7 +3,11 @@
 @inject('layoutHelper', 'JeroenNoten\LaravelAdminLte\Helpers\LayoutHelper')
 @inject('preloaderHelper', 'JeroenNoten\LaravelAdminLte\Helpers\PreloaderHelper')
 
+{{-- The company's title, logos and preloader (Settings → Company Branding). --}}
+@php(\App\Support\Branding::applyToAdminLte())
+
 @section('adminlte_css')
+    @include('partials.brand-head')
     @stack('css')
     @yield('css')
 @stop

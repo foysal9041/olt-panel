@@ -384,7 +384,7 @@ class SettlementImporter
     }
 
     /**
-     * "Navaron - (Zone) (habibur@sunlit)" → ["Navaron", "habibur@sunlit"];
+     * "Navaron - (Zone) (user@zone)" → ["Navaron", "user@zone"];
      * anything else → [name without *, null].
      *
      * @return array{0: string, 1: ?string}

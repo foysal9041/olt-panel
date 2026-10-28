@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Receipt RCPT-{{ str_pad($transaction->id, 6, '0', STR_PAD_LEFT) }} — Sunlit Network</title>
+    <title>Receipt RCPT-{{ str_pad($transaction->id, 6, '0', STR_PAD_LEFT) }} — {{ \App\Support\Branding::name() }}</title>
 
     @include('accounts.partials.print-styles')
 
@@ -36,12 +36,18 @@
                 <td class="brand-cell">
                     <table class="brand">
                         <tr>
-                            <td class="logo-cell"><img src="{{ asset('images/logo-icon.png') }}?v={{ filemtime(public_path('images/logo-icon.png')) }}" alt="Sunlit Network"></td>
+                            <td class="logo-cell"><img src="{{ \App\Support\Branding::url('icon') }}" alt="{{ \App\Support\Branding::name() }}"></td>
                             <td>
-                                <p>Sunlit Network DC</p>
-                                <p>Navaron, Sharsha, Jashore</p>
-                                <p>Email: account@sunlitnetwork.com</p>
-                                <p>Website: sunlitnetwork.com</p>
+                                <p>{{ \App\Support\Branding::legalName() }}</p>
+                                @if (\App\Support\Branding::addressShort())
+                                    <p>{{ \App\Support\Branding::addressShort() }}</p>
+                                @endif
+                                @if (\App\Support\Branding::accountsEmail())
+                                    <p>Email: {{ \App\Support\Branding::accountsEmail() }}</p>
+                                @endif
+                                @if (\App\Support\Branding::websiteShort())
+                                    <p>Website: {{ \App\Support\Branding::websiteShort() }}</p>
+                                @endif
                             </td>
                         </tr>
                     </table>
@@ -84,8 +90,10 @@
         </table>
 
         <div class="footer-note">
-            This is a computer-generated receipt from Sunlit Network ERP.
-            For any billing queries, please call 09614-552233.
+            This is a computer-generated receipt from {{ \App\Support\Branding::appTitle() }}.
+            @if (\App\Support\Branding::phone())
+                For any billing queries, please call {{ \App\Support\Branding::phone() }}.
+            @endif
         </div>
 
     </div>

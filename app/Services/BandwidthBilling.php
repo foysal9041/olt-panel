@@ -167,10 +167,10 @@ class BandwidthBilling
         });
     }
 
-    /** Sunlit/DC/AUG26/01, numbered per month. */
+    /** <company prefix>AUG26/01 (e.g. INV/AUG26/01), numbered per month. */
     public function nextNumber(Carbon $month): string
     {
-        $prefix = 'Sunlit/DC/' . strtoupper($month->format('M')) . $month->format('y') . '/';
+        $prefix = \App\Support\Branding::invoicePrefix() . strtoupper($month->format('M')) . $month->format('y') . '/';
         $last = BandwidthInvoice::where('invoice_no', 'like', $prefix . '%')->lockForUpdate()->pluck('invoice_no')
             ->map(fn ($no) => (int) substr($no, strlen($prefix)))->max() ?? 0;
 

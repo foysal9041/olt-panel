@@ -1,8 +1,21 @@
+@use('App\Support\Branding')
 <div class="brand">
     <div class="brand-title">
-        <img src="{{ asset('images/logo-icon.png') }}?v={{ filemtime(public_path('images/logo-icon.png')) }}" alt="Sunlit Network DC">
-        <h1>Sunlit Network DC</h1>
+        <img src="{{ Branding::url('icon') }}" alt="{{ Branding::legalName() }}">
+        <h1>{{ Branding::legalName() }}</h1>
     </div>
-    <p>Navaron, Sharsha, Jashore</p>
-    <p>Email: account@sunlitnetwork.com · Website: sunlitnetwork.com</p>
+    @if (Branding::addressShort())
+        <p>{{ Branding::addressShort() }}</p>
+    @endif
+    <p>
+        @if (Branding::accountsEmail())
+            Email: {{ Branding::accountsEmail() }}
+        @endif
+        @if (Branding::accountsEmail() && Branding::websiteShort())
+            ·
+        @endif
+        @if (Branding::websiteShort())
+            Website: {{ Branding::websiteShort() }}
+        @endif
+    </p>
 </div>

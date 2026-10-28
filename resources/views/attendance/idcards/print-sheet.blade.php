@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 {{-- Office ID cards on A4 landscape: 5 a page, fronts on top, each back below, dashed cut lines. --}}
 @php
-    $logo = asset('images/logo.png') . '?v=' . filemtime(public_path('images/logo.png'));
+    $logo = \App\Support\Branding::url('logo');
     $W = 53.98; $H = 85.6; $gap = 3; $rowGap = 10;
     $x0 = (297 - (5 * $W + 4 * $gap)) / 2;
     $y0 = (210 - (2 * $H + $rowGap)) / 2;
     $pages = $items->chunk(5);
-    $fileName = 'Sunlit ID Cards ' . now()->format('Y-m-d');
+    $fileName = \App\Support\Branding::name() . ' ID Cards ' . now()->format('Y-m-d');
 @endphp
 <html lang="en">
 <head>
@@ -72,13 +72,14 @@
                     <div class="void" style="left: {{ $x }}mm; width: {{ $W }}mm; right: auto; top: {{ $y0 + 30 }}mm">NOT VALID</div>
                 @endunless
             @endforeach
-            <div class="note">Sunlit Network DC — office ID cards · top: front, below: back · cut along the dashed lines · print at 100% (actual size)</div>
+            <div class="note">{{ \App\Support\Branding::legalName() }} — office ID cards · top: front, below: back · cut along the dashed lines · print at 100% (actual size)</div>
         </div>
     @endforeach
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
             integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>window.BRAND_NAME = @json(\App\Support\Branding::legalName());</script>
     <script src="{{ asset('js/idcard-sheet.js') }}?v={{ filemtime(public_path('js/idcard-sheet.js')) }}"></script>
     <script>
     (function () {
@@ -121,7 +122,7 @@
                 });
             });
             document.querySelectorAll('.note').forEach(function (n) {
-                n.textContent = 'Sunlit Network DC — office ID cards · ' + (o.fold ? 'fold on the dark dashed line, then cut / die-cut on the marks' : 'top: front, below: back · cut on the marks') + ' · print at 100% (actual size)' + (o.mirror ? ' · MIRRORED' : '');
+                n.textContent = @json(\App\Support\Branding::legalName() . ' — office ID cards · ') + (o.fold ? 'fold on the dark dashed line, then cut / die-cut on the marks' : 'top: front, below: back · cut on the marks') + ' · print at 100% (actual size)' + (o.mirror ? ' · MIRRORED' : '');
             });
         }
         document.getElementById('idc-print-opts').addEventListener('change', relayout);

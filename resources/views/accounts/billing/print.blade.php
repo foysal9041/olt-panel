@@ -14,7 +14,7 @@
     $first = $invoices->first();
     $pdfName = $invoices->count() === 1
         ? str_replace('/', '-', $first->invoice_no) . ' ' . $first->customer->name
-        : 'Sunlit DC Bandwidth Invoices ' . $month->format('M Y');
+        : \App\Support\Branding::legalName() . ' Bandwidth Invoices ' . $month->format('M Y');
     $pdfName = trim(preg_replace('/[^\w\s.()-]+/u', ' ', $pdfName)) . '.pdf';
 @endphp
 
@@ -124,7 +124,7 @@
                         <div class="line"></div>
                         <div>{{ $invoice->prepared_by }}</div>
                         @if ($invoice->prepared_title)<div>{{ $invoice->prepared_title }}</div>@endif
-                        <div>Sunlit Network DC</div>
+                        <div>{{ \App\Support\Branding::legalName() }}</div>
                     </div>
                     <div class="inv-sign">
                         <p class="role">Received By</p>

@@ -22,7 +22,7 @@
         'qr' => $saved ? $card->verifyUrl() : '',
     ];
     $themeKey = old('theme', $card->theme ?: $settings['theme']);
-    $logo = asset('images/logo.png') . '?v=' . filemtime(public_path('images/logo.png'));
+    $logo = \App\Support\Branding::url('logo');
     $fileName = trim(preg_replace('/[^\w\s.-]+/u', ' ', 'ID Card ' . ($c['name'] ?: 'new') . ($card->card_no ? ' ' . $card->card_no : '')));
     $status = $saved ? $card->status() : null;
     $statusInfo = ['valid' => ['Valid', '#16a34a'], 'expired' => ['Expired', '#d97706'], 'revoked' => ['Cancelled', '#dc2626'], 'left' => ['Employee left', '#dc2626']];
@@ -281,6 +281,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
         integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>window.BRAND_NAME = @json(\App\Support\Branding::legalName());</script>
 <script src="{{ asset('js/idcard-sheet.js') }}?v={{ filemtime(public_path('js/idcard-sheet.js')) }}"></script>
 <script>
 (function () {
@@ -337,7 +338,7 @@
         qrTimer = setTimeout(function () {
             var box = stage.querySelector('[data-qr]');
             // The QR library only copes with plain ASCII text.
-            var text = (savedQr || ['Sunlit Network DC - ID card', 'Name: ' + val('name'), 'ID: ' + val('id'), 'Phone: ' + val('phone'), 'Valid till: ' + val('expiry')].join('\n'))
+            var text = (savedQr || [@json(\App\Support\Branding::legalName() . ' - ID card'), 'Name: ' + val('name'), 'ID: ' + val('id'), 'Phone: ' + val('phone'), 'Valid till: ' + val('expiry')].join('\n'))
                 .replace(/[^\x20-\x7E\n]/g, '');
             var tmp = document.createElement('div');
             try {

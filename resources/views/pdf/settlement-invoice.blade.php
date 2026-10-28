@@ -56,7 +56,7 @@
                         <div class="line"></div>
                         <div>{{ $settlement->prepared_by }}</div>
                         @if ($settlement->prepared_title)<div>{{ $settlement->prepared_title }}</div>@endif
-                        <div>Sunlit Network DC</div>
+                        <div>{{ \App\Support\Branding::legalName() }}</div>
                     </td>
                     <td class="gap"></td>
                     <td>

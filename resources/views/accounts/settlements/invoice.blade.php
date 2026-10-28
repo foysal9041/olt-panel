@@ -18,7 +18,7 @@
     $n = fn ($v) => number_format((float) Dec::round($v, 2), 2);
     $pdfName = $rows->count() === 1
         ? str_replace('/', '-', $rows->first()->invoice_no) . ' ' . $rows->first()->displayName()
-        : 'Sunlit DC Invoices ' . $settlement->month->format('M Y');
+        : \App\Support\Branding::legalName() . ' Invoices ' . $settlement->month->format('M Y');
     $pdfName = trim(preg_replace('/[^\w\s.()-]+/u', ' ', $pdfName)) . '.pdf';
 @endphp
 
@@ -99,7 +99,7 @@
                         <div class="line"></div>
                         <div>{{ $settlement->prepared_by }}</div>
                         @if ($settlement->prepared_title)<div>{{ $settlement->prepared_title }}</div>@endif
-                        <div>Sunlit Network DC</div>
+                        <div>{{ \App\Support\Branding::legalName() }}</div>
                     </div>
                     <div class="inv-sign">
                         <p class="role">Received By</p>

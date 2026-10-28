@@ -25,7 +25,7 @@
     <p>Dear {{ $d['name'] }},</p>
     <p>
         We are pleased to appoint you as <b>{{ $d['designation'] }}</b>@if (! empty($d['department'])) in the <b>{{ $d['department'] }}</b> department{{ '' }}@endif
-        of Sunlit Network DC. Your appointment is subject to the following terms and conditions:
+        of {{ \App\Support\Branding::legalName() }}. Your appointment is subject to the following terms and conditions:
     </p>
 
     <ol>
@@ -44,7 +44,7 @@
         @endforeach
     </ol>
 
-    <p>Please sign the duplicate copy of this letter to confirm that you accept this appointment. We welcome you to Sunlit Network DC and wish you a successful career with us.</p>
+    <p>Please sign the duplicate copy of this letter to confirm that you accept this appointment. We welcome you to {{ \App\Support\Branding::legalName() }} and wish you a successful career with us.</p>
 
     @include('components.print.letters.sign')
 

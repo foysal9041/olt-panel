@@ -11,7 +11,7 @@
     $resignation = $reason === 'resignation';
     $opening = match ($reason) {
         'resignation' => 'With reference to your resignation letter' . (! empty($d['resignation_date']) ? ' dated ' . $date($d['resignation_date']) : '') . ', the management has accepted your resignation. You will be released from your duties as ' . $role . ' at the close of business on ' . $last . '.',
-        'contract_end' => 'This is to inform you that your contract of employment as ' . $role . ' comes to an end, and your employment with Sunlit Network DC will end on ' . $last . '.',
+        'contract_end' => 'This is to inform you that your contract of employment as ' . $role . ' comes to an end, and your employment with ' . \App\Support\Branding::legalName() . ' will end on ' . $last . '.',
         'redundancy' => 'Due to restructuring of the company\'s operations, the position of ' . $role . ' is no longer required. We regret to inform you that your employment will end on ' . $last . '.',
         'performance' => 'Despite earlier discussions and opportunities to improve, your performance has not met the required standard. The management has therefore decided to terminate your employment as ' . $role . ' with effect from ' . $last . '.',
         'absence' => 'You have been absent from duty without permission and have not resumed work. The management has therefore decided to terminate your employment as ' . $role . ' with effect from ' . $last . '.',
@@ -43,7 +43,7 @@
     </ol>
 
     @if ($thanks)
-        <p>We thank you for your service with Sunlit Network DC and wish you every success in the future.</p>
+        <p>We thank you for your service with {{ \App\Support\Branding::legalName() }} and wish you every success in the future.</p>
     @endif
 
     @include('components.print.letters.sign')

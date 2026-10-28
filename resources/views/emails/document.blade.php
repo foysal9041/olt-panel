@@ -1,3 +1,5 @@
+@use('App\Support\Branding')
+@php($brandColor = Branding::color('primary') ?? '#0d6fd8')
 {{-- Body of App\Mail\DocumentMail: invoice / money receipt sent to a client, the PDF attached. Inline styles only — mail apps drop <style>. --}}
 <!DOCTYPE html>
 <html lang="en">
@@ -7,8 +9,8 @@
     <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#ffffff; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0;">
             <tr>
-                <td style="padding:20px 28px 16px; border-bottom:3px solid #0d6fd8;">
-                    <img src="{{ $message->embed(public_path('images/logo.png')) }}" alt="Sunlit Network DC" height="48" style="display:block; height:48px; width:auto; border:0;">
+                <td style="padding:20px 28px 16px; border-bottom:3px solid {{ $brandColor }};">
+                    <img src="{{ $message->embed(Branding::path('logo')) }}" alt="{{ Branding::legalName() }}" height="48" style="display:block; height:48px; width:auto; border:0;">
                 </td>
             </tr>
             <tr>
@@ -30,14 +32,18 @@
                     @endif
 
                     <p style="margin:18px 0 0;">The PDF copy is attached to this email (<strong>{{ $fileName }}</strong>).</p>
-                    <p style="margin:12px 0 0;">For any question about this bill, please call <strong>09614-552233</strong> or reply to this email.</p>
-                    <p style="margin:18px 0 0;">Regards,<br><strong>Sunlit Network DC</strong></p>
+                    @if (Branding::phone())
+                        <p style="margin:12px 0 0;">For any question about this bill, please call <strong>{{ Branding::phone() }}</strong> or reply to this email.</p>
+                    @else
+                        <p style="margin:12px 0 0;">For any question about this bill, please reply to this email.</p>
+                    @endif
+                    <p style="margin:18px 0 0;">Regards,<br><strong>{{ Branding::legalName() }}</strong></p>
                 </td>
             </tr>
             <tr>
-                <td style="padding:16px 28px; background:#0d6fd8; color:#ffffff; font-size:12px; line-height:1.5;">
-                    Sunlit Network DC, Roshid Super Market 2nd Floor, Navaron Bazar, Sharsha, Jashore<br>
-                    09614-552233 · <a href="https://www.sunlitnetwork.com" style="color:#ffffff;">www.sunlitnetwork.com</a>
+                <td style="padding:16px 28px; background:{{ $brandColor }}; color:#ffffff; font-size:12px; line-height:1.5;">
+                    {{ Branding::legalName() }}{{ Branding::address() ? ', ' . Branding::address() : '' }}<br>
+                    {{ Branding::phone() }}{{ Branding::phone() && Branding::website() ? ' · ' : '' }}@if (Branding::website())<a href="{{ Branding::websiteUrl() }}" style="color:#ffffff;">{{ Branding::website() }}</a>@endif
                 </td>
             </tr>
         </table>

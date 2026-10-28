@@ -40,7 +40,7 @@ class ZoneSettlementRow extends Model
 
     /**
      * Name to show / bill to: the linked customer, else the zone part of
-     * "Navaron - (Zone) (habibur@sunlit)", else the name as in the sheet.
+     * "Navaron - (Zone) (user@zone)", else the name as in the sheet.
      */
     public function displayName(): string
     {

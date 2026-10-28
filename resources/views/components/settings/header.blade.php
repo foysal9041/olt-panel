@@ -7,6 +7,7 @@
     ['settings.whatsapp', 'settings.whatsapp*', 'WhatsApp Alerts', 'fab fa-whatsapp', 'access-settings-telegram'],
     ['settings.mail', 'settings.mail*', 'Email', 'fas fa-envelope', 'access-settings-mail'],
     ['settings', 'settings', 'General', 'fas fa-sliders-h', 'access-settings-general'],
+    ['settings.branding', 'settings.branding*', 'Company Branding', 'fas fa-palette', 'access-settings-branding'],
     ['profile.edit', 'profile.edit', 'My Profile', 'fas fa-user-circle', null],
     ['profile.activity', 'profile.activity', 'My Activity', 'fas fa-user-clock', null],
 ]">

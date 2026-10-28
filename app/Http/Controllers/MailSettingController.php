@@ -37,7 +37,7 @@ class MailSettingController extends Controller
             'reply_to' => 'nullable|email|max:255',
             'bcc' => ['nullable', 'string', 'max:500', new EmailList],
         ], [
-            'host.regex' => 'The mail server is a host name like mail.sunlitnetwork.com — no http:// or slashes.',
+            'host.regex' => 'The mail server is a host name like mail.example.com — no http:// or slashes.',
         ]);
 
         // Blank keeps the saved password so it never has to be shown again.

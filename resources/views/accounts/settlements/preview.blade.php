@@ -13,8 +13,8 @@
     $mailable = \App\Models\Customer::whereIn('id', $counted->pluck('customer_id')->filter())->get()->filter(fn ($c) => $c->emails());
     $mailCount = $counted->filter(fn ($r) => $mailable->contains('id', $r['customer_id']))->count();
     $colLabel = fn ($c) => $c . (isset($headers[$c]) && is_scalar($headers[$c]) && trim((string) $headers[$c]) !== '' ? ' — ' . \Illuminate\Support\Str::limit(trim((string) $headers[$c]), 28) : '');
-    $firstNo = \App\Http\Controllers\Accounts\ZoneSettlementController::INVOICE_PREFIX . str_pad((string) $nextInvoice, 3, '0', STR_PAD_LEFT);
-    $lastNo = \App\Http\Controllers\Accounts\ZoneSettlementController::INVOICE_PREFIX . str_pad((string) ($nextInvoice + max($counted->count() - 1, 0)), 3, '0', STR_PAD_LEFT);
+    $firstNo = \App\Http\Controllers\Accounts\ZoneSettlementController::invoicePrefix() . str_pad((string) $nextInvoice, 3, '0', STR_PAD_LEFT);
+    $lastNo = \App\Http\Controllers\Accounts\ZoneSettlementController::invoicePrefix() . str_pad((string) ($nextInvoice + max($counted->count() - 1, 0)), 3, '0', STR_PAD_LEFT);
     $flagIcon = ['error' => ['badge-danger', 'fas fa-times-circle'], 'warn' => ['badge-warning', 'fas fa-exclamation-triangle'], 'info' => ['badge-secondary', 'fas fa-info-circle']];
 @endphp
 

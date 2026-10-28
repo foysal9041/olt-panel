@@ -14,7 +14,9 @@ return [
     |
     */
 
-    'title' => 'Sunlit Network ERP',
+    // The company's own title and logos replace these on every page
+    // (App\Support\Branding::applyToAdminLte, Settings → Company Branding).
+    'title' => 'OLT Panel',
     'title_prefix' => '',
     'title_postfix' => '',
 
@@ -70,11 +72,11 @@ return [
     // in the collapsed (~74px) sidebar width, since that slot is sized for
     // a small square icon.
     'logo' => '',
-    'logo_img' => 'images/logo-icon.png?v=' . @filemtime(public_path('images/logo-icon.png')),
+    'logo_img' => 'brand/icon',
     'logo_img_class' => 'brand-image',
-    'logo_img_xl' => 'images/logo.png?v=' . @filemtime(public_path('images/logo.png')),
+    'logo_img_xl' => 'brand/logo',
     'logo_img_xl_class' => 'brand-image-xl',
-    'logo_img_alt' => 'Sunlit Network',
+    'logo_img_alt' => 'Logo',
 
     /*
     |--------------------------------------------------------------------------
@@ -119,8 +121,8 @@ return [
         'enabled' => true,
         'mode' => 'cwrapper',
         'img' => [
-            'path' => 'images/logo.png?v=' . @filemtime(public_path('images/logo.png')),
-            'alt' => 'Sunlit Network Preloader Image',
+            'path' => 'brand/logo',
+            'alt' => 'Loading',
             'effect' => 'animation__shake',
             'width' => 120,
             'height' => 47,
@@ -641,6 +643,12 @@ return [
                 'url'  => 'settings',
                 'icon' => 'fas fa-sliders-h',
                 'can'  => 'access-settings-general',
+            ],
+            [
+                'text' => 'Company Branding',
+                'url'  => 'settings/branding',
+                'icon' => 'fas fa-palette',
+                'can'  => 'access-settings-branding',
             ],
             [
                 'text' => 'Users & Roles',

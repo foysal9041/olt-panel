@@ -27,7 +27,11 @@ use Illuminate\Support\Str;
  */
 class ZoneSettlementController extends Controller
 {
-    public const INVOICE_PREFIX = 'Sunlit/DC/';
+    /** Start of the invoice numbers: the company's (Settings → Company Branding), e.g. INV/019. */
+    public static function invoicePrefix(): string
+    {
+        return \App\Support\Branding::invoicePrefix();
+    }
 
     public function __construct(private SettlementImporter $importer)
     {
@@ -159,7 +163,7 @@ class ZoneSettlementController extends Controller
                     'deduction' => $row['deduction'],
                     'included' => $row['included'],
                     'flags' => array_values(array_map(fn ($f) => ['level' => $f[0], 'text' => $f[1]], $row['flags'])) ?: null,
-                    'invoice_no' => $row['included'] ? self::INVOICE_PREFIX . str_pad((string) $next++, 3, '0', STR_PAD_LEFT) : null,
+                    'invoice_no' => $row['included'] ? self::invoicePrefix() . str_pad((string) $next++, 3, '0', STR_PAD_LEFT) : null,
                 ]);
             }
 
@@ -418,8 +422,8 @@ class ZoneSettlementController extends Controller
 
     private function lastInvoiceNumber(): int
     {
-        return (int) ZoneSettlementRow::where('invoice_no', 'like', self::INVOICE_PREFIX . '%')->lockForUpdate()->pluck('invoice_no')
-            ->map(fn ($no) => (int) substr($no, strlen(self::INVOICE_PREFIX)))->max();
+        return (int) ZoneSettlementRow::where('invoice_no', 'like', self::invoicePrefix() . '%')->lockForUpdate()->pluck('invoice_no')
+            ->map(fn ($no) => (int) substr($no, strlen(self::invoicePrefix())))->max();
     }
 
     /**

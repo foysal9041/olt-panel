@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AppSetting;
 use App\Models\Employee;
+use App\Support\Branding;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -16,15 +17,16 @@ use Illuminate\Validation\ValidationException;
  */
 class HrDocs
 {
+    /** Until set on the ID card page; office phone, email, website and address come from the company's branding. */
     public const DEFAULTS = [
         'phone' => null,
-        'office_phone' => '09614-552233',
-        'email' => 'sunlitnetwork@gmail.com',
-        'website' => 'www.sunlitnetwork.com',
-        'address' => 'Roshid Super Market 2nd Floor, Navaron Bazar, Sharsha, Jashore',
+        'office_phone' => null,
+        'email' => null,
+        'website' => null,
+        'address' => null,
         'theme' => 'navy',
-        'signatory' => 'Md Habibur Rahman',
-        'signatory_title' => 'Chairman',
+        'signatory' => null,
+        'signatory_title' => 'Authorised Signatory',
         'signature' => null,
         'validity_years' => 2,
     ];
@@ -36,7 +38,7 @@ class HrDocs
      * old keys so saved cards look the same.
      */
     public const THEMES = [
-        'navy' => ['Wave · Sunlit blue', '#0a2a5e', '#123f86', '#1e88e5', 'wave'],
+        'navy' => ['Wave · Navy blue', '#0a2a5e', '#123f86', '#1e88e5', 'wave'],
         'teal' => ['Wave · Teal', '#063f3c', '#0b5f5a', '#14b8a6', 'wave'],
         'maroon' => ['Wave · Maroon', '#4a0d1a', '#701428', '#e11d48', 'wave'],
         'graphite' => ['Wave · Graphite', '#111827', '#1f2937', '#f59e0b', 'wave'],
@@ -54,7 +56,12 @@ class HrDocs
 
     public function settings(): array
     {
-        return AppSetting::get('hr', self::DEFAULTS);
+        return AppSetting::get('hr', array_merge(self::DEFAULTS, [
+            'office_phone' => Branding::phone(),
+            'email' => Branding::email(),
+            'website' => Branding::website(),
+            'address' => Branding::address() ?: null,
+        ]));
     }
 
     public function theme(?string $key = null): array

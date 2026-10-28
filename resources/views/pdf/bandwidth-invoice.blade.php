@@ -101,7 +101,7 @@
                         <div class="line"></div>
                         <div>{{ $invoice->prepared_by }}</div>
                         @if ($invoice->prepared_title)<div>{{ $invoice->prepared_title }}</div>@endif
-                        <div>Sunlit Network DC</div>
+                        <div>{{ \App\Support\Branding::legalName() }}</div>
                     </td>
                     <td class="gap"></td>
                     <td>

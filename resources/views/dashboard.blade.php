@@ -28,7 +28,7 @@
     <div class="row align-items-center">
         <div class="col-sm-8">
             <h1>{{ \App\Support\Ui::t($greeting) }}, {{ auth()->user()->name }} 👋</h1>
-            <div class="dash-hero-sub">Sunlit Network ERP — here's what's happening across your network today.</div>
+            <div class="dash-hero-sub">{{ \App\Support\Branding::appTitle() }} — {{ \App\Support\Ui::t("here's what's happening across your network today.") }}</div>
 
             <div data-live="hero-status">
             @if ($anyModule)

@@ -11,7 +11,11 @@
 # certificate. Run it again at any time to update: it pulls the latest code,
 # installs packages and runs new migrations, keeping .env and all data.
 #
+# One installation = one company: its own server, domain, database, files and
+# branding (name, logos, colours: Settings → Company Branding).
+#
 # Options (each also works as an environment variable, e.g. DOMAIN=…):
+#   --company="Acme Fiber"       the company's name (asked; logos and colours later in the panel)
 #   --domain=noc.example.com     address the panel answers on (default: this server's IP)
 #   --admin-user=admin           first admin's username (default: admin)
 #   --admin-pass=…               first admin's password (default: asked, or a random one)
@@ -19,6 +23,8 @@
 #   --restore=/path/backup.tar.gz   move an existing panel here: a file made by deploy/backup.sh
 #   --dir=/var/www/olt-panel     where the app lives
 #   --repo=URL --branch=master   where the code comes from
+#   --version=v1.2.0             install / update to this release (a git tag or commit)
+#   --no-backup                  updating: skip the automatic backup taken first
 #   --php=8.3                    PHP version (default: the system's, if 8.2 or newer)
 #   -y, --yes                    no questions; defaults for everything not given
 #
@@ -48,6 +54,10 @@ ASSUME_YES="${ASSUME_YES:-}"
 DB_NAME="${DB_NAME:-olt_panel}"
 DB_USER="${DB_USER:-olt_panel}"
 APP_NAME="${APP_NAME:-OLT Panel}"
+COMPANY="${COMPANY:-}"
+VERSION_REF="${VERSION_REF:-}"
+NO_BACKUP="${NO_BACKUP:-}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/olt-panel}"
 WEB_USER="www-data"
 
 for arg in "$@"; do
@@ -62,6 +72,9 @@ for arg in "$@"; do
         --dir=*) APP_DIR="${arg#*=}" ;;
         --repo=*) REPO_URL="${arg#*=}" ;;
         --branch=*) BRANCH="${arg#*=}" ;;
+        --company=*) COMPANY="${arg#*=}" ;;
+        --version=*) VERSION_REF="${arg#*=}" ;;
+        --no-backup) NO_BACKUP=yes ;;
         --php=*) PHP_VERSION="${arg#*=}" ;;
         -y|--yes) ASSUME_YES=yes ;;
         -h|--help) sed -n '2,27p' "${BASH_SOURCE[0]:-/dev/null}" 2>/dev/null | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -158,6 +171,7 @@ else
     info "Installing into $APP_DIR"
     [[ -n "$DOMAIN" ]] || ask DOMAIN "Domain or IP the panel will be opened on" "$SERVER_IP"
     if [[ -z "$RESTORE" ]]; then
+        [[ -n "$COMPANY" ]] || ask COMPANY "Company name (shown in the panel, invoices and e-mails)" "OLT Panel"
         [[ -n "$ADMIN_USER" ]] || ask ADMIN_USER "Admin username" "admin"
         [[ -n "$ADMIN_PASS" ]] || ask_secret ADMIN_PASS "Admin password (leave blank for a random one)"
         if [[ -z "$ADMIN_PASS" ]]; then ADMIN_PASS="$(random 16)"; SHOW_PASS=yes; fi
@@ -226,6 +240,23 @@ fi
 systemctl enable --now mariadb >/dev/null 2>&1 || systemctl enable --now mysql >/dev/null 2>&1 || true
 systemctl enable --now "php$PHP_VERSION-fpm" nginx cron >/dev/null
 
+# ---- Backup before an update -----------------------------------------------------
+
+PREV_VERSION=""
+BACKUP_FILE=""
+if [[ "$UPDATING" == yes ]]; then
+    PREV_VERSION="$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || true)"
+    if [[ "$NO_BACKUP" != yes && -f "$APP_DIR/deploy/backup.sh" ]]; then
+        step "Backing up first (database, uploaded files, settings)"
+        bash "$APP_DIR/deploy/backup.sh" --no-history --out="$BACKUP_DIR" | sed -n 's/^/    /;2,3p'
+        BACKUP_FILE="$(ls -t "$BACKUP_DIR"/olt-panel-backup-*.tar.gz 2>/dev/null | head -n1)"
+        [[ -n "$BACKUP_FILE" ]] || die "the backup wasn't made — not updating. (Skip it with --no-backup.)"
+        info "Saved: $BACKUP_FILE"
+        # Keep the 10 newest.
+        ls -t "$BACKUP_DIR"/olt-panel-backup-*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+    fi
+fi
+
 # ---- The code -------------------------------------------------------------------
 
 step "Getting the code"
@@ -233,12 +264,15 @@ git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR" 
 if [[ -d "$APP_DIR/.git" ]]; then
     if [[ "$APP_DIR" != "$SCRIPT_DIR" || "$UPDATING" == yes ]]; then
         # As the folder's owner: their SSH key, and no root-owned files left in .git.
-        if as_owner git -C "$APP_DIR" diff --quiet && as_owner git -C "$APP_DIR" diff --cached --quiet; then
+        if ! { as_owner git -C "$APP_DIR" diff --quiet && as_owner git -C "$APP_DIR" diff --cached --quiet; }; then
+            warn "$APP_DIR has local changes — not pulling; installing what is there."
+        elif [[ -n "$VERSION_REF" ]]; then
+            { as_owner git -C "$APP_DIR" fetch -q --tags origin && as_owner git -C "$APP_DIR" checkout -q "$VERSION_REF"; } \
+                || die "couldn't check out version $VERSION_REF."
+        else
             { as_owner git -C "$APP_DIR" fetch -q origin "$BRANCH" && as_owner git -C "$APP_DIR" checkout -q "$BRANCH" \
                 && as_owner git -C "$APP_DIR" pull -q --ff-only origin "$BRANCH"; } \
                 || warn "couldn't pull the latest code (local commits?) — installing what is there."
-        else
-            warn "$APP_DIR has local changes — not pulling; installing what is there."
         fi
     fi
 elif [[ -e "$APP_DIR" && -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]]; then
@@ -246,6 +280,7 @@ elif [[ -e "$APP_DIR" && -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]]; then
 else
     mkdir -p "$(dirname "$APP_DIR")"
     git clone -q --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+    [[ -z "$VERSION_REF" ]] || git -C "$APP_DIR" checkout -q "$VERSION_REF" || die "there's no version $VERSION_REF."
 fi
 info "$(git -C "$APP_DIR" log -1 --format='%h %s (%cd)' --date=short)"
 
@@ -285,12 +320,13 @@ SQL
     if [[ -n "$RESTORE_DIR" ]]; then
         info "Importing the backed-up database (this can take a while)…"
         gunzip -c "$RESTORE_DIR/database.sql.gz" | mysql -uroot "$DB_NAME"
+        [[ ! -f "$RESTORE_DIR/skipped-tables.sql.gz" ]] || gunzip -c "$RESTORE_DIR/skipped-tables.sql.gz" | mysql -uroot "$DB_NAME"
     fi
 
     step "Writing the settings (.env)"
     cp "$APP_DIR/.env.example" "$APP_DIR/.env"
     SCHEME=http; [[ "$SSL" == yes ]] && SCHEME=https
-    set_env APP_NAME "$APP_NAME"
+    set_env APP_NAME "${COMPANY:-$APP_NAME}"
     set_env APP_ENV production
     set_env APP_DEBUG false
     set_env APP_URL "$SCHEME://$DOMAIN"
@@ -349,6 +385,8 @@ fi
 if [[ -n "$ADMIN_USER" && -n "$ADMIN_PASS" ]]; then
     printf '%s' "$ADMIN_PASS" | artisan app:create-admin --username="$ADMIN_USER" --password-stdin
 fi
+# The company's name (logos, colours, contact details: Settings → Company Branding).
+[[ -z "$COMPANY" ]] || artisan app:branding --name="$COMPANY" -q
 artisan optimize -q
 
 # ---- Scheduler --------------------------------------------------------------------
@@ -475,6 +513,8 @@ systemctl reload nginx
 step "Checking"
 CODE="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $DOMAIN" http://127.0.0.1/login || true)"
 if [[ "$CODE" == 200 || "$CODE" == 301 ]]; then info "The sign-in page answers ($CODE)."; else warn "The sign-in page answered $CODE — see $APP_DIR/storage/logs and /var/log/nginx/error.log"; fi
+UP="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $DOMAIN" http://127.0.0.1/up || true)"
+[[ "$UP" == 200 || "$UP" == 301 ]] && info "Health check /up: OK." || warn "Health check /up answered $UP."
 [[ -n "$RESTORE_DIR" ]] && rm -rf "$RESTORE_DIR"
 
 URL="$(env_value APP_URL "$APP_DIR/.env")"
@@ -492,9 +532,10 @@ if [[ "$UPDATING" != yes ]]; then
 fi
 
 echo
-echo "${B}${G}Done.${N} ${B}OLT Panel is ready at $URL${N}"
+echo "${B}${G}Done.${N} ${B}The panel is ready at $URL${N}"
 if [[ "$UPDATING" == yes ]]; then
-    echo "    Updated to $(git -C "$APP_DIR" log -1 --format='%h %s')."
+    echo "    Updated to $(git -C "$APP_DIR" log -1 --format='%h %s')${PREV_VERSION:+ (was $PREV_VERSION)}."
+    [[ -n "$BACKUP_FILE" ]] && echo "    If something is wrong:  sudo bash $APP_DIR/deploy/rollback.sh $BACKUP_FILE"
     [[ "${SHOW_PASS:-}" == yes ]] && echo "    New admin: $ADMIN_USER / $ADMIN_PASS   (change it after signing in)"
 elif [[ -n "$RESTORE" ]]; then
     echo "    Sign in with the same usernames and passwords as on the old server."

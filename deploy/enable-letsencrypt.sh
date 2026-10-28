@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Turn on HTTPS for noc.sunlitnetwork.com with a free Let's Encrypt
+# Turn on HTTPS for this installation's domain with a free Let's Encrypt
 # certificate (certbot). Renews itself; nginx reloads after each renewal.
 #
-#   sudo bash /var/www/olt-panel/deploy/enable-letsencrypt.sh [your-email]
+#   sudo bash deploy/enable-letsencrypt.sh [your-email]      (domain: APP_URL in .env, or DOMAIN=…)
 #
 # The email (optional) gets Let's Encrypt's expiry warnings. Running this
 # means you accept the Let's Encrypt terms (https://letsencrypt.org/repository/).
@@ -14,11 +14,18 @@
 
 set -euo pipefail
 
-DOMAIN="noc.sunlitnetwork.com"
-APP_DIR="/var/www/olt-panel"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The domain: DOMAIN=…, else the host of APP_URL in .env.
+DOMAIN="${DOMAIN:-$(sed -n 's#^APP_URL="\{0,1\}https\{0,1\}://\([^/":]*\).*#\1#p' "$APP_DIR/.env" 2>/dev/null | head -n1)}"
+[[ -n "$DOMAIN" && "$DOMAIN" =~ [a-zA-Z] ]] || { echo "Set the domain: DOMAIN=panel.example.com sudo -E bash $0 (APP_URL in .env has none)." >&2; exit 1; }
+PHP_SOCK="$(ls /run/php/php*-fpm.sock 2>/dev/null | sort -V | tail -n1)"
+[[ -n "$PHP_SOCK" ]] || { echo "No PHP-FPM socket in /run/php — is php-fpm installed and running?" >&2; exit 1; }
+render_site() { # render_site CERT KEY > file
+    sed -e "s#__DOMAIN__#$DOMAIN#g" -e "s#__APP_DIR__#$APP_DIR#g" -e "s#__PHP_SOCK__#$PHP_SOCK#g" \
+        -e "s#__CERT__#$1#g" -e "s#__KEY__#$2#g" "$APP_DIR/deploy/nginx/https-site.conf.template"
+}
 WEBROOT="$APP_DIR/public"
 LIVE="/etc/letsencrypt/live/$DOMAIN"
-SITE_SRC="$APP_DIR/deploy/nginx/$DOMAIN.conf"
 SITE_AVAIL="/etc/nginx/sites-available/$DOMAIN.conf"
 SITE_ENABLED="/etc/nginx/sites-enabled/$DOMAIN.conf"
 EMAIL="${1:-}"
@@ -80,10 +87,7 @@ rollback() {
     exit 1
 }
 
-sed -e "s#/etc/ssl/cloudflare/$DOMAIN.pem#$LIVE/fullchain.pem#" \
-    -e "s#/etc/ssl/cloudflare/$DOMAIN.key#$LIVE/privkey.pem#" \
-    -e "s#Uses a Cloudflare Origin Certificate.*#Uses the Let's Encrypt certificate from certbot (renews itself).#" \
-    "$SITE_SRC" > "$SITE_AVAIL"
+render_site "$LIVE/fullchain.pem" "$LIVE/privkey.pem" > "$SITE_AVAIL"
 chmod 644 "$SITE_AVAIL"
 ln -sfn "$SITE_AVAIL" "$SITE_ENABLED"
 
@@ -106,6 +110,6 @@ cat <<MSG
 
 Done — HTTPS is on for $DOMAIN. Backup of anything replaced: $BACKUP
 
-Last step, in Cloudflare (sunlitnetwork.com):
+If the domain is behind Cloudflare, last step there:
   SSL/TLS -> Overview -> Configure -> Custom SSL/TLS -> "Full (strict)" -> Save
 MSG

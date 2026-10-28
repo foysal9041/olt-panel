@@ -4,7 +4,7 @@
     <div class="col-md-8 form-group">
         <label>Zone / POP Name <span class="text-danger">*</span></label>
         <input type="text" name="name" class="form-control" value="{{ $v('name') }}"
-               placeholder="e.g. Sunlit Khulna POP" required autofocus>
+               placeholder="e.g. Khulna POP" required autofocus>
         @if ($zone->exists ?? false)
             <small class="form-text text-muted"><i class="fas fa-info-circle"></i>
                 Renaming also renames it on every OLT, switch, IP subnet, NTTN link, VLAN, user, employee and customer.</small>

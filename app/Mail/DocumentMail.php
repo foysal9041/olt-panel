@@ -46,7 +46,7 @@ class DocumentMail extends Mailable
     /** From the office mailbox, replies to its reply-to address if it has one. */
     public function sender(string $address, ?string $name, ?string $replyTo): static
     {
-        $this->from(new Address($address, $name ?: 'Sunlit Network DC'));
+        $this->from(new Address($address, $name ?: \App\Support\Branding::legalName()));
         if ($replyTo) {
             $this->replyTo($replyTo);
         }

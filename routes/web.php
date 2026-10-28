@@ -215,6 +215,16 @@ Route::middleware(['auth', 'can:access-settings-mail'])->prefix('settings')->nam
     Route::post('mail/test', [\App\Http\Controllers\MailSettingController::class, 'test'])->name('mail.test');
 });
 
+// Settings → Company Branding: names, contact details, logos and colours of this installation's company.
+Route::middleware(['auth', 'can:access-settings-branding'])->prefix('settings')->name('settings.')->group(function () {
+    Route::get('branding', [\App\Http\Controllers\BrandingController::class, 'edit'])->name('branding');
+    Route::put('branding', [\App\Http\Controllers\BrandingController::class, 'update'])->name('branding.update');
+});
+
+// The company's logo, mark, grey mark and favicon — public (sign-in page, e-mails).
+Route::get('brand/{which}', [\App\Http\Controllers\BrandingController::class, 'asset'])
+    ->whereIn('which', \App\Services\BrandAssets::WHICH)->name('brand.asset');
+
 // Old location of the Telegram page (it used to live under NOC).
 Route::redirect('/noc-alerts', '/settings/telegram');
 
