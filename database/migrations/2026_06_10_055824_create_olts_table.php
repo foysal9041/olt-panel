@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('zone');
             $table->string('brand');
             $table->string('model');
+            $table->string('vlan', 100)->nullable();
 
             $table->string('name');
 
@@ -27,6 +28,9 @@ return new class extends Migration
             $table->string('snmp')->nullable();
 
             $table->timestamps();
+
+            // Reachable at the last check (app:check-olt-status).
+            $table->boolean('status')->default(false);
         });
     }
 
