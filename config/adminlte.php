@@ -433,34 +433,28 @@ return [
                 ],
             ],
             [
-                'text' => 'IP & VLAN',
-                'icon' => 'fas fa-sitemap',
-                'submenu' => [
-                    [
-                        'text' => 'Zones',
-                        'url'  => 'zones',
-                        'icon' => 'fas fa-map-marked-alt',
-                        'can'  => 'access-olt-zones',
-                    ],
-                    [
-                        'text' => 'VLAN Management',
-                        'url'  => 'vlans',
-                        'icon' => 'fas fa-stream',
-                        'can'  => 'access-olt-vlans',
-                    ],
-                    [
-                        'text' => 'IP Management',
-                        'url'  => 'ip-pools',
-                        'icon' => 'fas fa-globe',
-                        'can'  => 'access-olt-ip',
-                    ],
-                    [
-                        'text' => 'NTTN Links',
-                        'url'  => 'nttn-links',
-                        'icon' => 'fas fa-project-diagram',
-                        'can'  => 'access-olt-nttn',
-                    ],
-                ],
+                'text' => 'Zones',
+                'url'  => 'zones',
+                'icon' => 'fas fa-map-marked-alt',
+                'can'  => 'access-olt-zones',
+            ],
+            [
+                'text' => 'VLAN Management',
+                'url'  => 'vlans',
+                'icon' => 'fas fa-stream',
+                'can'  => 'access-olt-vlans',
+            ],
+            [
+                'text' => 'IP Management',
+                'url'  => 'ip-pools',
+                'icon' => 'fas fa-globe',
+                'can'  => 'access-olt-ip',
+            ],
+            [
+                'text' => 'NTTN Links',
+                'url'  => 'nttn-links',
+                'icon' => 'fas fa-project-diagram',
+                'can'  => 'access-olt-nttn',
             ],
             [
                 'text' => 'Technical Support',

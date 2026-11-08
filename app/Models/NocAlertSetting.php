@@ -35,6 +35,7 @@ class NocAlertSetting extends Model
         'telegram_bot_token',
         'telegram_chat_ids',
         'alert_port_status',
+        'alert_olt_uplink',
         'alert_switch_status',
         'alert_nttn_status',
         'rx_low_threshold',
@@ -51,6 +52,11 @@ class NocAlertSetting extends Model
         'alert_util',
         'util_threshold',
         'util_minutes',
+        'alert_cpu',
+        'cpu_threshold',
+        'cpu_core_threshold',
+        'cpu_minutes',
+        'cpu_switches',
     ];
 
     protected $hidden = ['telegram_bot_token', 'whatsapp_token'];
@@ -68,6 +74,12 @@ class NocAlertSetting extends Model
             'alert_util' => 'boolean',
             'util_threshold' => 'integer',
             'util_minutes' => 'integer',
+            'alert_olt_uplink' => 'boolean',
+            'alert_cpu' => 'boolean',
+            'cpu_threshold' => 'integer',
+            'cpu_core_threshold' => 'integer',
+            'cpu_minutes' => 'integer',
+            'cpu_switches' => 'boolean',
             'rx_low_threshold' => 'float',
             'rx_warn_10g' => 'float',
             'rx_warn_1g' => 'float',

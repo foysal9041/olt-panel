@@ -141,10 +141,42 @@
                             </div>
                             <input type="password"
                                    name="password"
-                                   value="{{ $olt->password }}"
+                                   value=""
+                                   autocomplete="new-password"
+                                   placeholder="Leave blank to keep the current password"
                                    class="form-control">
                         </div>
+                        <small class="form-text text-muted">Stored encrypted; never shown on this page.</small>
                     </div>
+
+                    @if ($uplinkPorts->flatten()->isNotEmpty() || $olt->uplink_port_id)
+                        @php $chosenUplink = (int) old('uplink_port_id', $olt->uplink_port_id ?? $suggestedUplink); @endphp
+                        <div class="form-group">
+                            <label>Uplink port <small class="text-muted">(optional)</small></label>
+                            <select name="uplink_port_id" class="form-control js-uplink-select @error('uplink_port_id') is-invalid @enderror" data-placeholder="The switch / router port this OLT is connected to">
+                                <option value=""></option>
+                                @if ($olt->uplink_port_id && ! $uplinkPorts->flatten()->contains('id', $olt->uplink_port_id))
+                                    <option value="{{ $olt->uplink_port_id }}" selected>{{ $olt->uplinkPort?->networkSwitch?->name }} · {{ $olt->uplinkPort?->name }}</option>
+                                @endif
+                                @foreach ($uplinkPorts as $device => $ports)
+                                    <optgroup label="{{ $device }}">
+                                        @foreach ($ports as $port)
+                                            <option value="{{ $port->id }}" @selected($chosenUplink === $port->id)>{{ $port->name ?: $port->descr }}{{ $port->alias ? ' — ' . $port->alias : '' }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                            @error('uplink_port_id')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                            <small class="form-text text-muted">
+                                When this port goes down, Telegram gets "OLT uplink down" with this OLT's name.
+                                @if (! $olt->uplink_port_id && $suggestedUplink)
+                                    {{ \App\Support\Ui::t('Suggested from the port description — save to keep it.') }}
+                                @endif
+                            </small>
+                        </div>
+                    @endif
 
                     <div class="form-group">
                         <label>SNMP Community <small class="text-muted">(optional)</small></label>
@@ -152,12 +184,19 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-key"></i></span>
                             </div>
-                            <input type="text"
+                            <input type="password"
                                    name="snmp"
-                                   value="{{ old('snmp', $olt->snmp) }}"
-                                   placeholder="Leave blank if not used"
+                                   value=""
+                                   autocomplete="new-password"
+                                   placeholder="{{ filled($olt->snmp) ? 'Set — leave blank to keep it' : 'Leave blank if not used' }}"
                                    class="form-control">
                         </div>
+                        @if (filled($olt->snmp))
+                            <div class="custom-control custom-checkbox mt-1">
+                                <input type="checkbox" class="custom-control-input" id="remove_snmp" name="remove_snmp" value="1">
+                                <label class="custom-control-label small" for="remove_snmp">Remove the SNMP community</label>
+                            </div>
+                        @endif
                     </div>
 
                 </div>
@@ -185,4 +224,10 @@
 
 </div>
 
+@stop
+
+@section('js')
+<script>
+    $('.js-uplink-select').select2({ theme: 'bootstrap4', width: '100%', allowClear: true, placeholder: $('.js-uplink-select').data('placeholder') });
+</script>
 @stop

@@ -59,7 +59,7 @@ class OltController extends Controller
                 'rx_alarms' => $switches->sum('ports_rx_alarm_count'),
             ];
 
-            $events = SwitchEvent::whereIn('network_switch_id', $switches->pluck('id'))->with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(10)->get();
+            $events = SwitchEvent::whereIn('network_switch_id', $switches->pluck('id'))->with('networkSwitch:id,name,device_type')->latest('occurred_at')->latest('id')->limit(10)->get();
         }
 
         $latencyTargets = $gate('access-latency-graphs')
@@ -414,11 +414,35 @@ class OltController extends Controller
 
         $zones = Zone::orderBy('name')->pluck('name');
         $zoneStats = $this->zoneStats(Olt::query(), allZones: true);
+        [$uplinkPorts, $suggestedUplink] = $this->uplinkOptions($olt);
 
         return view(
             'olts.edit',
-            compact('olt', 'zones', 'zoneStats')
+            compact('olt', 'zones', 'zoneStats', 'uplinkPorts', 'suggestedUplink')
         );
+    }
+
+    /**
+     * Ports of the switches / routers this user can see, for "Uplink port",
+     * grouped by device; and, when none is set, the port whose description
+     * is the OLT's name (Kagojpukur_OLT2 ↔ "Kagojpukur OLT-2"), if exactly one.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: ?int}
+     */
+    protected function uplinkOptions(Olt $olt): array
+    {
+        $switches = \App\Models\NetworkSwitch::visibleTo(auth()->user())->orderBy('name')
+            ->with(['ports' => fn ($q) => $q->orderBy('if_index')])->get(['id', 'name', 'device_type']);
+        $ports = $switches->mapWithKeys(fn ($s) => [$s->name => $s->ports]);
+
+        $suggested = null;
+        if (! $olt->uplink_port_id) {
+            $norm = fn (?string $v) => preg_replace('/[^a-z0-9]/', '', strtolower((string) $v));
+            $hits = $switches->flatMap->ports->filter(fn ($p) => $norm($p->alias ?: $p->name) === $norm($olt->name));
+            $suggested = $hits->count() === 1 ? $hits->first()->id : null;
+        }
+
+        return [$ports, $suggested];
     }
 
     public function update(Request $request, Olt $olt, OltStatusChecker $checker)
@@ -433,8 +457,17 @@ class OltController extends Controller
             'name'      => 'required',
             'ip'        => 'required|ip|unique:olts,ip,' . $olt->id,
             'username'  => 'required',
-            'password'  => 'required',
+            // Blank keeps the stored password / community (they're never sent to the page).
+            'password'  => 'nullable|string|max:255',
             'snmp'      => 'nullable|string|max:255',
+            'uplink_port_id' => ['nullable', 'integer', function ($attr, $value, $fail) use ($olt) {
+                // A port of a switch this user can see (or the one already set).
+                $visible = \App\Models\SwitchPort::whereKey($value)
+                    ->whereIn('network_switch_id', \App\Models\NetworkSwitch::visibleTo(auth()->user())->select('id'))->exists();
+                if (! $visible && (int) $value !== (int) $olt->uplink_port_id) {
+                    $fail('Pick a port of a switch or router you can see.');
+                }
+            }],
         ],
         [
         'ip.unique' => 'Sorry! This IP Address already exists.',
@@ -445,7 +478,16 @@ class OltController extends Controller
         $this->assertIpNotUsed($request->ip, 'olt', $olt->id);
         $this->assertVlanNotOverlapping($request->vlan ?? '', $olt->id, zone: $request->zone);
 
-        $olt->update($request->except('status'));
+        $data = $request->except(['status', 'remove_snmp']);
+        if (blank($data['password'] ?? null)) {
+            unset($data['password']);
+        }
+        if ($request->boolean('remove_snmp')) {
+            $data['snmp'] = null;
+        } elseif (blank($data['snmp'] ?? null)) {
+            unset($data['snmp']);
+        }
+        $olt->update($data);
 
         $checker->refresh($olt);
 
@@ -479,6 +521,33 @@ class OltController extends Controller
              ->run(['ping', '-n', '-c', '4', '-W', '2', $olt->ip]);
 
          return response('<pre>' . e($result->output() ?: $result->errorOutput()) . '</pre>');
+    }
+
+    /**
+     * The OLT's login details, fetched by its page's 👁 / copy buttons — not
+     * written into the page. Needs the user's own password once every 15
+     * minutes; view-only accounts can't; every look goes in the activity log.
+     */
+    public function reveal(Request $request, Olt $olt)
+    {
+        $user = $request->user();
+        abort_unless($user->canSeeOlt($olt), 403);
+        abort_if($user->isViewer(), 403, "View-only accounts can't see OLT passwords.");
+
+        if (time() - (int) $request->session()->get('olt_secrets_confirmed_at', 0) > 900) {
+            $request->validate(
+                ['current_password' => 'required|string|current_password'],
+                ['current_password.required' => 'Enter your panel password.', 'current_password.current_password' => "That isn't your password."]
+            );
+            $request->session()->put('olt_secrets_confirmed_at', time());
+        }
+
+        \App\Models\ActivityLog::record('viewed_secret', "Viewed the login details of OLT {$olt->name} ({$olt->ip})", $olt);
+
+        return response()
+            ->json(['username' => $olt->username, 'password' => $olt->password, 'snmp' => $olt->snmp])
+            ->header('Cache-Control', 'no-store, private, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 
     public function web(Olt $olt)

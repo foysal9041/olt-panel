@@ -20,8 +20,15 @@ class Olt extends Model
         'username',
         'password',
         'snmp',
-        'status'
+        'status',
+        'uplink_port_id',
     ];
+
+    /** The switch / router port this OLT is connected to: its going down raises an "OLT uplink" alert. */
+    public function uplinkPort()
+    {
+        return $this->belongsTo(SwitchPort::class, 'uplink_port_id');
+    }
 
     /**
      * Encrypted at rest using the app key — stored ciphertext, not plaintext,
@@ -32,8 +39,29 @@ class Olt extends Model
     protected function casts(): array
     {
         return [
+            'username' => 'encrypted',
             'password' => 'encrypted',
+            'snmp' => 'encrypted',
         ];
+    }
+
+    /** Never in arrays / JSON: shown only through OltController::reveal. */
+    protected $hidden = ['username', 'password', 'snmp'];
+
+    /** Credentials in the activity log only as "changed", never their values. */
+    protected function loggableChanges(): array
+    {
+        $changes = [];
+        foreach ($this->getChanges() as $key => $new) {
+            if (in_array($key, ['created_at', 'updated_at'], true)) {
+                continue;
+            }
+            $changes[$key] = in_array($key, ['username', 'password', 'snmp'], true)
+                ? ['old' => '•••', 'new' => '(changed)']
+                : ['old' => $this->getOriginal($key), 'new' => $new];
+        }
+
+        return $changes;
     }
 
     public function onus()

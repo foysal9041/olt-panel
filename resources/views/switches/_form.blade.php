@@ -92,6 +92,32 @@
     </div>
 </div>
 
+@php($cpuDefaults = \App\Models\NocAlertSetting::current())
+<div class="form-row mt-2">
+    <div class="col-12">
+        <label class="mb-1">CPU alert at <small class="text-muted font-weight-normal">(leave empty for the default in Settings → Telegram)</small></label>
+    </div>
+    <div class="col-sm-6 col-md-4 form-group">
+        <div class="input-group">
+            <div class="input-group-prepend"><span class="input-group-text">Total</span></div>
+            <input type="number" name="cpu_alert_total" min="10" max="100" class="form-control @error('cpu_alert_total') is-invalid @enderror"
+                   value="{{ old('cpu_alert_total', $switch->cpu_alert_total) }}" placeholder="{{ $cpuDefaults->cpu_threshold ?? 70 }}">
+            <div class="input-group-append"><span class="input-group-text">%</span></div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-md-4 form-group">
+        <div class="input-group">
+            <div class="input-group-prepend"><span class="input-group-text">One core</span></div>
+            <input type="number" name="cpu_alert_core" min="10" max="100" class="form-control @error('cpu_alert_core') is-invalid @enderror"
+                   value="{{ old('cpu_alert_core', $switch->cpu_alert_core) }}" placeholder="{{ $cpuDefaults->cpu_core_threshold ?? 70 }}">
+            <div class="input-group-append"><span class="input-group-text">%</span></div>
+        </div>
+    </div>
+    <div class="col-md-4 small text-muted pt-md-2">
+        Routers are always checked; switches only when "switches too" is on in Settings → Telegram.
+    </div>
+</div>
+
 @php($hasCustom = old('dom_rx_oid', $switch->dom_rx_oid) || old('dom_tx_oid', $switch->dom_tx_oid) || old('dom_temp_oid', $switch->dom_temp_oid))
 
 <div class="mt-3">

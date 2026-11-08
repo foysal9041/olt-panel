@@ -10,11 +10,7 @@
 @endphp
 
 @section('content_header')
-<x-noc.header title="OLTs" icon="fas fa-network-wired" subtitle="Every OLT — status, IP, VLAN, web access and credentials">
-    <a href="{{ route('olt.create', array_filter(['zone' => request('zone')])) }}" class="btn btn-primary btn-sm">
-        <i class="fas fa-plus"></i> {{ request('zone') ? 'Add OLTs to ' . request('zone') : 'Add OLTs' }}
-    </a>
-</x-noc.header>
+<x-noc.header title="OLTs" icon="fas fa-network-wired" subtitle="Every OLT — status, IP, VLAN, web access and credentials" />
 @stop
 
 @section('css')
@@ -36,7 +32,7 @@
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
 
-<div class="acct-stats" data-live="olt-stats">
+<div class="acct-stats is-compact" data-live="olt-stats">
     <div class="acct-stat" style="--accent:#4f46e5">
         <div class="acct-stat-label">{{ $filtered ? 'Matching OLTs' : 'OLTs' }} <i class="fas fa-network-wired"></i></div>
         <div class="acct-stat-value">{{ $olts->count() }}</div>
@@ -66,7 +62,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-4 col-lg-3 form-group">
+            <div class="col-md-4 col-lg-2 form-group">
                 <label>Name / IP</label>
                 <input type="text" name="search" class="form-control" placeholder="e.g. Navaron or 192.168.50" value="{{ request('search') }}">
             </div>
@@ -82,11 +78,16 @@
                     <option value="0" @selected(request('status') === '0')>Offline</option>
                 </select>
             </div>
-            <div class="col-md-12 col-lg-2 form-group d-flex" style="gap:.35rem">
+            <div class="col-md-12 col-lg-3 form-group d-flex" style="gap:.35rem">
                 <button type="submit" class="btn btn-primary flex-fill"><i class="fas fa-search"></i> Filter</button>
                 @if ($filtered)
                     <a href="{{ route('olt.index') }}" class="btn btn-light" title="Clear filters"><i class="fas fa-times"></i></a>
                 @endif
+                @unless (auth()->user()->isViewer())
+                    <a href="{{ route('olt.create', array_filter(['zone' => request('zone')])) }}" class="btn btn-success flex-fill text-nowrap" title="{{ request('zone') ? 'Add OLTs to ' . request('zone') : 'Add OLTs' }}">
+                        <i class="fas fa-plus"></i> Add OLTs
+                    </a>
+                @endunless
             </div>
         </form>
     </div>

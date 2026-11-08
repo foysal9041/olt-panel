@@ -900,3 +900,16 @@ tr.inv-inactive { opacity: .5; }
 .content-wrapper:has(.acct-header) .small-box .inner p { color: #64748b; font-weight: 600; font-size: .85rem; }
 .content-wrapper:has(.acct-header) .small-box .icon > i { color: var(--sb); opacity: .16; }
 .content-wrapper:has(.acct-header) .small-box > .small-box-footer { background: #f8fafc; color: #475569 !important; }
+
+/* Compact stat cards (list pages: OLTs, switches & routers) */
+.acct-stats.is-compact { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin-bottom: .85rem; }
+.acct-stats.is-compact .acct-stat { padding: .55rem .8rem .5rem; border-radius: .75rem; }
+.acct-stats.is-compact .acct-stat-label { font-size: .66rem; }
+.acct-stats.is-compact .acct-stat-label i { width: 1.6rem; height: 1.6rem; font-size: .72rem; border-radius: .5rem; }
+.acct-stats.is-compact .acct-stat-value { margin-top: .05rem; font-size: 1.25rem; }
+.acct-stats.is-compact .acct-stat-foot { margin-top: .05rem; font-size: .72rem; }
+.acct-stats.is-compact .acct-progress { margin-top: .35rem; height: .3rem; }
+
+/* "Add …" buttons beside a table's search box */
+.dataTables_filter.has-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; }
+.dataTables_filter.has-actions label { margin-bottom: 0; }

@@ -21,7 +21,7 @@
             <select name="type" class="form-control form-control-sm mr-2 mb-1">
                 <option value="">All events</option>
                 @foreach (\App\Models\SwitchEvent::TYPES as $key => [$label])
-                    <option value="{{ $key }}" @selected(request('type') === $key)>{{ $label }}</option>
+                    <option value="{{ $key }}" @selected(request('type') === $key)>{{ str_contains($key, 'switch_') ? str_replace('Switch', 'Switch / Router', $label) : $label }}</option>
                 @endforeach
             </select>
             <button class="btn btn-primary btn-sm mb-1"><i class="fas fa-filter"></i> Filter</button>

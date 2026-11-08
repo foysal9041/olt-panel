@@ -73,7 +73,7 @@ class DashboardController extends Controller
                 'rx_alarms' => (clone $ports)->where('rx_alarm', true)->count(),
             ];
 
-            $events = SwitchEvent::whereIn('network_switch_id', $all->pluck('id'))->with('networkSwitch:id,name')->latest('occurred_at')->latest('id')->limit(20)->get();
+            $events = SwitchEvent::whereIn('network_switch_id', $all->pluck('id'))->with('networkSwitch:id,name,device_type')->latest('occurred_at')->latest('id')->limit(20)->get();
         }
 
         $latency = null;

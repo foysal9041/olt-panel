@@ -16,6 +16,7 @@ class ActivityLog extends Model
         'deleted' => ['Deleted', 'badge-danger', 'fas fa-trash'],
         'access' => ['Access changed', 'badge-primary', 'fas fa-key'],
         'emailed' => ['Emailed', 'badge-info', 'fas fa-envelope'],
+        'viewed_secret' => ['Viewed password', 'badge-dark', 'fas fa-eye'],
     ];
 
     protected $fillable = [

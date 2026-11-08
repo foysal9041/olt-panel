@@ -52,6 +52,18 @@ class SwitchPort extends Model
         'util_streak' => 'integer',
     ];
 
+    /** OLTs connected to this port (set on the OLT's edit page). */
+    public function olts()
+    {
+        return $this->hasMany(Olt::class, 'uplink_port_id');
+    }
+
+    /** "OLT" in the port's name, description or alias (e.g. Chitipu_OLT, sfp-sfpplus2-OLT-Cdata). */
+    public function namedAsOlt(): bool
+    {
+        return (bool) preg_match('/(^|[^a-z])olt/i', implode(' ', array_filter([$this->name, $this->descr, $this->alias])));
+    }
+
     public function networkSwitch()
     {
         return $this->belongsTo(NetworkSwitch::class);

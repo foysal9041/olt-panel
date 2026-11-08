@@ -24,7 +24,8 @@ class DeviceCpuRecorder
 
     /**
      * Read the CPU % and set it on the device (not saved — the poller
-     * saves the device). Null when the device doesn't report one.
+     * saves the device), with the busiest single core / CPU (cpu_core_max)
+     * and how many there are. Null when the device doesn't report one.
      */
     public function measure(SnmpClient $snmp, NetworkSwitch $switch): ?int
     {
@@ -49,6 +50,8 @@ class DeviceCpuRecorder
 
             $switch->cpu_source = $source;
             $switch->cpu_percent = $cpu;
+            $switch->cpu_core_max = max(0, min(100, max($values)));
+            $switch->cpu_cores = count($values);
             $switch->cpu_at = now();
 
             return $cpu;
@@ -57,6 +60,8 @@ class DeviceCpuRecorder
         // The remembered MIB stopped answering: try them all next poll. Nothing at all: "none".
         $switch->cpu_source = $known ? null : 'none';
         $switch->cpu_percent = null;
+        $switch->cpu_core_max = null;
+        $switch->cpu_cores = null;
 
         return null;
     }

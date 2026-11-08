@@ -4,14 +4,7 @@
 
 @section('content_header')
 <x-noc.header :title="$type === 'router' ? 'Routers' : ($type === 'switch' ? 'Switches' : 'Switches & Routers')" :icon="$type === 'router' ? 'fas fa-route' : 'fas fa-server'"
-    :subtitle="$type === 'router' ? 'SNMP-monitored routers: interfaces, VLANs, traffic, CPU and memory' : ($type === 'switch' ? 'SNMP-monitored switches: ports, traffic and SFP transceivers' : 'Every SNMP-monitored switch and router')">
-    @if ($type !== 'router')
-        <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add Switch</a>
-    @endif
-    @if ($type !== 'switch')
-        <a href="{{ route('routers.create') }}" class="btn {{ $type === 'router' ? 'btn-primary' : 'btn-outline-primary' }} btn-sm"><i class="fas fa-plus"></i> Add Router</a>
-    @endif
-</x-noc.header>
+    :subtitle="$type === 'router' ? 'SNMP-monitored routers: interfaces, VLANs, traffic, CPU and memory' : ($type === 'switch' ? 'SNMP-monitored switches: ports, traffic and SFP transceivers' : 'Every SNMP-monitored switch and router')" />
 @stop
 
 @section('content')
@@ -33,29 +26,36 @@
     <a href="{{ route('switches.index', ['type' => 'all']) }}" class="btn {{ $type === null ? 'btn-primary' : 'btn-outline-secondary' }}"><i class="fas fa-list"></i> All devices ({{ $counts->sum() }})</a>
 </div>
 
-<div class="row" data-live="sw-stats">
+<div class="acct-stats is-compact" data-live="sw-stats">
     @foreach ([
-        ['Devices', $summary['total'], 'bg-info', 'fas fa-server'],
-        ['Up', $summary['up'], 'bg-success', 'fas fa-check'],
-        ['Down', $summary['down'], 'bg-danger', 'fas fa-times'],
-        ['Ports Down (enabled)', $summary['ports_down'], 'bg-warning', 'fas fa-plug'],
-    ] as [$label, $value, $bg, $icon])
-        <div class="col-lg-3 col-6">
-            <div class="info-box">
-                <span class="info-box-icon {{ $bg }}"><i class="{{ $icon }}"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">{{ $label }}</span>
-                    <span class="info-box-number">{{ $value }}</span>
-                </div>
-            </div>
+        [$type === 'router' ? 'Routers' : ($type === 'switch' ? 'Switches' : 'Devices'), $summary['total'], '#0284c7', $type === 'router' ? 'fas fa-route' : 'fas fa-server'],
+        ['Up', $summary['up'], '#16a34a', 'fas fa-check'],
+        ['Down', $summary['down'], '#e11d48', 'fas fa-times'],
+        ['Ports Down (enabled)', $summary['ports_down'], '#d97706', 'fas fa-plug'],
+    ] as [$label, $value, $accent, $icon])
+        <div class="acct-stat" style="--accent: {{ $accent }}">
+            <div class="acct-stat-label">{{ \App\Support\Ui::t($label) }} <i class="{{ $icon }}"></i></div>
+            <div class="acct-stat-value {{ $label === 'Down' && $value ? 'text-danger' : '' }}">{{ $value }}</div>
         </div>
     @endforeach
 </div>
 
+{{-- Moved beside the table's search box by the script below. --}}
+@unless (auth()->user()->isViewer())
+    <div id="table-actions" class="d-flex justify-content-end mb-2" style="gap:.4rem">
+        @if ($type !== 'router')
+            <a href="{{ route('switches.create') }}" class="btn btn-primary btn-sm text-nowrap"><i class="fas fa-plus"></i> Add Switch</a>
+        @endif
+        @if ($type !== 'switch')
+            <a href="{{ route('routers.create') }}" class="btn {{ $type === 'router' ? 'btn-primary' : 'btn-outline-primary' }} btn-sm text-nowrap"><i class="fas fa-plus"></i> Add Router</a>
+        @endif
+    </div>
+@endunless
+
 <div class="card card-outline card-primary">
 
     <div class="card-header">
-        <h3 class="card-title">All Switches</h3>
+        <h3 class="card-title">{{ \App\Support\Ui::t($type === 'router' ? 'All Routers' : ($type === 'switch' ? 'All Switches' : 'All Switches & Routers')) }}</h3>
     </div>
 
     <div class="card-body p-0 table-responsive">
@@ -173,6 +173,15 @@ $(function () {
         if (!$.fn.dataTable || !$.fn.dataTable.isDataTable($table)) return;
 
         var dt = $table.DataTable();
+
+        // "Add Router / Switch" beside the search box.
+        var $filter = $(dt.table().container()).find('.dataTables_filter');
+        var $actions = $('#table-actions');
+        if ($filter.length && $actions.length) {
+            $filter.addClass('has-actions').append($actions.children());
+            $actions.remove();
+        }
+
         dt.on('draw.dt', function () {
             var start = dt.page.info().start;
             dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each(function (cell, i) {

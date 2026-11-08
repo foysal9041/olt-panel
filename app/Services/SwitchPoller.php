@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\NetworkSwitch;
 use App\Models\NocAlertSetting;
+use App\Models\Olt;
 use App\Models\SwitchEvent;
 use App\Models\SwitchPort;
 use App\Models\SwitchPortReading;
@@ -57,6 +58,12 @@ class SwitchPoller
     /** Utilisation must fall this many points below the threshold to clear its alarm. */
     protected const UTIL_HYSTERESIS = 10;
 
+    /** CPU "back to normal" this many points below the threshold. */
+    protected const CPU_HYSTERESIS = 10;
+
+    /** @var \Illuminate\Support\Collection<int, Olt>|null  OLTs (name, IP, zone, uplink), read once per poll */
+    protected ?\Illuminate\Support\Collection $olts = null;
+
     /** @var list<array{event: SwitchEvent, notify: bool}> */
     protected array $events = [];
 
@@ -105,7 +112,7 @@ class SwitchPoller
                 }
             }
             $this->storeTraffic($switch, $traffic);
-            $this->recordCpu($snmp, $switch);
+            $this->recordCpu($snmp, $switch, $now, $settings);
             $this->recordHealth($snmp, $switch, $snmpMs);
 
             $switch->last_error = null;
@@ -231,16 +238,7 @@ class SwitchPoller
                 $port->oper_status = $newOper;
                 $port->save();
 
-                $adminNote = $newAdmin === 2 ? ' (administratively shut down)' : '';
-
-                $this->event(
-                    $switch,
-                    $port,
-                    $isUp ? 'port_up' : 'port_down',
-                    "Port {$this->portLabel($port)} on {$switch->name} is " . ($isUp ? 'UP' : 'DOWN') . $adminNote,
-                    $now,
-                    $settings->alert_port_status && $port->notify
-                );
+                $this->portStatusEvent($switch, $port, $isUp, $newAdmin, $now, $settings);
             } else {
                 $port->oper_status = $newOper;
                 $port->save();
@@ -253,6 +251,35 @@ class SwitchPoller
         $switch->ports()->whereNotIn('if_index', $seen)->delete();
 
         return $ports;
+    }
+
+    /** A port went up or down: an "OLT uplink" event when an OLT hangs off it, else a plain port event. */
+    protected function portStatusEvent(NetworkSwitch $switch, SwitchPort $port, bool $isUp, ?int $newAdmin, Carbon $now, NocAlertSetting $settings): void
+    {
+        $adminNote = $newAdmin === 2 ? ' (administratively shut down)' : '';
+        $olts = $this->oltsOn($port);
+
+        if ($olts !== null) {
+            // An OLT hangs off this port: its own alert, on even when port alerts are off.
+            $names = $olts->isNotEmpty() ? $olts->pluck('name')->implode(', ') : 'OLT';
+            $this->event(
+                $switch,
+                $port,
+                $isUp ? 'olt_uplink_up' : 'olt_uplink_down',
+                "OLT uplink {$this->portLabel($port)} on {$switch->name} is " . ($isUp ? 'UP' : 'DOWN') . " — {$names}" . $adminNote,
+                $now,
+                $settings->alert_olt_uplink && $port->notify
+            );
+        } else {
+            $this->event(
+                $switch,
+                $port,
+                $isUp ? 'port_up' : 'port_down',
+                "Port {$this->portLabel($port)} on {$switch->name} is " . ($isUp ? 'UP' : 'DOWN') . $adminNote,
+                $now,
+                $settings->alert_port_status && $port->notify
+            );
+        }
     }
 
     // ---- Traffic -------------------------------------------------------------
@@ -323,16 +350,88 @@ class SwitchPoller
         }
     }
 
-    /** CPU load for the device's CPU graph; a device that won't say must not stop the poll. */
-    protected function recordCpu(SnmpClient $snmp, NetworkSwitch $switch): void
+    /** CPU load for the device's CPU graph and alerts; a device that won't say must not stop the poll. */
+    protected function recordCpu(SnmpClient $snmp, NetworkSwitch $switch, Carbon $now, NocAlertSetting $settings): void
     {
         try {
             if (($cpu = $this->cpu->measure($snmp, $switch)) !== null) {
                 $this->cpu->store($switch, $cpu);
+                $this->checkCpu($switch, $now, $settings);
             }
         } catch (\Throwable $e) {
             report($e);
         }
+    }
+
+    /**
+     * Total CPU at or above its level, or the busiest single core / CPU at or
+     * above its own, for cpu_minutes polls in a row raises "High CPU" (routers;
+     * switches too when cpu_switches is on). Levels: the device's own, else
+     * Settings → Telegram. It clears once both are CPU_HYSTERESIS points below.
+     */
+    protected function checkCpu(NetworkSwitch $switch, Carbon $now, NocAlertSetting $settings): void
+    {
+        if (! $switch->isRouter() && ! $settings->cpu_switches) {
+            $switch->cpu_streak = 0;
+            $switch->cpu_alarm = false;
+
+            return;
+        }
+        [$totalAt, $coreAt] = $switch->cpuAlertLevels($settings);
+        $needed = max(1, (int) ($settings->cpu_minutes ?: 3));
+        $total = (int) $switch->cpu_percent;
+        $core = (int) ($switch->cpu_core_max ?? $switch->cpu_percent);
+        $line = $this->cpuLine($switch);
+        $levels = "total {$totalAt}%" . ($switch->cpu_cores > 1 ? " / one core {$coreAt}%" : '');
+
+        if ($total >= $totalAt || ($switch->cpu_cores > 1 && $core >= $coreAt)) {
+            $switch->cpu_streak = min(255, (int) $switch->cpu_streak + 1);
+            if (! $switch->cpu_alarm && $switch->cpu_streak >= $needed) {
+                $switch->cpu_alarm = true;
+                $this->event($switch, null, 'cpu_high', "High CPU on {$switch->name}: {$line} (alert at {$levels} for {$needed} min)", $now, (bool) $settings->alert_cpu);
+            }
+        } else {
+            $switch->cpu_streak = 0;
+            if ($switch->cpu_alarm && $total < $totalAt - self::CPU_HYSTERESIS && ($switch->cpu_cores <= 1 || $core < $coreAt - self::CPU_HYSTERESIS)) {
+                $switch->cpu_alarm = false;
+                $this->event($switch, null, 'cpu_normal', "CPU back to normal on {$switch->name}: {$line}", $now, (bool) $settings->alert_cpu);
+            }
+        }
+    }
+
+    /** "total 34% · busiest core 92% (of 36)" */
+    protected function cpuLine(NetworkSwitch $switch): string
+    {
+        $line = "total {$switch->cpu_percent}%";
+        if ($switch->cpu_cores > 1 && $switch->cpu_core_max !== null) {
+            $line .= " · busiest " . ($switch->cpu_source === 'hr' ? 'core' : 'CPU') . " {$switch->cpu_core_max}% (of {$switch->cpu_cores})";
+        }
+
+        return $line;
+    }
+
+    /**
+     * The OLTs on a port, or null when no OLT hangs off it: OLTs linked to
+     * it on their edit page, else "OLT" in the port's name / description
+     * (then the OLT whose name matches the port's description, if exactly one).
+     *
+     * @return \Illuminate\Support\Collection<int, Olt>|null
+     */
+    protected function oltsOn(SwitchPort $port): ?\Illuminate\Support\Collection
+    {
+        $this->olts ??= Olt::get(['id', 'name', 'ip', 'zone', 'uplink_port_id']);
+        $linked = $this->olts->where('uplink_port_id', $port->id)->values();
+        if ($linked->isNotEmpty()) {
+            return $linked;
+        }
+        if (! $port->namedAsOlt()) {
+            return null;
+        }
+        $norm = fn (?string $s) => preg_replace('/[^a-z0-9]/', '', strtolower((string) $s));
+        $alias = $norm($port->alias ?: $port->name);
+        $match = $this->olts->filter(fn ($o) => $alias !== '' && $norm($o->name) === $alias);
+
+        return $match->count() === 1 ? $match->values() : collect();
     }
 
     protected function storeTraffic(NetworkSwitch $switch, array $samples): void
@@ -465,6 +564,8 @@ class SwitchPoller
             'switch_down' => '🚨', 'switch_up' => '✅',
             'rx_low' => '⚠️', 'rx_normal' => '🔵',
             'util_high' => '📈', 'util_normal' => '📉',
+            'olt_uplink_down' => '🔴', 'olt_uplink_up' => '🟢',
+            'cpu_high' => '🔥', 'cpu_normal' => '✅',
         ];
 
         $lines = [];
@@ -476,6 +577,22 @@ class SwitchPoller
 
             $block = ($icons[$event->type] ?? '•') . ' <b>' . e(strtoupper($title)) . '</b>';
             $block .= "\n🖧 <b>" . e($switch->name) . '</b> <code>' . e($switch->ip) . '</code>';
+
+            if (in_array($event->type, ['cpu_high', 'cpu_normal'], true)) {
+                [$totalAt, $coreAt] = $switch->cpuAlertLevels($settings);
+                $block .= "\n🖥 CPU: <b>" . e($this->cpuLine($switch)) . '</b>';
+                $block .= "\n📏 Alert at total {$totalAt}%" . ($switch->cpu_cores > 1 ? " · one core {$coreAt}%" : '');
+            }
+
+            if ($port && in_array($event->type, ['olt_uplink_down', 'olt_uplink_up'], true)) {
+                $olts = $this->oltsOn($port) ?? collect();
+                foreach ($olts as $olt) {
+                    $block .= "\n📡 OLT: <b>" . e($olt->name) . '</b> <code>' . e($olt->ip) . '</code>' . ($olt->zone ? ' · ' . e($olt->zone) : '');
+                }
+                if ($olts->isEmpty()) {
+                    $block .= "\n📡 OLT (from the port's description)";
+                }
+            }
 
             if ($port) {
                 $block .= "\n🔌 Port: <b>" . e($port->name ?: $port->descr) . '</b>';

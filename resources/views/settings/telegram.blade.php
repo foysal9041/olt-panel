@@ -80,6 +80,14 @@
                     </div>
 
                     <div class="custom-control custom-checkbox">
+                        <input type="hidden" name="alert_olt_uplink" value="0">
+                        <input type="checkbox" class="custom-control-input" id="alert_olt_uplink" name="alert_olt_uplink" value="1"
+                               @checked(old('alert_olt_uplink', $settings->alert_olt_uplink ?? true))>
+                        <label class="custom-control-label" for="alert_olt_uplink">An OLT's uplink port goes DOWN or comes back UP</label>
+                        <small class="form-text text-muted mt-0">The switch / router port an OLT is connected to: set on the OLT's edit page, or found by "OLT" in the port's name or description. Sent even when port alerts above are off.</small>
+                    </div>
+
+                    <div class="custom-control custom-checkbox">
                         <input type="hidden" name="alert_switch_status" value="0">
                         <input type="checkbox" class="custom-control-input" id="alert_switch_status" name="alert_switch_status" value="1"
                                @checked(old('alert_switch_status', $settings->alert_switch_status))>
@@ -112,6 +120,39 @@
                             <div class="input-group-append"><span class="input-group-text">min</span></div>
                         </div>
                         <small class="text-muted w-100">Busier direction (in or out) against the link speed, every minute; "back to normal" once it falls 10 points below.</small>
+                    </div>
+
+                    <div class="d-flex flex-wrap align-items-center mb-3" style="gap:.35rem">
+                        <div class="custom-control custom-checkbox">
+                            <input type="hidden" name="alert_cpu" value="0">
+                            <input type="checkbox" class="custom-control-input" id="alert_cpu" name="alert_cpu" value="1"
+                                   @checked(old('alert_cpu', $settings->alert_cpu ?? true))>
+                            <label class="custom-control-label" for="alert_cpu">A router's total CPU stays at or above</label>
+                        </div>
+                        <div class="input-group input-group-sm" style="width:6.5rem">
+                            <input type="number" name="cpu_threshold" min="10" max="100" class="form-control @error('cpu_threshold') is-invalid @enderror"
+                                   value="{{ old('cpu_threshold', $settings->cpu_threshold ?? 70) }}" aria-label="Total CPU alert level">
+                            <div class="input-group-append"><span class="input-group-text">%</span></div>
+                        </div>
+                        <span>or any single core at or above</span>
+                        <div class="input-group input-group-sm" style="width:6.5rem">
+                            <input type="number" name="cpu_core_threshold" min="10" max="100" class="form-control @error('cpu_core_threshold') is-invalid @enderror"
+                                   value="{{ old('cpu_core_threshold', $settings->cpu_core_threshold ?? 70) }}" aria-label="Single core alert level">
+                            <div class="input-group-append"><span class="input-group-text">%</span></div>
+                        </div>
+                        <span>for</span>
+                        <div class="input-group input-group-sm" style="width:6.5rem">
+                            <input type="number" name="cpu_minutes" min="1" max="60" class="form-control @error('cpu_minutes') is-invalid @enderror"
+                                   value="{{ old('cpu_minutes', $settings->cpu_minutes ?? 3) }}" aria-label="CPU minutes">
+                            <div class="input-group-append"><span class="input-group-text">min</span></div>
+                        </div>
+                        <div class="custom-control custom-checkbox ml-1">
+                            <input type="hidden" name="cpu_switches" value="0">
+                            <input type="checkbox" class="custom-control-input" id="cpu_switches" name="cpu_switches" value="1"
+                                   @checked(old('cpu_switches', $settings->cpu_switches ?? false))>
+                            <label class="custom-control-label" for="cpu_switches">switches too</label>
+                        </div>
+                        <small class="text-muted w-100">Checked every minute over SNMP; "back to normal" once both fall 10 points below. A router can have its own levels on its edit page.</small>
                     </div>
 
                     <p class="small text-muted mb-3">

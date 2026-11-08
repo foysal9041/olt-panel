@@ -18,7 +18,7 @@ Built with Laravel 12 (PHP 8.2+), MariaDB/MySQL, AdminLTE 3 and Chart.js.
 | **Graph dashboards** | Your own dashboards of chosen interfaces and devices. Drag graphs into place, resize them by the corner, share by role |
 | **Weathermaps** | Network maps with links coloured by live traffic |
 | **Latency checker** | Ping graphs for chosen targets |
-| **Alerts** | Telegram and WhatsApp alerts for OLTs, links, ports and devices going down |
+| **Alerts** | Telegram and WhatsApp alerts for: links, ports and devices going down; an OLT's uplink port going down (with the OLT's name); a router's CPU, total or any single core, staying above a threshold (70% by default); ports running near full |
 | **HR & attendance** | Pushed live from ZKTeco F18 devices. Shifts with end times, office hours, late time and extra duty, overtime on off days, leave, absence report, HR letters, ID cards |
 | **Accounts** | Income and expenses, daily cash book, salary sheet, zone settlement (Excel · bKash), bandwidth billing, net profit and partner shares. Invoices and money receipts can be emailed as PDFs |
 | **Inventory** | Products, stock in and out, and company assets |

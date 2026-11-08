@@ -204,7 +204,7 @@
                     @else
                         <ul class="timeline-mini">
                             @foreach ($events as $event)
-                                @php [$label, $color] = \App\Models\SwitchEvent::TYPES[$event->type] ?? [$event->type, 'secondary']; @endphp
+                                @php [, $color] = \App\Models\SwitchEvent::TYPES[$event->type] ?? [$event->type, 'secondary']; $label = $event->label(); @endphp
                                 <li style="--dot: {{ $eventColors[$color] ?? '#94a3b8' }}">
                                     <div class="tl-time">{{ $event->occurred_at->format('d M, h:i A') }} · {{ $event->occurred_at->diffForHumans() }}</div>
                                     <div class="tl-text"><strong>{{ $label }}</strong> — {{ $event->message }}</div>

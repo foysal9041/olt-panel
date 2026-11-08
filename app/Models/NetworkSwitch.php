@@ -38,6 +38,8 @@ class NetworkSwitch extends Model
         'snmp_port',
         'is_active',
         'notify',
+        'cpu_alert_total',
+        'cpu_alert_core',
         'dom_rx_oid',
         'dom_tx_oid',
         'dom_temp_oid',
@@ -56,6 +58,11 @@ class NetworkSwitch extends Model
             'status' => 'integer',
             'last_polled_at' => 'datetime',
             'cpu_percent' => 'integer',
+            'cpu_core_max' => 'integer',
+            'cpu_cores' => 'integer',
+            'cpu_alarm' => 'boolean',
+            'cpu_alert_total' => 'integer',
+            'cpu_alert_core' => 'integer',
             'cpu_at' => 'datetime',
             'mem_percent' => 'integer',
             'mem_total_bytes' => 'integer',
@@ -69,7 +76,7 @@ class NetworkSwitch extends Model
         return [
             'community', 'created_at', 'updated_at', 'status', 'fail_count',
             'sys_name', 'sys_descr', 'uptime_seconds', 'last_polled_at', 'last_error',
-            'cpu_percent', 'cpu_source', 'cpu_at', 'mem_percent', 'mem_source', 'mem_total_bytes', 'snmp_ms', 'sensors_at',
+            'cpu_percent', 'cpu_core_max', 'cpu_cores', 'cpu_streak', 'cpu_alarm', 'cpu_source', 'cpu_at', 'mem_percent', 'mem_source', 'mem_total_bytes', 'snmp_ms', 'sensors_at',
         ];
     }
 
@@ -117,6 +124,20 @@ class NetworkSwitch extends Model
     public function hasCurrentCpu(): bool
     {
         return $this->cpu_percent !== null && $this->cpu_at && $this->cpu_at->gt(now()->subMinutes(5));
+    }
+
+    /**
+     * CPU alert levels [total %, single core %]: this device's own, else
+     * the ones in Settings → Telegram.
+     *
+     * @return array{0: int, 1: int}
+     */
+    public function cpuAlertLevels(NocAlertSetting $settings): array
+    {
+        return [
+            $this->cpu_alert_total ?: max(1, (int) ($settings->cpu_threshold ?: 70)),
+            $this->cpu_alert_core ?: max(1, (int) ($settings->cpu_core_threshold ?: $settings->cpu_threshold ?: 70)),
+        ];
     }
 
     public function isRouter(): bool

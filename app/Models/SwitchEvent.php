@@ -17,6 +17,10 @@ class SwitchEvent extends Model
         'rx_normal'   => ['Rx Normal', 'info'],
         'util_high'   => ['High Utilisation', 'warning'],
         'util_normal' => ['Utilisation Normal', 'info'],
+        'olt_uplink_down' => ['OLT Uplink Down', 'danger'],
+        'olt_uplink_up' => ['OLT Uplink Up', 'success'],
+        'cpu_high' => ['High CPU', 'warning'],
+        'cpu_normal' => ['CPU Normal', 'info'],
     ];
 
     protected $fillable = [

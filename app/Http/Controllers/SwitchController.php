@@ -321,6 +321,8 @@ class SwitchController extends Controller
             'dom_temp_oid' => ['nullable', 'regex:/^\.?\d+(\.\d+)+$/', 'max:255'],
             'dom_divisor' => 'required|integer|min:1|max:1000000',
             'dom_power_unit' => 'required|in:dbm,mw,uw',
+            'cpu_alert_total' => 'nullable|integer|min:10|max:100',
+            'cpu_alert_core' => 'nullable|integer|min:10|max:100',
         ], [
             'ip.unique' => 'A switch or router with this IP address already exists.',
             'dom_rx_oid.regex' => 'OIDs must be numeric, e.g. 1.3.6.1.4.1.3320.9.63.1.7.1.3',

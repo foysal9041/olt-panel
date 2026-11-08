@@ -93,6 +93,9 @@ Route::middleware(['auth', 'can:access-olt'])->group(function () {
     Route::resource('olt', OltController::class)
         ->middleware('can:access-olt-manage');
 
+    Route::post('/olt/{olt}/reveal', [OltController::class, 'reveal'])
+        ->name('olt.reveal')->middleware('throttle:10,1,olt-reveal');
+
     Route::get('/olt/{olt}/ping',
         [OltController::class,'ping']
     )->name('olts.ping')->middleware('can:access-olt-manage');
